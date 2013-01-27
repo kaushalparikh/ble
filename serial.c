@@ -8,8 +8,20 @@
 #include <termios.h>
 #include <fcntl.h>
 
+#include <libudev.h>
+#include <libusb.h>
+
 /* Local/project headers */
 #include "serial.h"
+
+/* Local structures */
+typedef struct
+{
+  libusb_device_handle * libusb_handle;
+  struct udev_device   * libudev_device;
+  char                 * node;
+  int                    file_desc;
+} serial_device_t;
 
 /* Verbose output */
 #define DEBUG_VERBOSE
@@ -18,18 +30,17 @@
 #define SERIAL_TIMEOUT  (1000)
 
 /* Global variables */
-char * serial_device = NULL;
-int serial_device_handle = -1;
-
-
-void uart_device (char * device)
+serial_device_t serial_device =
 {
-  if (serial_device != NULL)
-  {
-    free (serial_device);
-    serial_device = NULL;
-  }
-  
+  .libusb_handle  = NULL,
+  .libudev_device = NULL,
+  .node           = NULL,
+  .file_desc      = -1
+};
+
+
+int uart_device (char * vendor_id, char * product_id)
+{
   serial_device = (char *)malloc ((strlen (device)) + 1);
   strcpy (serial_device, device);
 }
