@@ -1,7 +1,9 @@
 #ifndef __SERIAL_H__
 #define __SERIAL_H__
 
-extern void uart_device (char * device);
+extern int uart_init (char *vendor_id, char *product_id);
+
+extern void uart_deinit (void);
 
 extern int uart_open (void);
 
