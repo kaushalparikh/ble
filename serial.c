@@ -45,22 +45,22 @@ static serial_device_t serial_device =
 
 int uart_init (char *vendor_id, char *product_id)
 {
-	struct udev *udev = NULL;
-	struct udev_enumerate *udev_enumerate = NULL;
-	struct udev_list_entry *udev_list;
+  struct udev *udev = NULL;
+  struct udev_enumerate *udev_enumerate = NULL;
+  struct udev_list_entry *udev_list;
   int status = -1;
 
-	/* Create the udev context */
-	udev = udev_new ();
-	if (udev != NULL)
+  /* Create the udev context */
+  udev = udev_new ();
+  if (udev != NULL)
   {
-	  /* Create the udev enumerate object */
-	  udev_enumerate = udev_enumerate_new (udev);
+    /* Create the udev enumerate object */
+    udev_enumerate = udev_enumerate_new (udev);
     if (udev_enumerate != NULL)
     {
-	    /* Create a list of the devices in the 'tty' subsystem */
+      /* Create a list of the devices in the 'tty' subsystem */
       udev_enumerate_add_match_subsystem (udev_enumerate, "tty");
-	    udev_enumerate_scan_devices (udev_enumerate);
+      udev_enumerate_scan_devices (udev_enumerate);
 
       udev_list = udev_enumerate_get_list_entry (udev_enumerate);
       
@@ -70,35 +70,35 @@ int uart_init (char *vendor_id, char *product_id)
          be opened */
       while ((udev_list != NULL) && (status < 0))
       {
-	      struct udev_device *udev_dev, *udev_dev_parent;
-		    const char *udev_node, *dev_node;
-		
+        struct udev_device *udev_dev, *udev_dev_parent;
+        const char *udev_node, *dev_node;
+    
         /* Get the filename of the /sys entry for the device
-		       and create a udev_device object (dev) representing it
-		       usb_device_get_devnode() returns the path to the device node
-		       itself in /dev */
-		    udev_node = udev_list_entry_get_name (udev_list);
-		    udev_dev = udev_device_new_from_syspath (udev, udev_node);
-		
+           and create a udev_device object (dev) representing it
+           usb_device_get_devnode() returns the path to the device node
+           itself in /dev */
+        udev_node = udev_list_entry_get_name (udev_list);
+        udev_dev = udev_device_new_from_syspath (udev, udev_node);
+    
            /* The device pointed to by dev contains information about
-		          the tty device. In order to get information about the
-		          USB device, get the parent device with the
-		          subsystem/devtype pair of "usb"/"usb_device". This will
-		          be several levels up the tree, but the function will find
-		          it */
-		    udev_dev_parent = udev_device_get_parent_with_subsystem_devtype (udev_dev,
-		                                                                     "usb",
-		                                                                     "usb_device");
-		
+              the tty device. In order to get information about the
+              USB device, get the parent device with the
+              subsystem/devtype pair of "usb"/"usb_device". This will
+              be several levels up the tree, but the function will find
+              it */
+        udev_dev_parent = udev_device_get_parent_with_subsystem_devtype (udev_dev,
+                                                                         "usb",
+                                                                         "usb_device");
+    
         if (udev_dev_parent != NULL)
         {
-		      /* From here, we can call get_sysattr_value() for each file
-		         in the device's /sys entry. The strings passed into these
-		         functions (idProduct, idVendor, serial, etc.) correspond
-		         directly to the files in the directory which represents
-		         the USB device. Note that USB strings are Unicode, UCS2
-		         encoded, but the strings returned from
-		         udev_device_get_sysattr_value() are UTF-8 encoded */
+          /* From here, we can call get_sysattr_value() for each file
+             in the device's /sys entry. The strings passed into these
+             functions (idProduct, idVendor, serial, etc.) correspond
+             directly to the files in the directory which represents
+             the USB device. Note that USB strings are Unicode, UCS2
+             encoded, but the strings returned from
+             udev_device_get_sysattr_value() are UTF-8 encoded */
           if (((strcmp (vendor_id, (udev_device_get_sysattr_value (udev_dev_parent, "idVendor")))) == 0) &&
               ((strcmp (product_id, (udev_device_get_sysattr_value (udev_dev_parent, "idProduct")))) == 0))
           {
@@ -140,11 +140,11 @@ int uart_init (char *vendor_id, char *product_id)
               printf ("Can't open %s\n", dev_node);
             }
           }
-		      
+          
           /* Unreference parent, it will internally unreference child,
              i.e. udev_dev as well */
           udev_device_unref (udev_dev_parent);
-		    }
+        }
         else
         {
           /* Device parent not found, so the device has to be
@@ -156,19 +156,19 @@ int uart_init (char *vendor_id, char *product_id)
         udev_list = udev_list_entry_get_next (udev_list);
       }
 
-	    udev_enumerate_unref (udev_enumerate);
+      udev_enumerate_unref (udev_enumerate);
     }
     else
     {
-		  printf ("Can't create udev enumerate object\n");
+      printf ("Can't create udev enumerate object\n");
     }
     
     udev_unref (udev);
   }
   else
   {
-		printf ("Can't create udev context\n");
-	}
+    printf ("Can't create udev context\n");
+  }
 
   return status;
 }
