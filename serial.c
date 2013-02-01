@@ -80,12 +80,12 @@ int uart_init (char *vendor_id, char *product_id)
         udev_node = udev_list_entry_get_name (udev_list);
         udev_dev = udev_device_new_from_syspath (udev, udev_node);
     
-           /* The device pointed to by dev contains information about
-              the tty device. In order to get information about the
-              USB device, get the parent device with the
-              subsystem/devtype pair of "usb"/"usb_device". This will
-              be several levels up the tree, but the function will find
-              it */
+        /* The device pointed to by dev contains information about
+           the tty device. In order to get information about the
+           USB device, get the parent device with the
+           subsystem/devtype pair of "usb"/"usb_device". This will
+           be several levels up the tree, but the function will find
+           it */
         udev_dev_parent = udev_device_get_parent_with_subsystem_devtype (udev_dev,
                                                                          "usb",
                                                                          "usb_device");
@@ -107,37 +107,31 @@ int uart_init (char *vendor_id, char *product_id)
             dev_node = udev_device_get_devnode (udev_dev);
             printf ("Found %s\n", dev_node);
 
-            serial_device.file_desc = open (dev_node, (O_RDWR | O_NOCTTY /*| O_NDELAY*/));
+            serial_device.node = (char *)dev_node;
+            serial_device.file_desc = uart_open ();
+
             if (serial_device.file_desc > 0)
             {
-              if ((lockf (serial_device.file_desc, F_TLOCK, 0)) == 0)
-              {
-                serial_device.node = (char *)malloc ((strlen (dev_node)) + 1);
-                strcpy (serial_device.node, dev_node);
-                
-                serial_device.vendor_id = (char *)malloc ((strlen (vendor_id)) + 1);
-                strcpy (serial_device.vendor_id, vendor_id);
-                
-                serial_device.product_id = (char *)malloc ((strlen (product_id)) + 1);
-                strcpy (serial_device.product_id, product_id);
+              serial_device.node = (char *)malloc ((strlen (dev_node)) + 1);
+              strcpy (serial_device.node, dev_node);
+              
+              serial_device.vendor_id = (char *)malloc ((strlen (vendor_id)) + 1);
+              strcpy (serial_device.vendor_id, vendor_id);
+              
+              serial_device.product_id = (char *)malloc ((strlen (product_id)) + 1);
+              strcpy (serial_device.product_id, product_id);
 
-                serial_device.usb_bus_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
-                                                                                 "busnum"));
-                serial_device.usb_dev_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
-                                                                                 "devnum"));
+              serial_device.usb_bus_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
+                                                                               "busnum"));
+              serial_device.usb_dev_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
+                                                                               "devnum"));
 
-                status = 0;
-              }
-              else
-              {
-                printf ("Can't lock %s\n", dev_node);
-                close (serial_device.file_desc);
-                serial_device.file_desc = -1;
-              }
+              status = 0;
             }
             else
             {
-              printf ("Can't open %s\n", dev_node);
+              serial_device.node = NULL;
+              serial_device.file_desc = -1;
             }
           }
           
@@ -178,11 +172,7 @@ void uart_deinit (void)
   serial_device.usb_dev_num = -1;
   serial_device.usb_bus_num = -1;
 
-  if (serial_device.file_desc > 0)
-  {
-    close (serial_device.file_desc);
-    serial_device.file_desc = -1;
-  }
+  uart_close ();
   
   if (serial_device.node != NULL)
   {

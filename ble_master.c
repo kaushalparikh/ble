@@ -3,42 +3,37 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "serial.h"
 #include "ble.h"
 
 
 void master_loop (void)
 {
-  if ((ble_scan ()) >= 0)
+  if ((ble_scan ()) > 0)
   {
-    while ((ble_read_message ()) >= 0)
+    while ((ble_read_message (NULL, NULL)) >= 0)
     {
     }
-  }
-  else
-  {
-    printf ("BLE scan request failed\n");
   }
 }
 
 int main (int argc, char * argv[])
 {
-  int status;
+  int status = -1;
+  int init_attempt = 0;
 
-  status = uart_init ("2458", "0001");
-
-  if (status == 0)
+  do
   {
-    /* Reset BLE */
-    status = ble_reset ();
+    init_attempt++;
+    printf ("BLE init attempt %d\n", init_attempt);
+    
+    status = ble_init ();
+  } while ((status <= 0) && (init_attempt < 10));
 
-    if (status == 0)
-    {
-      master_loop ();
-    }
+  if (status > 0)
+  {
+    master_loop ();
+    ble_deinit ();
   }
-
-  uart_deinit ();
 
   return 0;
 }
