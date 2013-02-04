@@ -6,9 +6,10 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#if 0
+
 #include <libudev.h>
 #include <libusb.h>
-
 
 int libudev_main (char * vendor_id, char * product_id)
 {
@@ -168,4 +169,47 @@ int main (void)
 
   return 0;
 }
+
+#else
+
+#include <sys/ioctl.h>
+#include <linux/usbdevice_fs.h>
+
+int main (int argc, char **argv)
+
+{
+  struct usbdevfs_ioctl param;
+	const char *filename;
+	int fd;
+
+	filename = argv[1];
+	fd = open (filename, O_WRONLY);
+  sleep (1);
+	
+  memset (&param, 0, sizeof (param));
+  
+#if 0
+  param.ifno       = 0;
+  param.ioctl_code = USBDEVFS_DISCONNECT;
+  param.data       = NULL;
+  ioctl (fd, USBDEVFS_IOCTL, &param);
+  param.ifno       = 1;
+	ioctl (fd, USBDEVFS_IOCTL, &param);
+  sleep (1);
+#else
+  param.ifno       = 0;
+  param.ioctl_code = USBDEVFS_CONNECT;
+  param.data       = NULL;
+  ioctl (fd, USBDEVFS_IOCTL, &param);
+  param.ifno       = 1;
+	ioctl (fd, USBDEVFS_IOCTL, &param);
+  sleep (1);
+#endif
+  
+  close (fd);
+
+	return 0;
+}
+
+#endif
 

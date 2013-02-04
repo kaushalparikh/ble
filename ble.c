@@ -18,6 +18,7 @@ int ble_init (void)
   
   /* Find BLE device and initialize */
   status = uart_init ("2458", "0001");
+  sleep (1);
 
   if (status == 0)
   {
@@ -30,16 +31,16 @@ int ble_init (void)
     ble_cmd_system_reset (0);
     
     /* Sleep for 0.5s (500000 us) */
-    usleep (500000);
+    sleep (1);
 
     /* Close & re-open UART after reset */
     uart_close ();
 
-    retry = 10;
+    retry = 2;
     do
     {
       /* Sleep for 0.5s (500000 us) */
-      usleep(500000);
+      sleep(1);
       retry--;
     } while (((uart_open ()) < 0) && (retry > 0));
 
