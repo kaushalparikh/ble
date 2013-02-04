@@ -17,7 +17,7 @@ int ble_init (void)
   int retry;
   
   /* Find BLE device and initialize */
-  status = uart_init ("2458", "0001");
+  status = uart_init ();
 
   if (status == 0)
   {
@@ -35,7 +35,7 @@ int ble_init (void)
     /* Close & re-open UART after reset */
     uart_close ();
 
-    retry = 10;
+    retry = 3;
     do
     {
       /* Sleep for 0.5s (500000 us) */
@@ -49,11 +49,6 @@ int ble_init (void)
     {
       /* Ping BLE */
       status = ble_hello ();
-
-      if (status <= 0)
-      {
-        uart_deinit ();
-      }
     }
     else
     {
@@ -61,6 +56,12 @@ int ble_init (void)
       
       bglib_output = NULL;
       status = -1;
+    }
+
+    if (status <= 0)
+    {
+      uart_reset ();
+      uart_deinit ();
     }
   }
   else

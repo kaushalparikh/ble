@@ -27,7 +27,7 @@ int main (int argc, char * argv[])
     printf ("BLE init attempt %d\n", init_attempt);
     
     status = ble_init ();
-  } while ((status <= 0) && (init_attempt < 10));
+  } while ((status <= 0) && (init_attempt < 2));
 
   if (status > 0)
   {
