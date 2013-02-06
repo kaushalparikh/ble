@@ -175,6 +175,32 @@ int main (void)
 #include <sys/ioctl.h>
 #include <linux/usbdevice_fs.h>
 
+int usb_disconnect (char * dev_node,
+                    int    interface)
+{
+  struct usbdevfs_ioctl param;
+  memset (&param, 0, sizeof (param));
+  
+  param.ifno       = interface;
+  param.ioctl_code = USBDEVFS_DISCONNECT;
+  param.data       = NULL;
+  
+  return ioctl (fd, USBDEVFS_IOCTL, &param);
+}
+
+int usb_connect (char * dev_node,
+                 int    interface)
+{
+  struct usbdevfs_ioctl param;
+  memset (&param, 0, sizeof (param));
+  
+  param.ifno       = interface;
+  param.ioctl_code = USBDEVFS_CONNECT;
+  param.data       = NULL;
+  
+  return ioctl (fd, USBDEVFS_IOCTL, &param);
+}
+
 int main (int argc, char **argv)
 
 {
@@ -184,28 +210,6 @@ int main (int argc, char **argv)
 
 	filename = argv[1];
 	fd = open (filename, O_WRONLY);
-  sleep (1);
-	
-  memset (&param, 0, sizeof (param));
-  
-#if 0
-  param.ifno       = 0;
-  param.ioctl_code = USBDEVFS_DISCONNECT;
-  param.data       = NULL;
-  ioctl (fd, USBDEVFS_IOCTL, &param);
-  param.ifno       = 1;
-	ioctl (fd, USBDEVFS_IOCTL, &param);
-  sleep (1);
-#else
-  param.ifno       = 0;
-  param.ioctl_code = USBDEVFS_CONNECT;
-  param.data       = NULL;
-  ioctl (fd, USBDEVFS_IOCTL, &param);
-  param.ifno       = 1;
-	ioctl (fd, USBDEVFS_IOCTL, &param);
-  sleep (1);
-#endif
-  
   close (fd);
 
 	return 0;
