@@ -7,6 +7,7 @@
 #include <malloc.h>
 #include <termios.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 
 #include <libudev.h>
 #include <libusb.h>
@@ -206,7 +207,7 @@ int uart_open (void)
   {
     if ((lockf (serial_device.file_desc, F_TLOCK, 0)) == 0)
     {
-      int i;
+      int tiocm;
 
       /* Get current serial port options */
       tcgetattr (serial_device.file_desc, &options);
@@ -216,23 +217,23 @@ int uart_open (void)
       cfsetospeed (&options, B115200);
 
       /* Set parameters including enabling receiver */
-      options.c_cflag &= ~(PARENB | CSTOPB | CSIZE | CRTSCTS | HUPCL);
-      options.c_cflag |= (CS8 | CLOCAL | CREAD);
+      options.c_cflag &= ~(PARENB | CSTOPB | CSIZE | CRTSCTS /*| HUPCL*/);
+      options.c_cflag |= (CS8 | CLOCAL | CREAD | CRTSCTS);
       options.c_lflag &= ~(ICANON | ISIG | ECHO | ECHOE | ECHOK | ECHONL | ECHOCTL | ECHOPRT | ECHOKE | IEXTEN);
       options.c_iflag &= ~(INPCK | IXON | IXOFF | IXANY | ICRNL);
       options.c_oflag &= ~(OPOST | ONLCR);
-
-      for (i = 0; i < sizeof (options.c_cc); i++)
-      {
-        options.c_cc[i] = _POSIX_VDISABLE;
-      }
 
       /* Timeout is in tenths of seconds */
       options.c_cc[VTIME] = (SERIAL_TIMEOUT * 10)/1000;
       options.c_cc[VMIN]  = 0;
 
       /* Flush buffers and apply options */
-      tcsetattr(serial_device.file_desc, TCSAFLUSH, &options);
+      tcsetattr (serial_device.file_desc, TCSAFLUSH, &options);
+
+      /* Set DTR/RTS */
+      ioctl (serial_device.file_desc, TIOCMGET, &tiocm);
+      tiocm = TIOCM_DTR | TIOCM_RTS;
+      ioctl (serial_device.file_desc, TIOCMSET, &tiocm);
     }
     else
     {
@@ -253,6 +254,7 @@ void uart_close (void)
 {
   if (serial_device.file_desc > 0)
   {
+    tcdrain (serial_device.file_desc);
     close (serial_device.file_desc);
     serial_device.file_desc = -1;
   }
