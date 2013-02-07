@@ -35,8 +35,8 @@ typedef struct
 /* File scope global variables */
 static serial_device_t serial_device =
 {
-  .vendor_id   = "2458",
-  .product_id  = "0001",
+  .vendor_id   = NULL,
+  .product_id  = NULL,
   .node        = NULL,
   .usb_bus_num = -1,
   .usb_dev_num = -1,
@@ -44,72 +44,7 @@ static serial_device_t serial_device =
 }; 
 
 
-int uart_reset (void)
-{
-  int status;
-
-  status = libusb_init (NULL);
-  if (status == 0)
-  {
-    libusb_device **libusb_list;
-
-    status = libusb_get_device_list (NULL, &libusb_list);
-    if (status >= 0)
-    {
-      libusb_device *libusb_dev;
-      int i = 0;
-
-      status = -1;
-      while ((libusb_dev = libusb_list[i++]) != NULL)
-      {
-        struct libusb_device_descriptor libusb_dev_desc;
-        status = libusb_get_device_descriptor (libusb_dev, &libusb_dev_desc);
-
-        if (((strtol (serial_device.vendor_id, NULL, 16)) == libusb_dev_desc.idVendor) &&
-            ((strtol (serial_device.product_id, NULL, 16)) == libusb_dev_desc.idProduct) &&
-            (serial_device.usb_bus_num == libusb_get_bus_number (libusb_dev)) &&
-            (serial_device.usb_dev_num == libusb_get_device_address (libusb_dev)) &&
-            (status == 0))
-        {
-          libusb_device_handle *libusb_dev_handle;
-
-          printf ("libusb: Open device\n");
-          status = libusb_open (libusb_dev, &libusb_dev_handle);
-          if (status == 0)
-          {
-            printf ("libusb: Reset device\n");
-            status = libusb_reset_device (libusb_dev_handle);
-            if (status < 0)
-            {
-              printf ("Can't reset libusb dev\n");
-            }
-
-            printf ("libusb: Close device\n");
-            libusb_close (libusb_dev_handle);
-
-            sleep (2);
-          }
-          else
-          {
-            printf ("Can't open libusb dev\n");
-          }
-
-          break;
-        }
-
-        status = -1;
-      }
-
-      libusb_free_device_list (libusb_list, 1);
-    }
-
-    libusb_exit (NULL);
-  }
-
-  return status;
-}
-
-int uart_init (void)
+int uart_init (char *vendor_id, char *product_id)
 {
   struct udev *udev = NULL;
   struct udev_enumerate *udev_enumerate = NULL;
@@ -165,31 +100,37 @@ int uart_init (void)
              the USB device. Note that USB strings are Unicode, UCS2
              encoded, but the strings returned from
              udev_device_get_sysattr_value() are UTF-8 encoded */
-          if (((strcmp (serial_device.vendor_id, (udev_device_get_sysattr_value (udev_dev_parent, "idVendor")))) == 0) &&
-              ((strcmp (serial_device.product_id, (udev_device_get_sysattr_value (udev_dev_parent, "idProduct")))) == 0))
+          if (((strcmp (vendor_id, (udev_device_get_sysattr_value (udev_dev_parent, "idVendor")))) == 0) &&
+              ((strcmp (product_id, (udev_device_get_sysattr_value (udev_dev_parent, "idProduct")))) == 0))
           {
             /* Found what we were looking for, get it's node (under /dev)
                and try to open & lock it */
             dev_node = udev_device_get_devnode (udev_dev);
             printf ("Found %s\n", dev_node);
 
-            serial_device.node        = (char *)dev_node;
-            serial_device.usb_bus_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
-                                                                             "busnum"));
-            serial_device.usb_dev_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
-                                                                             "devnum"));
-
+            serial_device.node = (char *)dev_node;
             serial_device.file_desc = uart_open ();
+
             if (serial_device.file_desc > 0)
             {
               serial_device.node = (char *)malloc ((strlen (dev_node)) + 1);
               strcpy (serial_device.node, dev_node);
+              
+              serial_device.vendor_id = (char *)malloc ((strlen (vendor_id)) + 1);
+              strcpy (serial_device.vendor_id, vendor_id);
+              
+              serial_device.product_id = (char *)malloc ((strlen (product_id)) + 1);
+              strcpy (serial_device.product_id, product_id);
+
+              serial_device.usb_bus_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
+                                                                               "busnum"));
+              serial_device.usb_dev_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
+                                                                               "devnum"));
 
               status = 0;
             }
             else
             {
-              uart_reset ();
               serial_device.node = NULL;
               serial_device.file_desc = -1;
             }

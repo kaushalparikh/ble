@@ -13,7 +13,7 @@
 #include <libudev.h>
 
 
-int usb_find (char * vendor_id, char * product_id)
+int usb_find (char *vendor_id, char *product_id)
 {
   struct udev *udev;
   struct udev_enumerate *udev_enumerate;
