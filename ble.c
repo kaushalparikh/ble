@@ -14,10 +14,11 @@ static void ble_output (uint8 bytes1, uint8 * buffer1, uint16 bytes2, uint8 * bu
 int ble_init (void)
 {
   int status = 0;
-  int retry;
+  int init_attempt = 0;
   
   /* Find BLE device and initialize */
-  status = uart_init ();
+  status = uart_init ("2458", "0001");
+  sleep (1);
 
   if (status == 0)
   {
@@ -28,24 +29,20 @@ int ble_init (void)
 
       /* Reset BLE */
     ble_cmd_system_reset (0);
-    
-    /* Sleep for 0.5s (500000 us) */
-    usleep (500000);
+    sleep (1);
 
     /* Close & re-open UART after reset */
     uart_close ();
 
-    retry = 3;
     do
     {
-      /* Sleep for 0.5s (500000 us) */
-      usleep(500000);
-      retry--;
-    } while (((uart_open ()) < 0) && (retry > 0));
+      init_attempt++;
+      sleep (1);
+      
+      status = uart_open ();
+    } while ((status <= 0) && (init_attempt < 2));
 
-    /* Retry greater than zero, implies UART was
-       opened successfully */
-    if (retry > 0)
+    if (status > 0)
     {
       /* Ping BLE */
       status = ble_hello ();
@@ -53,14 +50,11 @@ int ble_init (void)
     else
     {
       printf ("BLE Reset request failed\n");
-      
       bglib_output = NULL;
-      status = -1;
     }
 
     if (status <= 0)
     {
-      uart_reset ();
       uart_deinit ();
     }
   }
