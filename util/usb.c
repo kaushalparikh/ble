@@ -10,19 +10,14 @@
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <linux/usbdevice_fs.h>
-
 #include <libudev.h>
 
-typedef struct
-{
-  char *dev_node;
-  char *sys_path;
-} usb_info_t;
+#include "util.h"
 
 
-struct udev_device * usb_find_child (struct udev *udev,
-                                     char        *dev_par_path,
-                                     char        *dev_subsystem)
+static struct udev_device * usb_find_child (struct udev *udev,
+                                            char        *dev_par_path,
+                                            char        *dev_subsystem)
 {
   struct udev_device *dev = NULL;
   DIR *dev_par_dir;
@@ -61,18 +56,19 @@ struct udev_device * usb_find_child (struct udev *udev,
 }
 
 int usb_find (char *vendor_id, char *product_id,
-              char *subsystem, char *sys_path,
-              usb_info_t **usb_info)
+              char *subsystem, usb_info_t **usb_info)
 {
   struct udev *udev;
   struct udev_enumerate *udev_enumerate;
   struct udev_list_entry *dev_par_list;
-  int count = -1;
+  int count = 0;
   
   /* Create the udev object */
   udev = udev_new ();
   if (udev != NULL)
   {
+    usb_info_t *usb_list = NULL;
+
     /* Create a list of the devices in the 'usb' subsystem */
     udev_enumerate = udev_enumerate_new (udev);
     udev_enumerate_add_match_sysattr (udev_enumerate, "idVendor", vendor_id);
@@ -82,38 +78,40 @@ int usb_find (char *vendor_id, char *product_id,
     udev_enumerate_scan_devices (udev_enumerate);
     dev_par_list = udev_enumerate_get_list_entry (udev_enumerate);
 
-    /* For each item enumerated, print out its information.
-       udev_list_entry_foreach is a macro which expands to
-       a loop. The loop will be executed for each member in
-       devices, setting dev_list_entry to a list entry
-       which contains the device's path in /sys */
+    /* For each device enumerated, find the sub-system device */
     while (dev_par_list != NULL)
     {
       struct udev_device *dev, *dev_par;
       char *dev_par_path;
       
-      /* Get the filename of the /sys entry for the device
-         and create a udev_device object (dev) representing it
-         usb_device_get_devnode() returns the path to the device node
-         itself in /dev. */
+      /* Get the filename of the /sys entry for the device */
       dev_par_path = (char *)udev_list_entry_get_name (dev_par_list);
       dev_par = udev_device_new_from_syspath (udev, dev_par_path);
 
-      printf ("Device VID/PID %s/%s\n", udev_device_get_sysattr_value (dev_par, "idVendor"),
-                                        udev_device_get_sysattr_value (dev_par, "idProduct"));
-      printf ("       Type %s\n", udev_device_get_devtype (dev_par));
-      printf ("       Node %s\n", udev_device_get_devnode (dev_par));
-      printf ("       Path %s\n", udev_device_get_syspath (dev_par));
-      printf ("       Name %s\n", udev_device_get_sysname (dev_par));
-
-      /* Now search for 'tty' interface */
+      /* Now search for subsystem */
       dev = usb_find_child (udev, dev_par_path, subsystem);
       if (dev != NULL)
       {
-        printf ("   Subsystem\n");
-        printf ("       Node %s\n", udev_device_get_devnode (dev));
-        printf ("       Path %s\n", udev_device_get_syspath (dev));
+        if (usb_list == NULL)
+        {
+          usb_list = (usb_info_t *)malloc (sizeof (usb_info_t));
+          *usb_info = usb_list;
+        }
+        else
+        {
+          usb_list->next = (usb_info_t *)malloc (sizeof (usb_info_t));
+          usb_list = usb_list->next;
+        }
 
+        usb_list->dev_node = (char *)malloc ((strlen (udev_device_get_devnode (dev_par))) + 1);
+        strcpy (usb_list->dev_node, udev_device_get_devnode (dev_par));
+        usb_list->dev_sys_path = (char *)malloc ((strlen (dev_par_path)) + 1);
+        strcpy (usb_list->dev_sys_path, dev_par_path);
+        usb_list->dev_subsystem_node = (char *)malloc ((strlen (udev_device_get_devnode (dev))) + 1);
+        strcpy (usb_list->dev_subsystem_node, udev_device_get_devnode (dev));
+        usb_list->next = NULL;
+
+        count++;
         udev_device_unref (dev);
       }
       
@@ -199,14 +197,34 @@ int usb_connect (char *dev_node,
   return status;
 }
 
+#ifdef UTIL_USB_TEST
+
 int main (void)
 {
+  usb_info_t *usb_list = NULL;
+  usb_info_t *usb_list_entry = NULL;
+  int count;
+
   printf ("\n");
-  usb_find ("2458", "0001", "tty",
-            "/sys/devices/pci0000:00/0000:00:1d.0/usb2/2-1/2-1.3",
-            NULL);
+  count = usb_find ("2458", "0001", "tty",
+                    &usb_list);
+
+  while (count > 0)
+  {
+    printf ("Device     %s\n", usb_list->dev_node);
+    printf ("  Sys Path %s\n", usb_list->dev_sys_path);
+    printf ("  Node     %s\n", usb_list->dev_subsystem_node);
+
+    usb_list_entry = usb_list;
+    usb_list = usb_list->next;
+    free (usb_list_entry);
+    count--;
+  }
+
   printf ("\n");
 
   return 0;
 }
+
+#endif
 

@@ -14,16 +14,15 @@
 
 /* Local/project headers */
 #include "serial.h"
+#include "util.h"
 
 /* Local structures */
 typedef struct
 {
-  char *vendor_id;
-  char *product_id;
-  char *node;
-  int  usb_bus_num;
-  int  usb_dev_num;
-  int  file_desc;
+  char       *vendor_id;
+  char       *product_id;
+  int         file_desc;
+  usb_info_t  usb_info;
 } serial_device_t;
 
 /* Verbose output */
@@ -35,12 +34,17 @@ typedef struct
 /* File scope global variables */
 static serial_device_t serial_device =
 {
-  .vendor_id   = NULL,
-  .product_id  = NULL,
-  .node        = NULL,
-  .usb_bus_num = -1,
-  .usb_dev_num = -1,
-  .file_desc   = -1
+  .vendor_id   = "2458",
+  .product_id  = "0001",
+  .file_desc   = -1,
+  .usb_info
+    {
+      .dev_node       = NULL,
+      .dev_sys_path   = NULL,
+      .subsystem_node = NULL,
+      .bus_num        = 255,
+      .dev_num        = 255
+    }
 }; 
 
 
