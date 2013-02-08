@@ -7,17 +7,58 @@
 #include <errno.h>
 
 #include <usb.h>
+#include <dirent.h>
 #include <sys/ioctl.h>
 #include <linux/usbdevice_fs.h>
 
 #include <libudev.h>
 
 
+struct udev_device * usb_find_child (struct udev *udev,
+                                     char        *dev_par_path,
+                                     char        *dev_subsystem)
+{
+  struct udev_device *dev = NULL;
+  DIR *dev_par_dir;
+  struct dirent *dev_dir;
+  char *dev_path;
+
+  dev_par_dir = opendir (dev_par_path);
+  if (dev_par_dir != NULL)
+  {
+    for (dev_dir = readdir (dev_par_dir); ((dev_dir != NULL) && (dev == NULL));
+         dev_dir = readdir (dev_par_dir))
+    {
+      if ((dev_dir->d_name[0] != '.') && (dev_dir->d_type == DT_DIR) &&
+          (asprintf (&dev_path, "%s/%s", dev_par_path, dev_dir->d_name) > 0))
+      {
+        dev = udev_device_new_from_syspath (udev, dev_path);
+
+        if ((dev == NULL) || ((udev_device_get_subsystem (dev)) == NULL) || 
+            ((strcmp (dev_subsystem, udev_device_get_subsystem (dev))) != 0))
+        {
+          if (dev != NULL)
+          {
+            udev_device_unref (dev);
+          }
+          dev = usb_find_child (udev, dev_path, dev_subsystem);
+        }
+            
+        free (dev_path);
+      }
+    }
+
+    closedir (dev_par_dir);
+  }
+
+  return dev;
+}
+
 int usb_find (char *vendor_id, char *product_id)
 {
   struct udev *udev;
   struct udev_enumerate *udev_enumerate;
-  struct udev_list_entry *dev_list, *dev_list_entry;
+  struct udev_list_entry *dev_par_list;
   
   /* Create the udev object */
   udev = udev_new ();
@@ -27,115 +68,52 @@ int usb_find (char *vendor_id, char *product_id)
     return 1;
   }
   
-  /* Create a list of the devices in the 'tty' subsystem */
+  /* Create a list of the devices in the 'usb' subsystem */
   udev_enumerate = udev_enumerate_new (udev);
-  udev_enumerate_add_match_subsystem (udev_enumerate, "tty");
+  udev_enumerate_add_match_sysattr (udev_enumerate, "idVendor", vendor_id);
+  udev_enumerate_add_match_sysattr (udev_enumerate, "idProduct", product_id);
+  udev_enumerate_add_match_subsystem (udev_enumerate, "usb");
   udev_enumerate_scan_devices (udev_enumerate);
-  dev_list = udev_enumerate_get_list_entry (udev_enumerate);
+  dev_par_list = udev_enumerate_get_list_entry (udev_enumerate);
 
   /* For each item enumerated, print out its information.
      udev_list_entry_foreach is a macro which expands to
      a loop. The loop will be executed for each member in
      devices, setting dev_list_entry to a list entry
      which contains the device's path in /sys */
-  udev_list_entry_foreach (dev_list_entry, dev_list) {
+  while (dev_par_list != NULL)
+  {
     struct udev_device *dev, *dev_par;
-    const char *dev_path;
+    char *dev_par_path;
     
     /* Get the filename of the /sys entry for the device
        and create a udev_device object (dev) representing it
        usb_device_get_devnode() returns the path to the device node
        itself in /dev. */
-    dev_path = udev_list_entry_get_name (dev_list_entry);
-    dev = udev_device_new_from_syspath (udev, dev_path);
+    dev_par_path = (char *)udev_list_entry_get_name (dev_par_list);
+    dev_par = udev_device_new_from_syspath (udev, dev_par_path);
 
-    /* The device pointed to by dev contains information about
-       the hidraw device. In order to get information about the
-       USB device, get the parent device with the
-       subsystem/devtype pair of "usb"/"usb_device". This will
-       be several levels up the tree, but the function will find
-       it */
-    dev_par = udev_device_get_parent_with_subsystem_devtype (dev,
-                                                             "usb",
-                                                             "usb_device");
-    if (dev_par != NULL)
+    printf ("Device VID/PID %s/%s\n", udev_device_get_sysattr_value (dev_par, "idVendor"),
+                                      udev_device_get_sysattr_value (dev_par, "idProduct"));
+    printf ("       Type %s\n", udev_device_get_devtype (dev_par));
+    printf ("       Node %s\n", udev_device_get_devnode (dev_par));
+    printf ("       Path %s\n", udev_device_get_syspath (dev_par));
+
+    /* Now search for 'tty' interface */
+    dev = usb_find_child (udev, dev_par_path, "tty");
+    if (dev != NULL)
     {
-      /* From here, we can call get_sysattr_value() for each file
-         in the device's /sys entry. The strings passed into these
-         functions (idProduct, idVendor, serial, etc.) correspond
-         directly to the files in the directory which represents
-         the USB device. Note that USB strings are Unicode, UCS2
-         encoded, but the strings returned from
-         udev_device_get_sysattr_value() are UTF-8 encoded */
-      if (((strcmp (vendor_id, (udev_device_get_sysattr_value (dev_par, "idVendor")))) == 0) &&
-          ((strcmp (product_id, (udev_device_get_sysattr_value (dev_par, "idProduct")))) == 0))
-      {
-        printf ("Device VID/PID %s/%s\n", udev_device_get_sysattr_value (dev_par, "idVendor"),
-                                          udev_device_get_sysattr_value (dev_par, "idProduct"));
-        printf ("       Type %s\n", udev_device_get_devtype (dev_par));
-        printf ("       Node %s\n", udev_device_get_devnode (dev_par));
-        printf ("       Path %s\n", udev_device_get_syspath (dev_par));
-        printf ("       Interface Path %s\n", udev_device_get_devpath (dev));
+      printf ("   TTY\n");
+      printf ("       Node %s\n", udev_device_get_devnode (dev));
+      printf ("       Path %s\n", udev_device_get_syspath (dev));
 
-        while ((dev_par = udev_device_get_parent (dev_par)) != NULL)
-        {
-          const char *dev_class = udev_device_get_sysattr_value (dev_par, "bDeviceClass");
-
-          if (dev_class == NULL)
-          {
-            continue;
-          }
-            
-          if (atoi (dev_class) == USB_CLASS_HUB)
-          {
-            struct usbdevfs_ioctl ioctl_param;
-            struct usbdevfs_hub_portinfo hub_portinfo;
-            int fd;
-            const char *dev_node = udev_device_get_devnode (dev_par);
-
-            printf ("Hub VID/PID %s/%s\n", udev_device_get_sysattr_value (dev_par, "idVendor"),
-                                              udev_device_get_sysattr_value (dev_par, "idProduct"));
-            printf ("    Type %s\n", udev_device_get_devtype (dev_par));
-            printf ("    Node %s\n", dev_node);
-            printf ("    Path %s\n", udev_device_get_syspath (dev_par));
-
-            ioctl_param.ifno       = 0;
-            ioctl_param.ioctl_code = USBDEVFS_HUB_PORTINFO;
-            ioctl_param.data       = &hub_portinfo;
-  
-            fd = open (dev_node, O_RDWR);
-            if (fd > 0)
-            {
-              if ((ioctl (fd, USBDEVFS_IOCTL, &ioctl_param)) >= 0)
-              {
-                int i;
-                printf ("    Number of Ports %d\n", hub_portinfo.nports);
-                for (i = 0; i < hub_portinfo.nports; i++)
-                {
-                  printf ("    Port %d Device Number %d\n", (i+1), hub_portinfo.port[i]);
-                }
-              }
-              else
-              {
-                printf ("    Unable to read hub port info\n");
-              }
-            }
-            else
-            {
-              printf ("    Unable to open hub device node\n");
-            }
-
-            break;
-            
-          }
-        }
-
-      }
+      udev_device_unref (dev);
     }
-
-    udev_device_unref (dev);
+    
+    dev_par_list = udev_list_entry_get_next (dev_par_list);
+    udev_device_unref (dev_par);
   }
-  
+
   /* Free the enumerator object */
   udev_enumerate_unref (udev_enumerate);
   udev_unref (udev);
