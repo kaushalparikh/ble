@@ -17,7 +17,7 @@ int ble_init (void)
   int init_attempt = 0;
   
   /* Find BLE device and initialize */
-  status = uart_init ("2458", "0001");
+  status = serial_init ();
   sleep (1);
 
   if (status == 0)
@@ -32,14 +32,14 @@ int ble_init (void)
     sleep (1);
 
     /* Close & re-open UART after reset */
-    uart_close ();
+    serial_deinit ();
 
     do
     {
       init_attempt++;
       sleep (1);
       
-      status = uart_open ();
+      status = serial_init ();
     } while ((status <= 0) && (init_attempt < 2));
 
     if (status > 0)
@@ -55,7 +55,7 @@ int ble_init (void)
 
     if (status <= 0)
     {
-      uart_deinit ();
+      serial_deinit ();
     }
   }
   else
@@ -72,8 +72,8 @@ void ble_deinit (void)
 
 void ble_output (uint8 bytes1, uint8 * buffer1, uint16 bytes2, uint8 * buffer2)
 {
-  (void)uart_tx (bytes1, buffer1);
-  (void)uart_tx (bytes2, buffer2);
+  (void)serial_tx (bytes1, buffer1);
+  (void)serial_tx (bytes2, buffer2);
 }
 
 int ble_read_message (struct ble_header *rsp_header, unsigned char *rsp_buffer)
@@ -82,12 +82,12 @@ int ble_read_message (struct ble_header *rsp_header, unsigned char *rsp_buffer)
   unsigned char buffer[256];
   int status;
 
-  status = uart_rx (sizeof(header), (unsigned char *)&header);
+  status = serial_rx (sizeof(header), (unsigned char *)&header);
   if (status > 0)
   {
     if (header.lolen > 0)
     {
-      status = uart_rx (header.lolen, buffer);
+      status = serial_rx (header.lolen, buffer);
     }
 
     if (rsp_header != NULL)

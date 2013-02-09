@@ -6,8 +6,7 @@ endif
 
 # Compiler specifications
 CC 	  := $(ARCH_PREFIX)gcc
-CC_DEBUG  := -g
-CC_FLAGS  := -c -Wall -O3
+CC_FLAGS  := -c -Wall -O3 -g -D_GNU_SOURCE
 DEP_FLAGS := -MM -MT
 
 # Compiler definitions
@@ -43,7 +42,7 @@ DEP_SLAVE := $(patsubst %.c,$(DEP_DIR)/%.d, $(SRC_SLAVE))
 OBJ_SLAVE := $(patsubst %.c,$(OBJ_DIR)/%.o, $(SRC_SLAVE))
 
 # System packages
-SYSTEM_PACKAGES := libudev libusb-1.0
+SYSTEM_PACKAGES := libudev
 
 # System headers/libraries
 ifneq ($(SYSTEM_PACKAGES),)
@@ -52,7 +51,7 @@ ifneq ($(SYSTEM_PACKAGES),)
 endif
 
 # Local packages
-LOCAL_PACKAGES :=
+LOCAL_PACKAGES := util
 
 # Local headers/libraries
 ifneq ($(LOCAL_PACKAGES),)

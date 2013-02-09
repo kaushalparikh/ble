@@ -9,12 +9,9 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
-#include <libudev.h>
-#include <libusb.h>
-
 /* Local/project headers */
-#include "serial.h"
 #include "util.h"
+#include "serial.h"
 
 /* Local structures */
 typedef struct
@@ -37,168 +34,124 @@ static serial_device_t serial_device =
   .vendor_id   = "2458",
   .product_id  = "0001",
   .file_desc   = -1,
-  .usb_info
+  .usb_info =
     {
-      .dev_node       = NULL,
-      .dev_sys_path   = NULL,
-      .subsystem_node = NULL,
-      .bus_num        = 255,
-      .dev_num        = 255
+      .dev_node           = NULL,
+      .dev_sys_path       = NULL,
+      .dev_subsystem_node = NULL,
+      .bus_num            = 255,
+      .dev_num            = 255,
+      .next               = NULL
     }
 }; 
 
 
-int uart_init (char *vendor_id, char *product_id)
+void serial_free (void)
 {
-  struct udev *udev = NULL;
-  struct udev_enumerate *udev_enumerate = NULL;
-  struct udev_list_entry *udev_list;
+  free (serial_device.usb_info.dev_node);
+  serial_device.usb_info.dev_node = NULL;
+  free (serial_device.usb_info.dev_subsystem_node);
+  serial_device.usb_info.dev_subsystem_node = NULL;
+  serial_device.usb_info.bus_num = 255;
+  serial_device.usb_info.dev_num = 255;
+}
+
+int serial_init (void)
+{
+  usb_info_t *usb_list = NULL;
   int status = -1;
 
-  /* Create the udev context */
-  udev = udev_new ();
-  if (udev != NULL)
+  if ((usb_find (serial_device.vendor_id, serial_device.product_id,
+                 "tty", &usb_list)) > 0)
   {
-    /* Create the udev enumerate object */
-    udev_enumerate = udev_enumerate_new (udev);
-    if (udev_enumerate != NULL)
+    usb_info_t *usb_list_entry = NULL;
+
+    if (serial_device.usb_info.dev_sys_path != NULL)
     {
-      /* Create a list of the devices in the 'tty' subsystem */
-      udev_enumerate_add_match_subsystem (udev_enumerate, "tty");
-      udev_enumerate_scan_devices (udev_enumerate);
-
-      udev_list = udev_enumerate_get_list_entry (udev_enumerate);
-      
-      /* For each enumerated tty device, check if it is
-         serial device with given VID/PID. Also check
-         if the device can be opened and lock it if it can
-         be opened */
-      while ((udev_list != NULL) && (status < 0))
+      usb_list_entry = usb_list;
+      while (usb_list_entry != NULL)
       {
-        struct udev_device *udev_dev, *udev_dev_parent;
-        const char *udev_node, *dev_node;
-    
-        /* Get the filename of the /sys entry for the device
-           and create a udev_device object (dev) representing it
-           usb_device_get_devnode() returns the path to the device node
-           itself in /dev */
-        udev_node = udev_list_entry_get_name (udev_list);
-        udev_dev = udev_device_new_from_syspath (udev, udev_node);
-    
-        /* The device pointed to by dev contains information about
-           the tty device. In order to get information about the
-           USB device, get the parent device with the
-           subsystem/devtype pair of "usb"/"usb_device". This will
-           be several levels up the tree, but the function will find
-           it */
-        udev_dev_parent = udev_device_get_parent_with_subsystem_devtype (udev_dev,
-                                                                         "usb",
-                                                                         "usb_device");
-    
-        if (udev_dev_parent != NULL)
+        if ((strcmp (serial_device.usb_info.dev_sys_path, usb_list_entry->dev_sys_path)) == 0)
         {
-          /* From here, we can call get_sysattr_value() for each file
-             in the device's /sys entry. The strings passed into these
-             functions (idProduct, idVendor, serial, etc.) correspond
-             directly to the files in the directory which represents
-             the USB device. Note that USB strings are Unicode, UCS2
-             encoded, but the strings returned from
-             udev_device_get_sysattr_value() are UTF-8 encoded */
-          if (((strcmp (vendor_id, (udev_device_get_sysattr_value (udev_dev_parent, "idVendor")))) == 0) &&
-              ((strcmp (product_id, (udev_device_get_sysattr_value (udev_dev_parent, "idProduct")))) == 0))
+          if (((asprintf (&(serial_device.usb_info.dev_node), "%s", usb_list_entry->dev_node)) > 0) &&
+              ((asprintf (&(serial_device.usb_info.dev_subsystem_node), "%s", usb_list_entry->dev_subsystem_node)) > 0))
           {
-            /* Found what we were looking for, get it's node (under /dev)
-               and try to open & lock it */
-            dev_node = udev_device_get_devnode (udev_dev);
-            printf ("Found %s\n", dev_node);
-
-            serial_device.node = (char *)dev_node;
-            serial_device.file_desc = uart_open ();
-
-            if (serial_device.file_desc > 0)
-            {
-              serial_device.node = (char *)malloc ((strlen (dev_node)) + 1);
-              strcpy (serial_device.node, dev_node);
-              
-              serial_device.vendor_id = (char *)malloc ((strlen (vendor_id)) + 1);
-              strcpy (serial_device.vendor_id, vendor_id);
-              
-              serial_device.product_id = (char *)malloc ((strlen (product_id)) + 1);
-              strcpy (serial_device.product_id, product_id);
-
-              serial_device.usb_bus_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
-                                                                               "busnum"));
-              serial_device.usb_dev_num = atoi (udev_device_get_sysattr_value (udev_dev_parent,
-                                                                               "devnum"));
-
-              status = 0;
-            }
-            else
-            {
-              serial_device.node = NULL;
-              serial_device.file_desc = -1;
-            }
+            serial_device.usb_info.bus_num = usb_list_entry->bus_num;
+            serial_device.usb_info.dev_num = usb_list_entry->dev_num;
           }
-          
-          /* Unreference parent, it will internally unreference child,
-             i.e. udev_dev as well */
-          udev_device_unref (udev_dev_parent);
-        }
-        else
-        {
-          /* Device parent not found, so the device has to be
-             unreferenced explicitly */
-          udev_device_unref (udev_dev);
+
+          break;
         }
 
-        /* Next device in list */
-        udev_list = udev_list_entry_get_next (udev_list);
+        usb_list_entry = usb_list_entry->next;
       }
 
-      udev_enumerate_unref (udev_enumerate);
+      if (serial_device.usb_info.dev_subsystem_node != NULL)
+      {
+        status = serial_open ();
+        if (status < 0)
+        {
+          /* Earlier device not valid, find new */
+          free (serial_device.usb_info.dev_sys_path);
+          serial_device.usb_info.dev_sys_path = NULL;
+          serial_free ();
+        }
+      }
     }
-    else
+
+    if (serial_device.usb_info.dev_subsystem_node == NULL)
     {
-      printf ("Can't create udev enumerate object\n");
+      usb_list_entry = usb_list;
+      while (usb_list_entry != NULL)
+      {
+        serial_device.usb_info = *usb_list_entry;
+        status = serial_open ();
+        if (status > 0)
+        {
+          if (((asprintf (&(serial_device.usb_info.dev_node), "%s", usb_list_entry->dev_node)) > 0) &&
+              ((asprintf (&(serial_device.usb_info.dev_sys_path), "%s", usb_list_entry->dev_sys_path)) > 0) &&
+              ((asprintf (&(serial_device.usb_info.dev_subsystem_node), "%s", usb_list_entry->dev_subsystem_node)) > 0))
+          {
+            serial_device.usb_info.bus_num = usb_list_entry->bus_num;
+            serial_device.usb_info.dev_num = usb_list_entry->dev_num;
+          }
+
+          break;
+        }
+
+        usb_list_entry = usb_list_entry->next;
+      }
     }
-    
-    udev_unref (udev);
-  }
-  else
-  {
-    printf ("Can't create udev context\n");
+
+    usb_list_entry = usb_list;
+    while (usb_list != NULL)
+    {
+      free (usb_list_entry->dev_node);
+      free (usb_list_entry->dev_sys_path);
+      free (usb_list_entry->dev_subsystem_node);
+      usb_list = usb_list->next;
+      free (usb_list_entry);
+    }
   }
 
   return status;
 }
 
-void uart_deinit (void)
+void serial_deinit (void)
 {
-  serial_device.usb_dev_num = -1;
-  serial_device.usb_bus_num = -1;
-
-  uart_close ();
-  
-  if (serial_device.node != NULL)
-  {
-    free (serial_device.node);
-    serial_device.node = NULL;
-  }
+  serial_close ();
+  serial_free ();
 }
 
-int uart_open (void)
+int serial_open (void)
 {
-  struct termios options;
-
-  if (serial_device.file_desc < 0)
-  {
-    serial_device.file_desc = open (serial_device.node, (O_RDWR | O_NOCTTY /*| O_NDELAY*/));
-  }
-
+  serial_device.file_desc = open (serial_device.usb_info.dev_subsystem_node,
+                                  (O_RDWR | O_NOCTTY /*| O_NDELAY*/));
   if (serial_device.file_desc > 0)
   {
     if ((lockf (serial_device.file_desc, F_TLOCK, 0)) == 0)
     {
+      struct termios options;
       int tiocm;
 
       /* Get current serial port options */
@@ -229,30 +182,25 @@ int uart_open (void)
     }
     else
     {
-      printf ("Can't lock %s\n", serial_device.node);
+      printf ("Can't lock %s\n", serial_device.usb_info.dev_subsystem_node);
       close (serial_device.file_desc);
-      serial_device.file_desc = -1;
     }
   }
   else
   {
-    printf("Can't open %s\n", serial_device.node);
+    printf("Can't open %s\n", serial_device.usb_info.dev_subsystem_node);
   }
 
   return serial_device.file_desc;
 }
 
-void uart_close (void)
+void serial_close (void)
 {
-  if (serial_device.file_desc > 0)
-  {
-    tcdrain (serial_device.file_desc);
-    close (serial_device.file_desc);
-    serial_device.file_desc = -1;
-  }
+  tcdrain (serial_device.file_desc);
+  close (serial_device.file_desc);
 }
 
-int uart_tx (size_t bytes, unsigned char * buffer)
+int serial_tx (size_t bytes, unsigned char * buffer)
 {
   ssize_t bytes_written = 0;
   
@@ -287,7 +235,7 @@ int uart_tx (size_t bytes, unsigned char * buffer)
   return bytes_written;
 }
 
-int uart_rx (size_t bytes, unsigned char * buffer)
+int serial_rx (size_t bytes, unsigned char * buffer)
 {
   ssize_t bytes_read = 0;
 

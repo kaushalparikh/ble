@@ -103,13 +103,14 @@ int usb_find (char *vendor_id, char *product_id,
           usb_list = usb_list->next;
         }
 
-        usb_list->dev_node = (char *)malloc ((strlen (udev_device_get_devnode (dev_par))) + 1);
-        strcpy (usb_list->dev_node, udev_device_get_devnode (dev_par));
-        usb_list->dev_sys_path = (char *)malloc ((strlen (dev_par_path)) + 1);
-        strcpy (usb_list->dev_sys_path, dev_par_path);
-        usb_list->dev_subsystem_node = (char *)malloc ((strlen (udev_device_get_devnode (dev))) + 1);
-        strcpy (usb_list->dev_subsystem_node, udev_device_get_devnode (dev));
-        usb_list->next = NULL;
+        if (((asprintf (&(usb_list->dev_node), "%s", udev_device_get_devnode (dev_par))) > 0) &&
+            ((asprintf (&(usb_list->dev_sys_path), "%s", dev_par_path)) > 0) &&
+            ((asprintf (&(usb_list->dev_subsystem_node), "%s", udev_device_get_devnode (dev))) > 0))
+        {
+          usb_list->bus_num = atoi (udev_device_get_sysattr_value (dev, "busnum"));
+          usb_list->dev_num = atoi (udev_device_get_sysattr_value (dev, "devnum"));
+          usb_list->next = NULL;
+        }
 
         count++;
         udev_device_unref (dev);
