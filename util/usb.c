@@ -88,10 +88,14 @@ int usb_find (char *vendor_id, char *product_id,
       dev_par_path = (char *)udev_list_entry_get_name (dev_par_list);
       dev_par = udev_device_new_from_syspath (udev, dev_par_path);
 
+      printf ("Search for '%s' subsystem under %s\n", subsystem, dev_par_path);
+
       /* Now search for subsystem */
       dev = usb_find_child (udev, dev_par_path, subsystem);
       if (dev != NULL)
       {
+        printf ("Found %s\n", udev_device_get_devnode (dev));
+
         if (usb_list == NULL)
         {
           usb_list = (usb_info_t *)malloc (sizeof (usb_info_t));
@@ -107,8 +111,8 @@ int usb_find (char *vendor_id, char *product_id,
             ((asprintf (&(usb_list->dev_sys_path), "%s", dev_par_path)) > 0) &&
             ((asprintf (&(usb_list->dev_subsystem_node), "%s", udev_device_get_devnode (dev))) > 0))
         {
-          usb_list->bus_num = atoi (udev_device_get_sysattr_value (dev, "busnum"));
-          usb_list->dev_num = atoi (udev_device_get_sysattr_value (dev, "devnum"));
+          usb_list->bus_num = (unsigned char)(atoi (udev_device_get_sysattr_value (dev_par, "busnum")));
+          usb_list->dev_num = (unsigned char)(atoi (udev_device_get_sysattr_value (dev_par, "devnum")));
           usb_list->next = NULL;
         }
 

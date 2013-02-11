@@ -40,9 +40,9 @@ int ble_init (void)
       sleep (1);
       
       status = serial_init ();
-    } while ((status <= 0) && (init_attempt < 2));
+    } while ((status < 0) && (init_attempt < 2));
 
-    if (status > 0)
+    if (status == 0)
     {
       /* Ping BLE */
       status = ble_hello ();
@@ -53,7 +53,7 @@ int ble_init (void)
       bglib_output = NULL;
     }
 
-    if (status <= 0)
+    if (status < 0)
     {
       serial_deinit ();
     }
@@ -177,6 +177,7 @@ int ble_hello (void)
   if (status <= 0)
   {
     printf ("BLE Hello response failed with %d\n", status);
+    status = -1;
   }
 
   return status;

@@ -88,26 +88,28 @@ int serial_init (void)
 
       if (serial_device.usb_info.dev_subsystem_node != NULL)
       {
-        status = serial_open ();
-        if (status < 0)
+        printf ("Trying to use %s\n", serial_device.usb_info.dev_subsystem_node);
+        if ((serial_open ()) >  0)
         {
-          /* Earlier device not valid, find new */
-          free (serial_device.usb_info.dev_sys_path);
-          serial_device.usb_info.dev_sys_path = NULL;
+          status = 0;
+        }
+        else
+        {
           serial_free ();
         }
       }
     }
-
-    if (serial_device.usb_info.dev_subsystem_node == NULL)
+    else
     {
       usb_list_entry = usb_list;
       while (usb_list_entry != NULL)
       {
         serial_device.usb_info = *usb_list_entry;
-        status = serial_open ();
-        if (status > 0)
+        printf ("Trying to use %s\n", serial_device.usb_info.dev_subsystem_node);
+        if ((serial_open ()) >  0)
         {
+          status = 0;
+
           if (((asprintf (&(serial_device.usb_info.dev_node), "%s", usb_list_entry->dev_node)) > 0) &&
               ((asprintf (&(serial_device.usb_info.dev_sys_path), "%s", usb_list_entry->dev_sys_path)) > 0) &&
               ((asprintf (&(serial_device.usb_info.dev_subsystem_node), "%s", usb_list_entry->dev_subsystem_node)) > 0))
@@ -118,14 +120,18 @@ int serial_init (void)
 
           break;
         }
+        else
+        {
+          serial_device.usb_info.dev_sys_path = NULL;
+        }
 
         usb_list_entry = usb_list_entry->next;
       }
     }
 
-    usb_list_entry = usb_list;
     while (usb_list != NULL)
     {
+      usb_list_entry = usb_list;
       free (usb_list_entry->dev_node);
       free (usb_list_entry->dev_sys_path);
       free (usb_list_entry->dev_subsystem_node);
@@ -184,6 +190,7 @@ int serial_open (void)
     {
       printf ("Can't lock %s\n", serial_device.usb_info.dev_subsystem_node);
       close (serial_device.file_desc);
+      serial_device.file_desc = -1;
     }
   }
   else
