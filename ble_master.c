@@ -10,7 +10,7 @@ void master_loop (void)
 {
   if ((ble_scan ()) > 0)
   {
-    while ((ble_read_message (NULL, NULL)) >= 0)
+    while ((ble_receive_message (NULL, NULL)) >= 0)
     {
     }
   }
