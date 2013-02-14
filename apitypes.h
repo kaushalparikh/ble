@@ -1,6 +1,5 @@
-
-#ifndef APITYPES_H_
-#define APITYPES_H_
+#ifndef __APITYPES_H__
+#define __APITYPES_H__
 
 #ifdef __GNUC__
 #define PACKED __attribute__((packed))
@@ -9,6 +8,7 @@
 #define PACKED
 #define ALIGNED
 #endif
+
 typedef unsigned char  uint8;
 typedef unsigned short uint16;
 typedef signed short   int16;
@@ -33,6 +33,5 @@ typedef struct
     uint8 len;
     int8 data[];
 }string;
-
 
 #endif

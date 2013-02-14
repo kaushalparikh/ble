@@ -1,5 +1,5 @@
 #ifndef __UTIL_H__
-#define __UTILL_H__
+#define __UTIL_H__
 
 /* USB utilities */
 struct usb_info

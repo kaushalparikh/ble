@@ -1,3 +1,4 @@
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -10,7 +11,10 @@ void master_loop (void)
 {
   if ((ble_scan ()) > 0)
   {
-    while ((ble_receive_message (NULL, NULL)) >= 0)
+    ble_message_t message;
+
+    message.header.type = BLE_ANY;
+    while ((ble_receive_message (&message)) >= 0)
     {
     }
   }

@@ -1,17 +1,49 @@
 #ifndef __BLE_H__
 #define __BLE_H__
 
-#include "cmd_def.h"
+#include "apitypes.h"
+
+/* Message types */
+enum
+{
+  BLE_COMMAND  = 0,
+  BLE_RESPONSE = 0,
+  BLE_EVENT    = 0x80,
+  BLE_ANY      = 0xFF
+};
+
+/* Maximum message data size */
+#define BLE_MAX_MESSAGE  (256)
+
+/* Message header */
+typedef struct PACKED
+{
+  uint8 type;
+  uint8 length;
+  uint8 class;
+  uint8 command;
+} ble_message_header_t;
+
+/* Message */
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                data[BLE_MAX_MESSAGE];
+} ble_message_t;
 
 extern int ble_init (void);
 
 extern void ble_deinit (void);
 
-extern int ble_receive_message (struct ble_header *rsp_header, unsigned char *rsp_buffer);
+extern int ble_receive_message (ble_message_t *message);
+
+extern int ble_send_message (ble_message_t *message);
 
 extern int ble_scan (void);
 
 extern int ble_hello (void);
+
+extern int ble_reset (void);
 
 #endif
 

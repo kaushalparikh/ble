@@ -225,7 +225,7 @@ int serial_tx (size_t bytes, unsigned char * buffer)
     }
 
 #ifdef DEBUG_VERBOSE
-    printf("UART TX: ");
+    printf("UART TX (%d): ", bytes_written);
     for (i = 0; i < bytes_written; i++)
     {
       printf("%02d", buffer[i]);
@@ -235,8 +235,6 @@ int serial_tx (size_t bytes, unsigned char * buffer)
 
     bytes  -= bytes_written;
     buffer += bytes_written;
-    
-    bytes_written = 0;
   }
 
   return bytes_written;
@@ -260,8 +258,8 @@ int serial_rx (size_t bytes, unsigned char * buffer)
     }
 
 #ifdef DEBUG_VERBOSE
-    printf("UART RX: ");
-    for (i = 0; i < bytes; i++)
+    printf("UART RX (%d): ", bytes_read);
+    for (i = 0; i < bytes_read; i++)
     {
       printf("%02d", buffer[i]);
     }

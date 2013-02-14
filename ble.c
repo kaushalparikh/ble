@@ -5,16 +5,7 @@
 #include <string.h>
 
 #include "serial.h"
-#include "cmd_def.h"
 #include "ble.h"
-
-/* Message types */
-enum
-{
-  BLE_COMMAND  = 0,
-  BLE_RESPONSE = 0,
-  BLE_EVENT    = 0x80
-};
 
 /* Command/Response/Event class */
 enum
@@ -225,27 +216,46 @@ enum
   BLE_EVENT_ADC_RESULT     = 2
 };
 
-/* Message header */
-typedef struct PACKED
+/* System reset modes */
+enum
 {
-  uint8 type;
-  uint8 length;
-  uint8 class;
-  uint8 command;
-} ble_message_header_t;
+  BLE_RESET_NORMAL = 0,
+  BLE_RESET_DFU    = 1
+};
 
-/* Message */
-typedef struct PACKED
+/* GAP discover modes */
+enum
 {
-  ble_message_header_t  header;
-  uint8                 *data;
-} ble_message_t;
+  BLE_DISCOVER_LIMITED     = 0,
+  BLE_DISCOVER_GENERIC     = 1,
+  BLE_DISCOVER_OBSERVATION = 2
+};
 
-/* Reset message */
+/* System hello message */
 typedef struct PACKED
 {
   ble_message_header_t header;
+} ble_command_hello_t;
+
+/* System reset message */
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                mode;
 } ble_command_reset_t;
+
+/* GAP discover message */
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  unit8                mode;
+} ble_command_discover_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  unit16               result;  
+} ble_response_discover_t;
 
 /* Command header macros */
 #define BLE_COMMAND_HEADER(message, class_id, command_id)                            \
@@ -282,9 +292,6 @@ typedef struct PACKED
   BLE_COMMAND_HEADER(message, BLE_CLASS_TEST, command_id)
 
 
-static void ble_output (uint8 bytes1, uint8 * buffer1, uint16 bytes2, uint8 * buffer2);
-
-
 int ble_init (void)
 {
   int status = 0;
@@ -296,13 +303,10 @@ int ble_init (void)
 
   if (status == 0)
   {
-    /* BLE TX function pointer */
-    bglib_output = ble_output;
-
     printf ("BLE Reset request\n");
 
       /* Reset BLE */
-    ble_cmd_system_reset (0);
+    (void)ble_reset ();
     sleep (1);
 
     /* Close & re-open UART after reset */
@@ -324,7 +328,6 @@ int ble_init (void)
     else
     {
       printf ("BLE Reset request failed\n");
-      bglib_output = NULL;
     }
 
     if (status < 0)
@@ -344,58 +347,52 @@ void ble_deinit (void)
 {
 }
 
-void ble_output (uint8 bytes1, uint8 * buffer1, uint16 bytes2, uint8 * buffer2)
+int ble_receive_message (ble_message_t *message)
 {
-  (void)serial_tx (bytes1, buffer1);
-  (void)serial_tx (bytes2, buffer2);
-}
-
-int ble_receive_message (struct ble_header *rsp_header, unsigned char *rsp_buffer)
-{
-  struct ble_header header;
-  unsigned char buffer[256];
+  ble_message_header_t header;
   int status;
 
-  status = serial_rx (sizeof(header), (unsigned char *)&header);
+  status = serial_rx (sizeof (header), (unsigned char *)(&header));
   if (status > 0)
   {
-    if (header.lolen > 0)
+    if (header.length > 0)
     {
-      status = serial_rx (header.lolen, buffer);
+      status = serial_rx (header.length, message->data);
     }
 
-    if (rsp_header != NULL)
+    if (message->header.type != BLE_ANY)
     {
       /* Response provided, match it and if successful
          copy the response */
-      if ((rsp_header->type_hilen == header.type_hilen) &&
-          (rsp_header->lolen == header.lolen)           &&
-          (rsp_header->cls == header.cls)               &&
-          (rsp_header->command == header.command))
-      {
-        if (rsp_header->lolen > 0)
-        {
-          memcpy (rsp_buffer, buffer, rsp_header->lolen);
-        }
-      }
-      else
+      if ((message->header.type != header.type)        ||
+          (message->header.length != header.length)    ||
+          (message->header.class != header.class)      ||
+          (message->header.command != header.command))
       {
         status = -1;
       }
     }
     else if (status > 0)
     {
-      struct ble_msg * message = (struct ble_msg *)ble_get_msg_hdr (header);
-    
-      if (message != NULL)
-      {
-        message->handler (buffer);
-      }
-      else
-      {
-        status = -1;
-      }
+      /* Store for message for processing */
+      printf ("Message not handled\n");
     }
+  }
+
+  return status;
+}
+
+int ble_send_message (ble_message_t *message)
+{
+  int status;
+
+  status = serial_tx (((sizeof (message->header)) + message->length),
+                      ((unsigned char *)message));
+
+  if (status > 0)
+  {
+    /* Check for response */
+    status = ble_receive_message (message);
   }
 
   return status;
@@ -404,24 +401,21 @@ int ble_receive_message (struct ble_header *rsp_header, unsigned char *rsp_buffe
 int ble_scan (void)
 {
   int status;
-  struct ble_header rsp_header;
-  short int result;
+  ble_message_t message;
+  ble_command_discover_t *discover_cmd;
 
   printf ("BLE Scan request\n");
 
-  ble_cmd_gap_discover (gap_discover_observation);
-
-  rsp_header.type_hilen = (uint8)ble_dev_type_ble|(uint8)ble_msg_type_rsp|0x0;
-  rsp_header.lolen      = 2;
-  rsp_header.cls        = ble_cls_gap;
-  rsp_header.command    = ble_cmd_gap_discover_id;
-  
-  status = ble_receive_message (&rsp_header, (unsigned char *)&result);
+  discover_cmd = (ble_command_discover_t *)(&message);
+  BLE_CLASS_GAP_HEADER (discover_cmd, BLE_COMMAND_DISCOVER);
+  discover_cmd->mode = BLE_DISCOVER_OBSERVATION;
+  status = ble_send_message (&message);  
   if (status > 0)
   {
-    if (result > 0)
+    ble_response_discover_t *discover_rsp = (ble_response_discover_t *)(&message);
+    if (discover_rsp->result > 0)
     {
-      printf ("BLE Scan response received with failure %d\n", result);
+      printf ("BLE Scan response received with failure %d\n", discover_rsp->result);
       status = -1;
     }
   }
@@ -436,26 +430,40 @@ int ble_scan (void)
 int ble_hello (void)
 {
   int status;
-  ble_command_reset_t reset;
-  struct ble_header rsp_header;
+  ble_message_t message;
+  ble_command_hello_t *hello;
 
   printf ("BLE Hello request\n");
-
-  BLE_CLASS_SYSTEM_HEADER (&reset, BLE_COMMAND_HELLO);
-  serial_tx (sizeof (reset), (unsigned char *)(&reset));
-
-  rsp_header.type_hilen = (uint8)ble_dev_type_ble|(uint8)ble_msg_type_rsp|0x0;
-  rsp_header.lolen      = 0;
-  rsp_header.cls        = ble_cls_system;
-  rsp_header.command    = ble_cmd_system_hello_id;
   
-  status = ble_receive_message (&rsp_header, NULL);
+  hello = (ble_command_hello_t *)(&message);
+  BLE_CLASS_SYSTEM_HEADER (hello, BLE_COMMAND_HELLO);
+  status = ble_send_message (&message);  
   if (status <= 0)
   {
     printf ("BLE Hello response failed with %d\n", status);
     status = -1;
   }
 
+  return status;
+}
+
+int ble_reset (void)
+{
+  int status;
+  ble_message_t message;
+  ble_command_reset_t *reset;
+
+  reset = (ble_command_reset_t *)(&message);
+  BLE_CLASS_SYSTEM_HEADER (reset, BLE_COMMAND_RESET);
+  reset->mode = BLE_RESET_NORMAL;
+  status = serial_tx (((sizeof (message->header)) + message->length),
+                      (unsigned char *)(&(message)));
+  if (status <= 0)
+  {
+    printf ("BLE Reset failed with %d\n", status);
+    status = -1;
+  }
+  
   return status;
 }
 
