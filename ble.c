@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "apitypes.h"
 #include "serial.h"
 #include "ble.h"
 
@@ -248,13 +249,13 @@ typedef struct PACKED
 typedef struct PACKED
 {
   ble_message_header_t header;
-  unit8                mode;
+  uint8                mode;
 } ble_command_discover_t;
 
 typedef struct PACKED
 {
   ble_message_header_t header;
-  unit16               result;  
+  uint16               result;  
 } ble_response_discover_t;
 
 /* Command header macros */
@@ -365,7 +366,7 @@ int ble_receive_message (ble_message_t *message)
       /* Response provided, match it and if successful
          copy the response */
       if ((message->header.type != header.type)        ||
-          (message->header.length != header.length)    ||
+          /* (message->header.length != header.length)    || */
           (message->header.class != header.class)      ||
           (message->header.command != header.command))
       {
@@ -386,7 +387,7 @@ int ble_send_message (ble_message_t *message)
 {
   int status;
 
-  status = serial_tx (((sizeof (message->header)) + message->length),
+  status = serial_tx (((sizeof (message->header)) + message->header.length),
                       ((unsigned char *)message));
 
   if (status > 0)
@@ -421,7 +422,7 @@ int ble_scan (void)
   }
   else
   {
-    printf ("BLE Hello response failed with %d\n", status);
+    printf ("BLE Scan response failed with %d\n", status);
   }
 
   return status;
@@ -456,8 +457,8 @@ int ble_reset (void)
   reset = (ble_command_reset_t *)(&message);
   BLE_CLASS_SYSTEM_HEADER (reset, BLE_COMMAND_RESET);
   reset->mode = BLE_RESET_NORMAL;
-  status = serial_tx (((sizeof (message->header)) + message->length),
-                      (unsigned char *)(&(message)));
+  status = serial_tx (((sizeof (reset->header)) + reset->header.length),
+                      (unsigned char *)reset);
   if (status <= 0)
   {
     printf ("BLE Reset failed with %d\n", status);

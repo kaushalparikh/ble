@@ -6,7 +6,7 @@ endif
 
 # Compiler specifications
 CC 	  := $(ARCH_PREFIX)gcc
-CC_FLAGS  := -c -Wall -O3 -g -D_GNU_SOURCE
+CC_FLAGS  := -c -Wall -O3 -g -fno-strict-aliasing -D_GNU_SOURCE
 DEP_FLAGS := -MM -MT
 
 # Compiler definitions
