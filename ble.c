@@ -258,6 +258,18 @@ typedef struct PACKED
   uint16               result;  
 } ble_response_discover_t;
 
+typedef struct PACKED
+{
+  int8                 rssi;
+  uint8                packet_type;
+  ble_device_address_t device_address;
+  uint8                address_type;
+  uint8                bond;
+  uint8                length;
+  uint8                data[];
+  
+} ble_event_scan_response_t;
+
 /* Command header macros */
 #define BLE_COMMAND_HEADER(message, class_id, command_id)                            \
   (message)->header.type    = BLE_COMMAND;                                           \
@@ -348,6 +360,69 @@ void ble_deinit (void)
 {
 }
 
+void ble_event_scan_response (ble_event_scan_response_t *scan_response)
+{
+  int i;
+  
+  printf ("Found device: ");
+  for (i = 0; i < 6; i++)
+  {
+    printf ("%02x", scan_response->device_address.byte[i]);
+  }
+  printf ("\n");
+  printf ("  RSSI %d, packet type %u, address type %u, bond %u\n",
+                    scan_response->rssi, scan_response->packet_type,
+                    scan_response->address_type, scan_response->bond);
+  printf ("  Data (%u) ", scan_response->length);
+  for (i = 0; i < scan_response->length; i++)
+  {
+    printf ("%02x", scan_response->data[i]);
+  }
+  printf ("\n");
+}
+
+int ble_event (ble_message_t *message)
+{
+  switch (message->header.class)
+  {
+    case BLE_CLASS_GAP:
+    {
+      switch (message->header.command)
+      {
+        case BLE_EVENT_SCAN_RESPONSE:
+        {
+          ble_event_scan_response ((ble_event_scan_response_t *)(message->data));
+          break;
+        }
+
+        default:
+        {
+          printf ("Event not handled\n");
+          printf ("  type %d, length %d, class %d, command %d", message->header.type,
+                                                                message->header.length,
+                                                                message->header.class,
+                                                                message->header.command);
+          break;
+        }
+      }
+      
+      break;
+    }
+
+    default:
+    {
+      printf ("Class not handled\n");
+      printf ("  type %d, length %d, class %d, command %d", message->header.type,
+                                                            message->header.length,
+                                                            message->header.class,
+                                                            message->header.command);
+      break;
+    }
+  }
+    
+  return 0;
+}
+
 int ble_receive_message (ble_message_t *message)
 {
   ble_message_header_t header;
@@ -375,8 +450,18 @@ int ble_receive_message (ble_message_t *message)
     }
     else if (status > 0)
     {
-      /* Store for message for processing */
-      printf ("Message not handled\n");
+      if (header.type == BLE_EVENT)
+      {
+        /* Store for message for processing */
+        message->header = header;
+        status = ble_event (message);
+      }
+      else
+      {
+        printf ("Message not handled\n");
+        printf ("  type %d, length %d, class %d, command %d", header.type, header.length,
+                                                              header.class, header.command);
+      }
     }
   }
 

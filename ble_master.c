@@ -13,10 +13,10 @@ void master_loop (void)
   {
     ble_message_t message;
 
-    message.header.type = BLE_ANY;
-    while ((ble_receive_message (&message)) >= 0)
+    do
     {
-    }
+      message.header.type = BLE_ANY;
+    } while ((ble_receive_message (&message)) >= 0);
   }
 }
 
