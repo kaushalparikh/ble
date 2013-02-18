@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "apitypes.h"
+#include "list.h"
 #include "serial.h"
 #include "ble.h"
 
@@ -305,6 +306,17 @@ typedef struct PACKED
   BLE_COMMAND_HEADER(message, BLE_CLASS_TEST, command_id)
 
 
+struct ble_message_list_entry
+{
+  struct ble_message_list_entry *next;
+  ble_message_t                  message;
+};
+
+typedef struct ble_message_list_entry ble_message_list_entry_t;
+
+LIST_HEAD_INIT (ble_message_list_entry_t, ble_message_list);
+
+
 int ble_init (void)
 {
   int status = 0;
@@ -428,40 +440,57 @@ int ble_receive_message (ble_message_t *message)
   ble_message_header_t header;
   int status;
 
-  status = serial_rx (sizeof (header), (unsigned char *)(&header));
-  if (status > 0)
+  while ((status = serial_rx (sizeof (header), (unsigned char *)(&header))) > 0)
   {
     if (header.length > 0)
     {
       status = serial_rx (header.length, message->data);
     }
 
-    if (message->header.type != BLE_ANY)
+    if (status > 0)
     {
-      /* Response provided, match it and if successful
-         copy the response */
       if ((message->header.type != header.type)        ||
-          /* (message->header.length != header.length)    || */
           (message->header.class != header.class)      ||
           (message->header.command != header.command))
       {
-        status = -1;
+        ble_message_list_entry_t *message_list_entry;
+
+        /* Store the message */
+        message_list_entry = (ble_message_list_entry_t *)(malloc (sizeof (*message_list_entry)));
+        message_list_entry->message.header = header;
+        memcpy (message_list_entry->message.data, message->data, header.length);
+        list_add ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
+      }
+      else
+      {
+        break;
       }
     }
-    else if (status > 0)
+  }
+      
+  if (message->header.type == BLE_ANY)
+  {
+    while (ble_message_list != NULL)
     {
-      if (header.type == BLE_EVENT)
+      ble_message_list_entry_t *message_list_entry;
+
+      message_list_entry = ble_message_list;
+      if (message_list_entry->message.header.type == BLE_EVENT)
       {
         /* Store for message for processing */
-        message->header = header;
-        status = ble_event (message);
+        status = ble_event (&(message_list_entry->message));
       }
       else
       {
         printf ("Message not handled\n");
-        printf ("  type %d, length %d, class %d, command %d", header.type, header.length,
-                                                              header.class, header.command);
+        printf ("  type %d, length %d, class %d, command %d", message_list_entry->message.header.type,
+                                                              message_list_entry->message.header.length,
+                                                              message_list_entry->message.header.class,
+                                                              message_list_entry->message.header.command);
       }
+
+      list_remove ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
+      free (message_list_entry);
     }
   }
 
