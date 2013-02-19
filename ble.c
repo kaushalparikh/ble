@@ -9,6 +9,15 @@
 #include "serial.h"
 #include "ble.h"
 
+/* Message types */
+enum
+{
+  BLE_COMMAND  = 0,
+  BLE_RESPONSE = 0,
+  BLE_EVENT    = 0x80,
+  BLE_ANY      = 0xFF
+};
+
 /* Command/Response/Event class */
 enum
 {
@@ -233,6 +242,20 @@ enum
   BLE_DISCOVER_OBSERVATION = 2
 };
 
+/* GAP scan modes */
+enum
+{
+  BLE_SCAN_PASSIVE = 0,
+  BLE_SCAN_ACTIVE  = 1
+};
+
+/* Convert MS to intervals of 625us */
+#define MS_TO_625US(millisec)  (((millisec * 1000) + 624)/625)
+
+/* GAP scan window/interval */
+#define BLE_SCAN_WINDOW    MS_TO_625US(200)
+#define BLE_SCAN_INTERVAL  MS_TO_625US(1000)
+
 /* System hello message */
 typedef struct PACKED
 {
@@ -258,6 +281,20 @@ typedef struct PACKED
   ble_message_header_t header;
   uint16               result;  
 } ble_response_discover_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint16               interval;
+  uint16               window;
+  uint8                mode;
+} ble_command_scan_params_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint16               result;  
+} ble_response_scan_params_t;
 
 typedef struct PACKED
 {
@@ -435,40 +472,41 @@ int ble_event (ble_message_t *message)
   return 0;
 }
 
-int ble_receive_message (ble_message_t *message)
+int ble_receive_message (ble_message_t *response)
 {
-  ble_message_header_t header;
+  ble_message_t message;
   int status;
 
-  while ((status = serial_rx (sizeof (header), (unsigned char *)(&header))) > 0)
+  while ((status = serial_rx (sizeof (message.header), (unsigned char *)(&(message.header)))) > 0)
   {
-    if (header.length > 0)
+    if (message.header.length > 0)
     {
-      status = serial_rx (header.length, message->data);
+      status = serial_rx (message.header.length, message.data);
     }
 
     if (status > 0)
     {
-      if ((message->header.type != header.type)        ||
-          (message->header.class != header.class)      ||
-          (message->header.command != header.command))
+      if ((response == NULL) ||
+          ((response->header.type != message.header.type)        ||
+           (response->header.class != message.header.class)      ||
+           (response->header.command != message.header.command)))
       {
         ble_message_list_entry_t *message_list_entry;
 
         /* Store the message */
         message_list_entry = (ble_message_list_entry_t *)(malloc (sizeof (*message_list_entry)));
-        message_list_entry->message.header = header;
-        memcpy (message_list_entry->message.data, message->data, header.length);
+        message_list_entry->message = message;
         list_add ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
       }
       else
       {
+        *response = message;
         break;
       }
     }
   }
       
-  if (message->header.type == BLE_ANY)
+  if (response == NULL)
   {
     while (ble_message_list != NULL)
     {
@@ -517,26 +555,51 @@ int ble_scan (void)
 {
   int status;
   ble_message_t message;
-  ble_command_discover_t *discover_cmd;
+  ble_command_scan_params_t *scan_params;
 
   printf ("BLE Scan request\n");
 
-  discover_cmd = (ble_command_discover_t *)(&message);
-  BLE_CLASS_GAP_HEADER (discover_cmd, BLE_COMMAND_DISCOVER);
-  discover_cmd->mode = BLE_DISCOVER_OBSERVATION;
-  status = ble_send_message (&message);  
+  scan_params = (ble_command_scan_params_t *)(&message);
+  BLE_CLASS_GAP_HEADER (scan_params, BLE_COMMAND_SET_SCAN_PARAMS);
+  scan_params->interval = BLE_SCAN_INTERVAL;
+  scan_params->window   = BLE_SCAN_WINDOW;
+  scan_params->mode     = BLE_SCAN_ACTIVE;
+  status = ble_send_message (&message);
+
   if (status > 0)
   {
-    ble_response_discover_t *discover_rsp = (ble_response_discover_t *)(&message);
-    if (discover_rsp->result > 0)
+    ble_response_scan_params_t *scan_params_rsp = (ble_response_scan_params_t *)(&message);
+    if (scan_params_rsp->result == 0)
     {
-      printf ("BLE Scan response received with failure %d\n", discover_rsp->result);
-      status = -1;
+      ble_command_discover_t *discover_cmd = (ble_command_discover_t *)(&message);
+      BLE_CLASS_GAP_HEADER (discover_cmd, BLE_COMMAND_DISCOVER);
+      discover_cmd->mode = BLE_DISCOVER_LIMITED;
+      status = ble_send_message (&message);
+
+      if (status > 0)
+      {
+        ble_response_discover_t *discover_rsp = (ble_response_discover_t *)(&message);
+        if (discover_rsp->result > 0)
+        {
+          printf ("BLE Scan response received with failure %d\n", discover_rsp->result);
+          status = -1;
+        }
+      }
+      else
+      {
+        printf ("BLE Scan response failed with %d\n", status);
+        status = -1;
+      }
+    }
+    else
+    {
+      printf ("BLE Scan params response received with failure %d\n", scan_params_rsp->result);
     }
   }
   else
   {
-    printf ("BLE Scan response failed with %d\n", status);
+    printf ("BLE Scan params response failed with %d\n", status);
+    status = -1;
   }
 
   return status;

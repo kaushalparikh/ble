@@ -18,7 +18,7 @@ static inline list_entry_t * list_tail (list_entry_t **head)
 {
   list_entry_t *entry;
 
-  for (entry = *head; entry != NULL; entry = entry->next);
+  for (entry = *head; ((entry != NULL) && (entry->next != NULL)); entry = entry->next);
 
   return entry;  
 }

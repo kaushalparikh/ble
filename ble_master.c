@@ -11,12 +11,10 @@ void master_loop (void)
 {
   if ((ble_scan ()) > 0)
   {
-    ble_message_t message;
 
     do
     {
-      message.header.type = BLE_ANY;
-    } while ((ble_receive_message (&message)) >= 0);
+    } while ((ble_receive_message (NULL)) >= 0);
   }
 }
 

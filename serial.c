@@ -207,7 +207,7 @@ void serial_close (void)
   close (serial_device.file_desc);
 }
 
-int serial_tx (size_t bytes, unsigned char * buffer)
+int serial_tx (size_t bytes, unsigned char *buffer)
 {
   ssize_t bytes_written = 0;
   
@@ -228,7 +228,7 @@ int serial_tx (size_t bytes, unsigned char * buffer)
     printf("UART TX (%d): ", bytes_written);
     for (i = 0; i < bytes_written; i++)
     {
-      printf("%02d", buffer[i]);
+      printf("%02x", buffer[i]);
     }
     printf("\n");
 #endif
@@ -240,7 +240,7 @@ int serial_tx (size_t bytes, unsigned char * buffer)
   return bytes_written;
 }
 
-int serial_rx (size_t bytes, unsigned char * buffer)
+int serial_rx (size_t bytes, unsigned char *buffer)
 {
   ssize_t bytes_read = 0;
 
@@ -261,7 +261,7 @@ int serial_rx (size_t bytes, unsigned char * buffer)
     printf("UART RX (%d): ", bytes_read);
     for (i = 0; i < bytes_read; i++)
     {
-      printf("%02d", buffer[i]);
+      printf("%02x", buffer[i]);
     }
     printf("\n");
 #endif

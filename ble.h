@@ -3,15 +3,6 @@
 
 #include "apitypes.h"
 
-/* Message types */
-enum
-{
-  BLE_COMMAND  = 0,
-  BLE_RESPONSE = 0,
-  BLE_EVENT    = 0x80,
-  BLE_ANY      = 0xFF
-};
-
 /* Maximum message data size */
 #define BLE_MAX_MESSAGE  (256)
 
