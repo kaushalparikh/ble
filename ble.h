@@ -334,6 +334,54 @@ enum
   BLE_SCAN_ACTIVE  = 1
 };
 
+/* Advertise packet type */
+enum
+{
+  BLE_ADV_IND             = 0,
+  BLE_ADV_DIRECT_IND      = 1,
+  BLE_ADV_NON_CONNECT_IND = 2,
+  BLE_SCAN_REQ            = 3,
+  BLE_SCAN_RSP            = 4,
+  BLE_CONNECT_REQ         = 5,
+  BLE_ADV_SCAN_IND        = 6
+};
+
+/* Advertise address type */
+enum
+{
+  BLE_ADDR_PUBLIC = 0,
+  BLE_ADDR_RANDOM = 1
+};
+
+/* Advertise data types */
+enum
+{
+  BLE_ADV_FLAGS               = 0x01,
+  BLE_ADV_16BIT_UUID_INCOMP   = 0x02,
+  BLE_ADV_16BIT_UUID          = 0x03,
+  BLE_ADV_32BIT_UUID_INCOMP   = 0x04,
+  BLE_ADV_32BIT_UUID          = 0x05,
+  BLE_ADV_128BIT_UUID_INCOMP  = 0x06,
+  BLE_ADV_128BIT_UUID         = 0x07,
+  BLE_ADV_LOCAL_NAME_SHORT    = 0x08,
+  BLE_ADV_LOCAL_NAME          = 0x09,
+  BLE_ADV_TX_POWER            = 0x0A,
+  BLE_ADV_DEVICE_CLASS        = 0x0D,
+  BLE_ADV_PAIRING_HASH_C      = 0x0E,
+  BLE_ADV_PAIRING_RAND_R      = 0x0F,
+  BLE_ADV_SM_TK_VALUE         = 0x10,
+  BLE_ADV_SM_OOB_FLAGS        = 0x11,
+  BLE_ADV_CONNECT_INTERVAL    = 0x12,
+  BLE_ADV_16BIT_SERVICE_UUID  = 0x14,
+  BLE_ADV_128BIT_SERVICE_UUID = 0x15,
+  BLE_ADV_SERVICE_DATA        = 0x16,
+  BLE_ADV_PUBLIC_TARGET_ADDR  = 0x17,
+  BLE_ADV_RANDOM_TARGET_ADDR  = 0x18,
+  BLE_ADV_APPEARANCE          = 0x19,
+  BLE_ADV_INTERVAL            = 0x1A,
+  BLE_ADV_MANUFACTURER_DATA   = 0xFF
+};
+
 /* Scan window/interval */
 #define BLE_SCAN_WINDOW    MS_TO_625US(200)
 #define BLE_SCAN_INTERVAL  MS_TO_625US(1000)
@@ -374,6 +422,9 @@ typedef struct PACKED
   uint8                length;
   uint8                data[];
 } ble_event_scan_response_t;
+
+
+/* Function declarations */
 
 extern int ble_init (void);
 

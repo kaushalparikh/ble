@@ -93,6 +93,13 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
     printf ("%02x", scan_response->data[i]);
   }
   printf ("\n");
+
+  for (i = 0; i < scan_response->length; )
+  {
+    printf ("    Adv data type   %02x\n", scan_response->data[i+1]);
+    printf ("             length %d\n", scan_response->data[i]);
+    i += (1 + scan_response->data[i]);
+  }
 }
 
 int ble_event (ble_message_t *message)
