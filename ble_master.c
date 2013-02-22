@@ -11,7 +11,6 @@ void master_loop (void)
 {
   if ((ble_scan ()) > 0)
   {
-
     do
     {
     } while ((ble_receive_message (NULL)) >= 0);

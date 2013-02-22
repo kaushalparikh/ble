@@ -241,39 +241,39 @@ int ble_scan (void)
   if (status > 0)
   {
     ble_response_scan_params_t *scan_params_rsp = (ble_response_scan_params_t *)(&message);
-    if (scan_params_rsp->result == 0)
-    {
-      ble_command_discover_t *discover_cmd = (ble_command_discover_t *)(&message);
-      BLE_CLASS_GAP_HEADER (discover_cmd, BLE_COMMAND_DISCOVER);
-      discover_cmd->mode = BLE_DISCOVER_LIMITED;
-      status = ble_send_message (&message);
-
-      if (status > 0)
-      {
-        ble_response_discover_t *discover_rsp = (ble_response_discover_t *)(&message);
-        if (discover_rsp->result > 0)
-        {
-          printf ("BLE Scan response received with failure %d\n", discover_rsp->result);
-          status = -1;
-        }
-      }
-      else
-      {
-        printf ("BLE Scan response failed with %d\n", status);
-        status = -1;
-      }
-    }
-    else
+    if (scan_params_rsp->result != 0)
     {
       printf ("BLE Scan params response received with failure %d\n", scan_params_rsp->result);
+      status = -1;
     }
   }
   else
   {
     printf ("BLE Scan params response failed with %d\n", status);
-    status = -1;
   }
 
+  if (status > 0)
+  {
+    ble_command_discover_t *discover_cmd = (ble_command_discover_t *)(&message);
+    BLE_CLASS_GAP_HEADER (discover_cmd, BLE_COMMAND_DISCOVER);
+    discover_cmd->mode = BLE_DISCOVER_LIMITED;
+    status = ble_send_message (&message);
+
+    if (status > 0)
+    {
+      ble_response_discover_t *discover_rsp = (ble_response_discover_t *)(&message);
+      if (discover_rsp->result != 0)
+      {
+        printf ("BLE Scan response received with failure %d\n", discover_rsp->result);
+        status = -1;
+      }
+    }
+    else
+    {
+      printf ("BLE Scan response failed with %d\n", status);
+    }
+  }
+  
   return status;
 }
 

@@ -28,6 +28,15 @@ typedef struct PACKED
     uint8 byte[6];
 } ble_device_address_t;
 
+/* BLE device */
+typedef struct
+{
+  ble_device_address_t  address;
+  uint8                 address_type;
+  char                 *name;
+  int8                  tx_power;
+} ble_device_t;
+
 /* Message header definitions */
 /* Message types */
 enum
