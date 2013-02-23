@@ -1,127 +1,104 @@
 
-#include <stdlib.h>
-#include <unistd.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <time.h>
 
-#define CLOCKID CLOCK_REALTIME
-#define SIG SIGRTMIN
+#include "util.h"
 
-#define errExit(msg)    do { perror(msg); exit(EXIT_FAILURE); \
-                        } while (0)
 
-static void
-print_siginfo(siginfo_t *si)
+static void timer_event (int event_id, siginfo_t *event_info, void *unused)
 {
-  timer_t *tidp;
-  int or;
+  timer_info_t *timer_info = event_info->si_value.sival_ptr;
+  timer_info->callback (timer_info->data);
+  timer_delete ((timer_t)(timer_info->id));
+}
 
-  tidp = si->si_value.sival_ptr;
+int timer_start (timer_info_t *timer_info)
+{
+  struct sigaction timer_action;
+  struct sigevent signal_event;
+  timer_t timer_id;
+  int status;
 
-  printf("    sival_ptr = %p; ", si->si_value.sival_ptr);
-  printf("    *sival_ptr = 0x%lx\n", (long) *tidp);
+  /* Establish handler for timer signal */
+  timer_action.sa_flags     = SA_SIGINFO;
+  timer_action.sa_sigaction = timer_event;
+  sigemptyset (&timer_action.sa_mask);
+  status = sigaction (SIGRTMIN, &timer_action, NULL);
+  if (status == 0)
+  {
+    /* Create the timer */
+    signal_event.sigev_notify = SIGEV_SIGNAL;
+    signal_event.sigev_signo  = SIGRTMIN;
+    signal_event.sigev_value.sival_ptr = timer_info;
+    status = timer_create (CLOCK_MONOTONIC, &signal_event, &timer_id);
+    if (status == 0)
+    {
+      struct itimerspec timer_spec;
 
-  or = timer_getoverrun(*tidp);
-  if (or == -1)
-      errExit("timer_getoverrun");
+      timer_info->id = (int)timer_id;
+      timer_spec.it_value.tv_sec  = timer_info->millisec / 1000;
+      timer_spec.it_value.tv_nsec = (timer_info->millisec % 1000) * 1000000;
+      /* One-shot timer */
+      timer_spec.it_interval.tv_sec  = 0;
+      timer_spec.it_interval.tv_nsec = 0;
+  
+      /* Start timer */
+      status = timer_settime (timer_id, 0, &timer_spec, NULL);
+      if (status != 0)
+      {
+        timer_delete (timer_id);
+        printf ("Unable to start timer\n");
+      }
+      else
+      {
+        printf ("Timer %d started\n", (int)timer_id);
+      }
+    }
+    else
+    {
+      printf ("Unable to create timer\n");
+    }
+  }
   else
-      printf("    overrun count = %d\n", or);
+  {
+    printf ("Unable to set timer expiry handler\n");
+  }
+
+  return status;
 }
 
-static void
-handler(int sig, siginfo_t *si, void *uc)
+int timer_stop (timer_info_t *timer_info)
 {
-    /* Note: calling printf() from a signal handler is not
-       strictly correct, since printf() is not async-signal-safe;
-       see signal(7) */
-
-    printf("Caught signal %d\n", sig);
-    print_siginfo(si);
-    signal(sig, SIG_IGN);
+  return timer_delete ((timer_t)(timer_info->id));
 }
 
-void timer_event (int event, siginfo_t *si, void *not_used)
+#ifdef UTIL_TIMER_TEST
+
+void callback (timer_info_t *timer_info)
 {
+  printf ("Timer %d expired\n", timer_info->id);
 }
 
-int timer_start (int millisec,
-                 void (*callback)(void *),
-                 void *callback_data)
+int main (void)
 {
+  timer_info_t timer_info;
+  int status;
+
+  timer_info.millisec = 3000;
+  timer_info.callback = (void (*)(void *))callback;
+  timer_info.data     = &timer_info;
+
+  status = timer_start (&timer_info);
+  sleep (4);
+  status = timer_start (&timer_info);
+  sleep (2);
+  status = timer_stop (&timer_info);
+
   return 0;
 }
 
-void timer_stop (int timer_id)
-{
-}
-
-int main (int argc, char *argv[])
-{
-  timer_t timerid;
-  struct sigevent sev;
-  struct itimerspec its;
-  long long freq_nanosecs;
-  sigset_t mask;
-  struct sigaction sa;
-
-  if (argc != 3) {
-      fprintf(stderr, "Usage: %s <sleep-secs> <freq-nanosecs>\n",
-              argv[0]);
-      exit(EXIT_FAILURE);
-  }
-
-  /* Establish handler for timer signal */
-
-  printf("Establishing handler for signal %d\n", SIG);
-  sa.sa_flags = SA_SIGINFO;
-  sa.sa_sigaction = handler;
-  sigemptyset(&sa.sa_mask);
-  if (sigaction(SIG, &sa, NULL) == -1)
-      errExit("sigaction");
-
-  /* Block timer signal temporarily */
-
-  printf("Blocking signal %d\n", SIG);
-  sigemptyset(&mask);
-  sigaddset(&mask, SIG);
-  if (sigprocmask(SIG_SETMASK, &mask, NULL) == -1)
-      errExit("sigprocmask");
-
-  /* Create the timer */
-
-  sev.sigev_notify = SIGEV_SIGNAL;
-  sev.sigev_signo = SIG;
-  sev.sigev_value.sival_ptr = &timerid;
-  if (timer_create(CLOCKID, &sev, &timerid) == -1)
-      errExit("timer_create");
-
-  printf("timer ID is 0x%lx\n", (long) timerid);
-
-  /* Start the timer */
-
-  freq_nanosecs = atoll(argv[2]);
-  its.it_value.tv_sec = freq_nanosecs / 1000000000;
-  its.it_value.tv_nsec = freq_nanosecs % 1000000000;
-  its.it_interval.tv_sec = its.it_value.tv_sec;
-  its.it_interval.tv_nsec = its.it_value.tv_nsec;
-
-  if (timer_settime(timerid, 0, &its, NULL) == -1)
-       errExit("timer_settime");
-
-  /* Sleep for a while; meanwhile, the timer may expire
-     multiple times */
-
-  printf("Sleeping for %d seconds\n", atoi(argv[1]));
-  sleep(atoi(argv[1]));
-
-  /* Unlock the timer signal, so that timer notification
-     can be delivered */
-
-  printf("Unblocking signal %d\n", SIG);
-  if (sigprocmask(SIG_UNBLOCK, &mask, NULL) == -1)
-      errExit("sigprocmask");
-
-  exit(EXIT_SUCCESS);
-}
+#endif
 
