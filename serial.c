@@ -8,6 +8,7 @@
 #include <termios.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <errno.h>
 
 /* Local/project headers */
 #include "util.h"
@@ -214,24 +215,28 @@ int serial_tx (size_t bytes, unsigned char *buffer)
   while (bytes > 0)
   {
 #ifdef DEBUG_VERBOSE
-    size_t i;
+    ssize_t i;
 #endif
   
     bytes_written = write (serial_device.file_desc, buffer, bytes);
 
-    if (bytes_written <= 0)
+    if (bytes_written > 0)
+    {
+#ifdef DEBUG_VERBOSE
+      printf("UART TX (%d): ", bytes_written);
+      for (i = 0; i < bytes_written; i++)
+      {
+        printf("%02x", buffer[i]);
+      }
+      printf("\n");
+#endif
+    }
+    else if ((bytes_written == 0) ||
+             ((bytes_written < 0) && (errno != EINTR)))
     {
       break;
     }
 
-#ifdef DEBUG_VERBOSE
-    printf("UART TX (%d): ", bytes_written);
-    for (i = 0; i < bytes_written; i++)
-    {
-      printf("%02x", buffer[i]);
-    }
-    printf("\n");
-#endif
 
     bytes  -= bytes_written;
     buffer += bytes_written;
@@ -247,24 +252,27 @@ int serial_rx (size_t bytes, unsigned char *buffer)
   while (bytes > 0)
   {
 #ifdef DEBUG_VERBOSE
-    size_t i;
+    ssize_t i;
 #endif
 
     bytes_read = read (serial_device.file_desc, buffer, bytes);
 
-    if (bytes_read <= 0)
+    if (bytes_read > 0)
+    {
+#ifdef DEBUG_VERBOSE
+      printf("UART RX (%d): ", bytes_read);
+      for (i = 0; i < bytes_read; i++)
+      {
+        printf("%02x", buffer[i]);
+      }
+      printf("\n");
+#endif
+    }
+    else if ((bytes_read == 0) ||
+             ((bytes_read < 0) && (errno != EINTR)))
     {
       break;
     }
-
-#ifdef DEBUG_VERBOSE
-    printf("UART RX (%d): ", bytes_read);
-    for (i = 0; i < bytes_read; i++)
-    {
-      printf("%02x", buffer[i]);
-    }
-    printf("\n");
-#endif
 
     bytes  -= bytes_read;
     buffer += bytes_read;

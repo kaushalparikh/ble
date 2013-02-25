@@ -9,11 +9,11 @@
 
 void master_loop (void)
 {
-  if ((ble_scan ()) > 0)
+  if ((ble_scan_start ()) > 0)
   {
     do
     {
-    } while ((ble_receive_message (NULL)) >= 0);
+    } while (((ble_receive_serial ()) >= 0) && ((ble_receive_timer ()) >= 0));
   }
 }
 

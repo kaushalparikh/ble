@@ -49,6 +49,7 @@ ifneq ($(SYSTEM_PACKAGES),)
         SYSTEM_INCLUDE_DIRS := `pkg-config --cflags $(SYSTEM_PACKAGES)`
         SYSTEM_LIBS := `pkg-config --libs $(SYSTEM_PACKAGES)`
 endif
+SYSTEM_LIBS += -lrt
 
 # Local packages
 LOCAL_PACKAGES := util

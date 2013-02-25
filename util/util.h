@@ -26,10 +26,10 @@ extern int usb_connect (char *dev_node,
 /* Timer utilities */
 typedef struct
 {
-  int   id;
-  int   millisec;
+  int    id;
+  int    millisec;
   void (*callback)(void *);
-  void *data;
+  void  *data;
 } timer_info_t;
 
 extern int timer_start (timer_info_t *timer_info);

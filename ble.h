@@ -255,6 +255,12 @@ enum
   BLE_EVENT_ADC_RESULT     = 2
 };
 
+/* Timers */
+enum
+{
+  BLE_TIMER_SCAN_STOP = 0
+};
+
 /* Message header */
 typedef struct PACKED
 {
@@ -327,7 +333,7 @@ typedef struct PACKED
   ble_message_header_t header;
 } ble_command_hello_t;
 
-/* GAP discover/scan command definitions */
+/* GAP discover/scan start command definitions */
 /* Discover modes */
 enum
 {
@@ -395,6 +401,8 @@ enum
 #define BLE_SCAN_WINDOW    MS_TO_625US(200)
 #define BLE_SCAN_INTERVAL  MS_TO_625US(1000)
 
+#define BLE_SCAN_DURATION  (10000)
+
 typedef struct PACKED
 {
   ble_message_header_t header;
@@ -432,22 +440,32 @@ typedef struct PACKED
   uint8                data[];
 } ble_event_scan_response_t;
 
+/* GAP end procedure definitions */
+typedef struct PACKED
+{
+  ble_message_header_t header;
+} ble_command_end_procedure_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint16               result;
+} ble_response_end_procedure_t;
+
 
 /* Function declarations */
+
+extern int ble_receive_timer (void);
 
 extern int ble_init (void);
 
 extern void ble_deinit (void);
 
-extern int ble_receive_message (ble_message_t *message);
+extern int ble_receive_serial (void);
 
-extern int ble_send_message (ble_message_t *message);
+extern int ble_scan_start (void);
 
-extern int ble_scan (void);
-
-extern int ble_hello (void);
-
-extern int ble_reset (void);
+extern int ble_end_procedure (void);
 
 #endif
 

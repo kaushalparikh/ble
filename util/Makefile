@@ -44,11 +44,10 @@ SYSTEM_PACKAGES := libudev
 # System headers/libraries
 ifneq ($(SYSTEM_PACKAGES),)
         SYSTEM_INCLUDE_DIRS := `pkg-config --cflags $(SYSTEM_PACKAGES)`
-        SYSTEM_LIBS := `pkg-config --libs $(SYSTEM_PACKAGES)`
 endif
 
 # All header files
-ALL_INCLUDE_DIRS := $(LOCAL_INCLUDE_DIRS)
+ALL_INCLUDE_DIRS := $(SYSTEM_INCLUDE_DIRS)
 
 # Library output files
 TARGET_FILE := libutil.a
@@ -67,9 +66,9 @@ $(OBJ_DIR)/%.o : %.c
 # Implicit rule for dependency files
 $(DEP_DIR)/%.d : %.c
 	$(CC) $(DEP_FLAGS) $(patsubst %.c,$(OBJ_DIR)/%.o, $(notdir $<)) \
-	$(DEFINES) $(LOCAL_INCLUDE_DIRS) $< > $@
+	$(DEFINES) $< > $@
 	$(CC) $(DEP_FLAGS) $(patsubst %.c,$(DEP_DIR)/%.d, $(notdir $<)) \
-	$(DEFINES) $(LOCAL_INCLUDE_DIRS) $< >> $@
+	$(DEFINES) $< >> $@
 
 ifneq ($(MAKECMDGOALS),clean)
         $(shell mkdir -p $(BUILD_DIR))

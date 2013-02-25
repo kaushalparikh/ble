@@ -52,10 +52,6 @@ int timer_start (timer_info_t *timer_info)
         timer_delete (timer_id);
         printf ("Unable to start timer\n");
       }
-      else
-      {
-        printf ("Timer %d started\n", (int)timer_id);
-      }
     }
     else
     {
