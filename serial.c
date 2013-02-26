@@ -230,16 +230,15 @@ int serial_tx (size_t bytes, unsigned char *buffer)
       }
       printf("\n");
 #endif
+
+      bytes  -= bytes_written;
+      buffer += bytes_written;
     }
     else if ((bytes_written == 0) ||
              ((bytes_written < 0) && (errno != EINTR)))
     {
       break;
     }
-
-
-    bytes  -= bytes_written;
-    buffer += bytes_written;
   }
 
   return bytes_written;
@@ -267,15 +266,15 @@ int serial_rx (size_t bytes, unsigned char *buffer)
       }
       printf("\n");
 #endif
+
+      bytes  -= bytes_read;
+      buffer += bytes_read;
     }
     else if ((bytes_read == 0) ||
              ((bytes_read < 0) && (errno != EINTR)))
     {
       break;
     }
-
-    bytes  -= bytes_read;
-    buffer += bytes_read;
   }
 
   return bytes_read;
