@@ -23,9 +23,11 @@ typedef signed short int   int16;
 typedef unsigned long int  uint32;
 
 /* BLE device address */
+#define BLE_DEVICE_ADDRESS_LENGTH  (6)
+
 typedef struct PACKED
 {
-    uint8 byte[6];
+    uint8 byte[BLE_DEVICE_ADDRESS_LENGTH];
 } ble_device_address_t;
 
 /* BLE device */
@@ -334,19 +336,48 @@ typedef struct PACKED
 } ble_command_hello_t;
 
 /* GAP discover/scan start command definitions */
-/* Discover modes */
-enum
-{
-  BLE_DISCOVER_LIMITED     = 0,
-  BLE_DISCOVER_GENERIC     = 1,
-  BLE_DISCOVER_OBSERVATION = 2
-};
+/* Scan window/interval */
+#define BLE_SCAN_WINDOW    MS_TO_625US(200)
+#define BLE_SCAN_INTERVAL  MS_TO_625US(1000)
+
+#define BLE_SCAN_DURATION  (10000)
 
 /* Scan modes */
 enum
 {
   BLE_SCAN_PASSIVE = 0,
   BLE_SCAN_ACTIVE  = 1
+};
+
+/* Scan policy */
+enum
+{
+  BLE_SCAN_POLICY_ALL       = 0,
+  BLE_SCAN_POLICY_WHITELIST = 1
+};
+
+/* Scan duplicate */
+enum
+{
+  BLE_SCAN_DUPLICATE_ALL    = 0,
+  BLE_SCAN_DUPLICATE_FILTER = 1
+};
+
+/* Advertise policy */
+enum
+{
+  BLE_ADV_POLICY_ALL               = 0,
+  BLE_ADV_POLICY_WHITELIST_SCAN    = 1,
+  BLE_ADV_POLICY_WHITELIST_CONNECT = 2,
+  BLE_ADV_POLICY_WHITELIST_ALL     = 3
+};
+
+/* Discover modes */
+enum
+{
+  BLE_DISCOVER_LIMITED     = 0,
+  BLE_DISCOVER_GENERIC     = 1,
+  BLE_DISCOVER_OBSERVATION = 2
 };
 
 /* Advertise packet type */
@@ -397,24 +428,6 @@ enum
   BLE_ADV_MANUFACTURER_DATA   = 0xFF
 };
 
-/* Scan window/interval */
-#define BLE_SCAN_WINDOW    MS_TO_625US(200)
-#define BLE_SCAN_INTERVAL  MS_TO_625US(1000)
-
-#define BLE_SCAN_DURATION  (10000)
-
-typedef struct PACKED
-{
-  ble_message_header_t header;
-  uint8                mode;
-} ble_command_discover_t;
-
-typedef struct PACKED
-{
-  ble_message_header_t header;
-  uint16               result;  
-} ble_response_discover_t;
-
 typedef struct PACKED
 {
   ble_message_header_t header;
@@ -428,6 +441,32 @@ typedef struct PACKED
   ble_message_header_t header;
   uint16               result;  
 } ble_response_scan_params_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                scan_policy;
+  uint8                adv_policy;
+  uint8                scan_duplicate;
+} ble_command_set_filtering_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint16               result;
+} ble_response_set_filtering_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                mode;
+} ble_command_discover_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint16               result;  
+} ble_response_discover_t;
 
 typedef struct PACKED
 {

@@ -30,6 +30,16 @@ typedef struct ble_message_list_entry ble_message_list_entry_t;
 
 LIST_HEAD_INIT (ble_message_list_entry_t, ble_message_list);
 
+struct ble_device_list_entry
+{
+  struct ble_device_list_entry *next;
+  ble_device_t                  info;
+};
+
+typedef struct ble_device_list_entry ble_device_list_entry_t;
+
+LIST_HEAD_INIT (ble_device_list_entry_t, ble_device_list);
+
 
 static void ble_timer_callback (timer_list_entry_t *timer_list_entry)
 {
@@ -88,6 +98,25 @@ static int ble_command (ble_message_t *message)
   return status;
 }
 
+static ble_device_t * ble_device_find (ble_device_address_t *address, uint8 address_type)
+{
+  ble_device_t *device = NULL;
+  ble_device_list_entry_t *device_list_entry = ble_device_list;
+
+  while (device_list_entry != NULL)
+  {
+    if ((device_list_entry->info.address_type == address_type) &&
+        ((memcmp (address, &(device_list_entry->info.address), BLE_DEVICE_ADDRESS_LENGTH)) == 0))
+    {
+      device = &(device_list_entry->info);
+      break;
+    }
+    device_list_entry = device_list_entry->next;
+  }
+
+  return device;
+}
+
 static int ble_reset (void)
 {
   int status;
@@ -131,28 +160,62 @@ static int ble_hello (void)
 static void ble_event_scan_response (ble_event_scan_response_t *scan_response)
 {
   int i;
-  
-  printf ("Found device: ");
-  for (i = 0; i < 6; i++)
-  {
-    printf ("%02x", scan_response->device_address.byte[i]);
-  }
-  printf ("\n");
-  printf ("  RSSI %d, packet type %u, address type %u, bond %u\n",
-                    scan_response->rssi, scan_response->packet_type,
-                    scan_response->address_type, scan_response->bond);
-  printf ("  Data (%u) ", scan_response->length);
-  for (i = 0; i < scan_response->length; i++)
-  {
-    printf ("%02x", scan_response->data[i]);
-  }
-  printf ("\n");
+  int new_device = 0;
+  ble_device_t *device;
 
+  device = ble_device_find (&(scan_response->device_address), scan_response->address_type);
+  if (device == NULL)
+  {
+    ble_device_list_entry_t *device_list_entry 
+      = (ble_device_list_entry_t *)malloc (sizeof (*device_list_entry));
+
+    device = &(device_list_entry->info);
+    list_add ((list_entry_t **)(&ble_device_list), (list_entry_t *)device_list_entry);
+
+    device->address      = scan_response->device_address;
+    device->address_type = scan_response->address_type;
+    device->name         = NULL;
+    device->tx_power     = -127;
+    new_device           = 1;
+  }
+  
   for (i = 0; i < scan_response->length; )
   {
-    printf ("    Adv data type   %02x\n", scan_response->data[i+1]);
-    printf ("             length %d\n", scan_response->data[i]);
+    if (scan_response->data[i+1] == BLE_ADV_TX_POWER)
+    {
+      device->tx_power = (int8)(scan_response->data[i+2]);
+    }
+    else if (scan_response->data[i+1] == BLE_ADV_LOCAL_NAME)
+    {
+      if (device->name != NULL)
+      {
+        free (device->name);
+      }
+      device->name = (char *)malloc (scan_response->data[i]);
+      device->name[scan_response->data[i]] = '\0';
+      strncpy (device->name, (char *)&(scan_response->data[i+2]), (scan_response->data[i] - 1));
+    }
+    else if ((scan_response->data[i+1] == BLE_ADV_LOCAL_NAME_SHORT) &&
+             (device->name != NULL))
+    {
+      device->name = (char *)malloc (scan_response->data[i]);
+      device->name[scan_response->data[i]] = '\0';
+      strncpy (device->name, (char *)&(scan_response->data[i+2]), (scan_response->data[i] - 1));
+    }
+      
     i += (1 + scan_response->data[i]);
+  }
+
+  if (new_device)
+  {
+    printf ("Found device: %s\n", device->name);
+    printf ("     Address: ");
+    for (i = 0; i < BLE_DEVICE_ADDRESS_LENGTH; i++)
+    {
+      printf ("%02x", scan_response->device_address.byte[i]);
+    }
+    printf (" (%s)\n", ((device->address_type > 0) ? "random" : "public"));
+    printf ("    Tx power: %d dBm\n", device->tx_power);
   }
 }
 
@@ -367,9 +430,33 @@ int ble_scan_start (void)
 
   if (status > 0)
   {
-    ble_command_discover_t *discover_cmd = (ble_command_discover_t *)(&message);
-    BLE_CLASS_GAP_HEADER (discover_cmd, BLE_COMMAND_DISCOVER);
-    discover_cmd->mode = BLE_DISCOVER_LIMITED;
+    ble_command_set_filtering_t *set_filtering = (ble_command_set_filtering_t *)(&message);
+    BLE_CLASS_GAP_HEADER (set_filtering, BLE_COMMAND_SET_FILTERING);
+    set_filtering->scan_policy    = BLE_SCAN_POLICY_ALL;
+    set_filtering->scan_duplicate = BLE_SCAN_DUPLICATE_FILTER;
+    set_filtering->adv_policy     = BLE_ADV_POLICY_ALL;
+    status = ble_command (&message);
+
+    if (status > 0)
+    {
+      ble_response_set_filtering_t *set_filtering_rsp = (ble_response_set_filtering_t *)(&message);
+      if (set_filtering_rsp->result != 0)
+      {
+        printf ("BLE Set filtering response received with failure %d\n", set_filtering_rsp->result);
+        status = -1;
+      }
+    }
+    else
+    {
+      printf ("BLE Set filtering failed with %d\n", status);
+    }
+  }
+
+  if (status > 0)
+  {
+    ble_command_discover_t *discover = (ble_command_discover_t *)(&message);
+    BLE_CLASS_GAP_HEADER (discover, BLE_COMMAND_DISCOVER);
+    discover->mode = BLE_DISCOVER_LIMITED;
     status = ble_command (&message);
 
     if (status > 0)
