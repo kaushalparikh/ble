@@ -45,7 +45,7 @@ static void ble_timer_callback (timer_list_entry_t *timer_list_entry)
 {
   list_add ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
 }
-
+  
 static int ble_response (ble_message_t *response)
 {
   ble_message_t message;
@@ -261,33 +261,57 @@ static int ble_event (ble_message_t *message)
   return 0;
 }
 
-int ble_receive_timer (void)
+int ble_set_timer (int millisec, int cause)
 {
   int status = 0;
+  timer_list_entry_t *timer_list_entry;
 
-  while (timer_expiry_list != NULL)
+  timer_list_entry = (timer_list_entry_t *)malloc (sizeof (*timer_list_entry));
+  timer_list_entry->info.millisec = millisec;
+  timer_list_entry->info.callback = (void (*)(void *))ble_timer_callback;
+  timer_list_entry->info.data     = timer_list_entry;
+  timer_list_entry->cause         = cause;
+  if ((timer_start (&(timer_list_entry->info))) != 0)
+  {
+    free (timer_list_entry);
+    status = -1;
+  }
+
+  return status;
+}
+
+int ble_check_timer (void)
+{
+  return list_length ((list_entry_t **)(&timer_expiry_list));
+}
+
+int ble_receive_timer (ble_message_t *message)
+{
+  if (timer_expiry_list != NULL)
   {
     timer_list_entry_t *timer_list_entry = timer_expiry_list;
 
-    switch (timer_list_entry->cause)
-    {
-      case BLE_TIMER_SCAN_STOP:
-      {
-        status = ble_end_procedure ();
-        break;
-      }
-      default:
-      {
-        printf ("Unknown timer expiry cause %d\n", timer_list_entry->cause);
-        break;
-      }
-    }
-
+    message->header.type    = BLE_EVENT;
+    message->header.length  = 1;
+    message->header.class   = BLE_CLASS_HW;
+    message->header.command = BLE_EVENT_SOFT_TIMER;
+    message->data[0]        = (uint8)(timer_list_entry->cause);
+    
     list_remove ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
     free (timer_list_entry);
   }
 
-  return status;
+  return list_length ((list_entry_t **)(&timer_expiry_list));
+}
+
+void ble_flush_timer (void)
+{
+  while (timer_expiry_list != NULL)
+  {
+    timer_list_entry_t *timer_list_entry = timer_expiry_list;
+    list_remove ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
+    free (timer_list_entry);
+  }  
 }
 
 int ble_init (void)
@@ -345,10 +369,10 @@ void ble_deinit (void)
 {
 }
 
-int ble_receive_serial (void)
+int ble_check_serial (void)
 {
-  ble_message_t message;
   int status;
+  ble_message_t message;
 
   while ((status = serial_rx (sizeof (message.header), (unsigned char *)(&(message.header)))) > 0)
   {
@@ -368,35 +392,32 @@ int ble_receive_serial (void)
     }
   }
 
-  while (ble_message_list != NULL)
+  return list_length ((list_entry_t **)(&ble_message_list));
+}
+
+int ble_receive_serial (ble_message_t *message)
+{
+  if (ble_message_list != NULL)
   {
     ble_message_list_entry_t *message_list_entry;
 
     message_list_entry = ble_message_list;
-    if (message_list_entry->message.header.type == BLE_EVENT)
-    {
-      /* Store for message for processing */
-      status = ble_event (&(message_list_entry->message));
-    }
-    else
-    {
-      printf ("Message not handled\n");
-      printf ("  type %d, length %d, class %d, command %d\n", message_list_entry->message.header.type,
-                                                              message_list_entry->message.header.length,
-                                                              message_list_entry->message.header.class,
-                                                              message_list_entry->message.header.command);
-    }
-
+    *message = message_list_entry->message;
     list_remove ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
     free (message_list_entry);
   }
 
-  if (status < 0)
-  {
-    printf ("Serial receive error, message list 0x%x\n", (unsigned int)ble_message_list);
-  }
+  return list_length ((list_entry_t **)(&ble_message_list));
+}
 
-  return status;
+void ble_flush_serial (void)
+{
+  while (ble_message_list != NULL)
+  {
+    ble_message_list_entry_t *message_list_entry = ble_message_list;
+    list_remove ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
+    free (message_list_entry);
+  }  
 }
 
 int ble_scan_start (void)
@@ -476,18 +497,7 @@ int ble_scan_start (void)
 
   if (status > 0)
   {
-    timer_list_entry_t *timer_list_entry;
-
-    timer_list_entry = (timer_list_entry_t *)malloc (sizeof (*timer_list_entry));
-    timer_list_entry->info.millisec = BLE_SCAN_DURATION;
-    timer_list_entry->info.callback = (void (*)(void *))ble_timer_callback;
-    timer_list_entry->info.data     = timer_list_entry;
-    timer_list_entry->cause         = BLE_TIMER_SCAN_STOP;
-    if ((timer_start (&(timer_list_entry->info))) != 0)
-    {
-      free (timer_list_entry);
-      status = -1;
-    }
+    status = ble_set_timer (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP);
   }
 
   return status;

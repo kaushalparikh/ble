@@ -260,7 +260,8 @@ enum
 /* Timers */
 enum
 {
-  BLE_TIMER_SCAN_STOP = 0
+  BLE_TIMER_WAKEUP    = 0,
+  BLE_TIMER_SCAN_STOP = 1
 };
 
 /* Message header */
@@ -494,13 +495,23 @@ typedef struct PACKED
 
 /* Function declarations */
 
-extern int ble_receive_timer (void);
+extern int ble_set_timer (int millisec, int cause);
 
+extern int ble_check_timer (void);
+
+extern int ble_receive_timer (ble_message_t *message);
+
+extern void ble_flush_timer (void);
+  
 extern int ble_init (void);
 
 extern void ble_deinit (void);
 
-extern int ble_receive_serial (void);
+extern int ble_check_serial (void);
+
+extern int ble_receive_serial (ble_message_t *message);
+
+extern void ble_flush_serial (void);
 
 extern int ble_scan_start (void);
 
