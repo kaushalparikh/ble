@@ -260,8 +260,9 @@ enum
 /* Timers */
 enum
 {
-  BLE_TIMER_WAKEUP    = 0,
-  BLE_TIMER_SCAN_STOP = 1
+  BLE_TIMER_SCAN      = 0,
+  BLE_TIMER_SCAN_STOP = 1,
+  BLE_TIMER_PROFILE   = 2
 };
 
 /* Message header */
@@ -507,6 +508,8 @@ extern int ble_init (void);
 
 extern void ble_deinit (void);
 
+extern void ble_print_message (ble_message_t *message);
+
 extern int ble_check_serial (void);
 
 extern int ble_receive_serial (ble_message_t *message);
@@ -514,6 +517,8 @@ extern int ble_receive_serial (ble_message_t *message);
 extern void ble_flush_serial (void);
 
 extern int ble_scan_start (void);
+
+extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
 extern int ble_end_procedure (void);
 

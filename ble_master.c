@@ -8,71 +8,107 @@
 
 typedef enum
 {
-  BLE_STATE_WAKEUP   = 0,
-  BLE_STATE_SCAN     = 1,
-  BLE_STATE_PROFILE  = 2,
-  BLE_STATE_DATA     = 3,
-  BLE_STATE_MAX      = 4
+  BLE_STATE_SCAN     = 0,
+  BLE_STATE_PROFILE  = 1,
+  BLE_STATE_DATA     = 2,
+  BLE_STATE_MAX      = 3
 } ble_state_e;
 
 typedef ble_state_e (*ble_state_handler_t)(ble_message_t *message);
 
-static ble_state_e ble_wakeup (ble_message_t *message);
 static ble_state_e ble_scan (ble_message_t *message);
 static ble_state_e ble_profile (ble_message_t *message);
 static ble_state_e ble_data (ble_message_t *message);
 
-static ble_state_e ble_state = BLE_STATE_WAKEUP;
+static ble_state_e ble_state = BLE_STATE_SCAN;
 
 static ble_state_handler_t state_handler[BLE_STATE_MAX] =
 {
-  ble_wakeup,
   ble_scan,
   ble_profile,
   ble_data
 };
 
-static ble_state_e ble_wakeup (ble_message_t *message)
+
+static ble_state_e ble_scan (ble_message_t *message)
 {
   ble_state_e new_state = BLE_STATE_SCAN;
-  
-  /* Only accept wakeup timer expiry messages */
-  if ((message->header.type == BLE_EVENT) &&
-      (message->header.command == BLE_EVENT_SOFT_TIMER))
+
+  /* Only accept GAP event or timer messages */
+  if (message->header.type == BLE_EVENT)
   {
-    if ((ble_scan_start ()) <= 0)
+    switch (message->header.command)
     {
-      /* Scan start failed, try again after sometime */
-      new_state = BLE_STATE_WAKEUP;
+      case BLE_EVENT_SCAN_RESPONSE:
+      {
+        ble_event_scan_response ((ble_event_scan_response_t *)(message->data));
+        break;
+      }
+      case BLE_EVENT_SOFT_TIMER:
+      {
+        if (message->data[0] == BLE_TIMER_SCAN)
+        {
+          if ((ble_scan_start ()) > 0)
+          {
+            (void)ble_set_timer (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP);
+          }
+          else
+          {
+            /* TODO: try again after sometime */
+          }
+          
+          /* Flush rest of message, both from serial & timer */
+          ble_flush_timer ();
+          ble_flush_serial ();    
+        }
+        else if (message->data[0] == BLE_TIMER_SCAN_STOP)
+        {
+          if ((ble_end_procedure ()) > 0)
+          {
+            /* Setup timer to move to profile state */
+            (void)ble_set_timer (10, BLE_TIMER_PROFILE);
+
+            /* Scan stopped, change state to profile */
+            new_state = BLE_STATE_PROFILE;
+          }
+          else
+          {
+            /* TODO: Scan stop failed, set timer to stop sometime later */
+          }
+        }
+        
+        break;
+      }
+      default:
+      {
+        ble_print_message (message);
+        break;
+      }
     }
-    
-    /* Flush rest of message, both from serial & timer */
-    ble_flush_timer ();
-    ble_flush_serial ();    
+  }
+  else
+  {
+    ble_print_message (message);
   }
 
   return new_state;
 }
 
-static ble_state_e ble_scan (ble_message_t *message)
-{
-  return BLE_STATE_PROFILE;
-}
-
 static ble_state_e ble_profile (ble_message_t *message)
 {
-  (void)ble_set_timer (30000, BLE_TIMER_WAKEUP);
-  return BLE_STATE_WAKEUP;
+  (void)ble_set_timer (30000, BLE_TIMER_SCAN);
+
+  return BLE_STATE_SCAN;
 }
 
 static ble_state_e ble_data (ble_message_t *message)
 {
-  return BLE_STATE_WAKEUP;
+  return BLE_STATE_SCAN;
 }
 
 void master_loop (void)
 {
-  (void)ble_set_timer (10, BLE_TIMER_WAKEUP);
+  (void)ble_set_timer (10, BLE_TIMER_SCAN);
 
   while (1)
   {
