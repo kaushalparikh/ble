@@ -25,6 +25,14 @@ typedef unsigned long int  uint32;
 /* BLE device address */
 #define BLE_DEVICE_ADDRESS_LENGTH  (6)
 
+typedef enum
+{
+  BLE_DEVICE_SCAN           = 0,
+  BLE_DEVICE_UPDATE_ADV     = 1,
+  BLE_DEVICE_UPDATE_PROFILE = 2,
+  BLE_DEVICE_UPDATE_DATA    = 3
+} ble_device_status_e;
+
 typedef struct PACKED
 {
     uint8 byte[BLE_DEVICE_ADDRESS_LENGTH];
@@ -36,7 +44,8 @@ typedef struct
   ble_device_address_t  address;
   uint8                 address_type;
   char                 *name;
-  int8                  tx_power;
+  int                   tx_power;
+  ble_device_status_e   status;
 } ble_device_t;
 
 /* Message header definitions */
@@ -260,9 +269,11 @@ enum
 /* Timers */
 enum
 {
-  BLE_TIMER_SCAN      = 0,
-  BLE_TIMER_SCAN_STOP = 1,
-  BLE_TIMER_PROFILE   = 2
+  BLE_TIMER_SCAN         = 0,
+  BLE_TIMER_SCAN_STOP    = 1,
+  BLE_TIMER_PROFILE      = 2,
+  BLE_TIMER_PROFILE_STOP = 3,
+  BLE_TIMER_DATA         = 4
 };
 
 /* Message header */
@@ -472,6 +483,13 @@ typedef struct PACKED
 
 typedef struct PACKED
 {
+  uint8 length;
+  uint8 type;
+  uint8 value[];
+} ble_adv_data_t;
+
+typedef struct PACKED
+{
   int8                 rssi;
   uint8                packet_type;
   ble_device_address_t device_address;
@@ -508,6 +526,8 @@ extern int ble_init (void);
 
 extern void ble_deinit (void);
 
+extern int ble_check_devices_status (ble_device_status_e status);
+
 extern void ble_print_message (ble_message_t *message);
 
 extern int ble_check_serial (void);
@@ -516,11 +536,13 @@ extern int ble_receive_serial (ble_message_t *message);
 
 extern void ble_flush_serial (void);
 
-extern int ble_scan_start (void);
+extern int ble_start_scan (void);
 
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
 extern int ble_end_procedure (void);
+
+extern int ble_start_profile (void);
 
 #endif
 

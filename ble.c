@@ -98,7 +98,7 @@ static int ble_command (ble_message_t *message)
   return status;
 }
 
-static ble_device_t * ble_device_find (ble_device_address_t *address, uint8 address_type)
+static ble_device_t * ble_find_device (ble_device_address_t *address, uint8 address_type)
 {
   ble_device_t *device = NULL;
   ble_device_list_entry_t *device_list_entry = ble_device_list;
@@ -274,6 +274,23 @@ void ble_print_message (ble_message_t *message)
                                                               message->header.command);
 }
 
+int ble_check_devices_status (ble_device_status_e status)
+{
+  int num_of_devices = 0;
+  ble_device_list_entry_t *device_list_entry = ble_device_list;
+
+  while (device_list_entry != NULL)
+  {
+    if (device_list_entry->info.status == status)
+    {
+      num_of_devices++;
+    }
+    device_list_entry = device_list_entry->next;
+  }
+
+  return num_of_devices;
+}
+
 int ble_check_serial (void)
 {
   int status;
@@ -326,7 +343,7 @@ void ble_flush_serial (void)
   }  
 }
 
-int ble_scan_start (void)
+int ble_start_scan (void)
 {
   int status;
   ble_message_t message;
@@ -407,10 +424,9 @@ int ble_scan_start (void)
 void ble_event_scan_response (ble_event_scan_response_t *scan_response)
 {
   int i;
-  int new_device = 0;
   ble_device_t *device;
 
-  device = ble_device_find (&(scan_response->device_address), scan_response->address_type);
+  device = ble_find_device (&(scan_response->device_address), scan_response->address_type);
   if (device == NULL)
   {
     ble_device_list_entry_t *device_list_entry 
@@ -423,47 +439,45 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
     device->address_type = scan_response->address_type;
     device->name         = NULL;
     device->tx_power     = -127;
-    new_device           = 1;
+    device->status       = BLE_DEVICE_UPDATE_PROFILE;
   }
   
-  for (i = 0; i < scan_response->length; )
+  for (i = 0; i < scan_response->length; i += (scan_response->data[i] + 1))
   {
-    if (scan_response->data[i+1] == BLE_ADV_TX_POWER)
+    ble_adv_data_t *adv_data = (ble_adv_data_t *)&(scan_response->data[i]);
+
+    adv_data->length--;    
+    if (adv_data->type == BLE_ADV_TX_POWER)
     {
-      device->tx_power = (int8)(scan_response->data[i+2]);
+      device->tx_power = (int)(adv_data->value[0]);
     }
-    else if (scan_response->data[i+1] == BLE_ADV_LOCAL_NAME)
+    else if (adv_data->type == BLE_ADV_LOCAL_NAME)
     {
       if (device->name != NULL)
       {
         free (device->name);
       }
-      device->name = (char *)malloc (scan_response->data[i]);
-      device->name[scan_response->data[i]] = '\0';
-      strncpy (device->name, (char *)&(scan_response->data[i+2]), (scan_response->data[i] - 1));
+      device->name = (char *)malloc (adv_data->length + 1);
+      device->name[adv_data->length] = '\0';
+      strncpy (device->name, (char *)(adv_data->value), adv_data->length);
     }
-    else if ((scan_response->data[i+1] == BLE_ADV_LOCAL_NAME_SHORT) &&
+    else if ((adv_data->type == BLE_ADV_LOCAL_NAME_SHORT) &&
              (device->name != NULL))
     {
-      device->name = (char *)malloc (scan_response->data[i]);
-      device->name[scan_response->data[i]] = '\0';
-      strncpy (device->name, (char *)&(scan_response->data[i+2]), (scan_response->data[i] - 1));
+      device->name = (char *)malloc (adv_data->length + 1);
+      device->name[adv_data->length] = '\0';
+      strncpy (device->name, (char *)(adv_data->value), adv_data->length);
     }
-      
-    i += (1 + scan_response->data[i]);
   }
 
-  if (new_device)
+  printf ("Found device: %s\n", device->name);
+  printf ("     Address: ");
+  for (i = 0; i < BLE_DEVICE_ADDRESS_LENGTH; i++)
   {
-    printf ("Found device: %s\n", device->name);
-    printf ("     Address: ");
-    for (i = 0; i < BLE_DEVICE_ADDRESS_LENGTH; i++)
-    {
-      printf ("%02x", scan_response->device_address.byte[i]);
-    }
-    printf (" (%s)\n", ((device->address_type > 0) ? "random" : "public"));
-    printf ("    Tx power: %d dBm\n", device->tx_power);
+    printf ("%02x", scan_response->device_address.byte[i]);
   }
+  printf (" (%s)\n", ((device->address_type > 0) ? "random" : "public"));
+  printf ("    Tx power: %d dBm\n", device->tx_power);
 }
 
 int ble_end_procedure (void)
@@ -493,5 +507,10 @@ int ble_end_procedure (void)
   }
 
   return status;
+}
+
+int ble_start_profile (void)
+{
+  return 0;
 }
 

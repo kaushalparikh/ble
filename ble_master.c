@@ -48,7 +48,7 @@ static ble_state_e ble_scan (ble_message_t *message)
       {
         if (message->data[0] == BLE_TIMER_SCAN)
         {
-          if ((ble_scan_start ()) > 0)
+          if ((ble_start_scan ()) > 0)
           {
             (void)ble_set_timer (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP);
           }
@@ -65,11 +65,21 @@ static ble_state_e ble_scan (ble_message_t *message)
         {
           if ((ble_end_procedure ()) > 0)
           {
-            /* Setup timer to move to profile state */
-            (void)ble_set_timer (10, BLE_TIMER_PROFILE);
-
-            /* Scan stopped, change state to profile */
-            new_state = BLE_STATE_PROFILE;
+            /* Check if some devices need service discovery/update */
+            if ((ble_check_devices_status (BLE_DEVICE_UPDATE_PROFILE)) > 0)
+            {
+              (void)ble_set_timer (10, BLE_TIMER_PROFILE);
+              new_state = BLE_STATE_PROFILE;
+            }
+            else if ((ble_check_devices_status (BLE_DEVICE_UPDATE_DATA)) > 0)
+            {
+              (void)ble_set_timer (10, BLE_TIMER_DATA);
+              new_state = BLE_STATE_DATA;
+            }
+            else
+            {
+              (void)ble_set_timer (10, BLE_TIMER_SCAN);
+            }
           }
           else
           {
@@ -96,9 +106,57 @@ static ble_state_e ble_scan (ble_message_t *message)
 
 static ble_state_e ble_profile (ble_message_t *message)
 {
-  (void)ble_set_timer (5000, BLE_TIMER_SCAN);
+  ble_state_e new_state = BLE_STATE_PROFILE;
 
-  return BLE_STATE_SCAN;
+  /* Only accept GAP event or timer messages */
+  if (message->header.type == BLE_EVENT)
+  {
+    switch (message->header.command)
+    {
+      /*
+      case BLE_EVENT_SCAN_RESPONSE:
+      {
+        ble_event_scan_response ((ble_event_scan_response_t *)(message->data));
+        break;
+      }
+      */
+      case BLE_EVENT_SOFT_TIMER:
+      {
+        if (message->data[0] == BLE_TIMER_PROFILE)
+        {
+          if ((ble_start_profile ()) > 0)
+          {
+            (void)ble_set_timer (30000, BLE_TIMER_PROFILE_STOP);
+          }
+          else
+          {
+            /* TODO: try again after sometime */
+          }
+          
+          /* Flush rest of message, both from serial & timer */
+          ble_flush_timer ();
+          ble_flush_serial ();    
+        }
+        else if (message->data[0] == BLE_TIMER_PROFILE_STOP)
+        {
+          /* TODO: Stop all connections */
+        }
+        
+        break;
+      }
+      default:
+      {
+        ble_print_message (message);
+        break;
+      }
+    }
+  }
+  else
+  {
+    ble_print_message (message);
+  }
+
+  return new_state;  
 }
 
 static ble_state_e ble_data (ble_message_t *message)
