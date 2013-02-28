@@ -96,7 +96,7 @@ static ble_state_e ble_scan (ble_message_t *message)
 
 static ble_state_e ble_profile (ble_message_t *message)
 {
-  (void)ble_set_timer (30000, BLE_TIMER_SCAN);
+  (void)ble_set_timer (5000, BLE_TIMER_SCAN);
 
   return BLE_STATE_SCAN;
 }
@@ -112,20 +112,25 @@ void master_loop (void)
 
   while (1)
   {
-    if (((ble_check_serial ()) > 0) || ((ble_check_timer ()) > 0))
+    int pending;
+    ble_message_t message;
+
+    if ((ble_check_timer ()) > 0)
     {
-      int pending;
-      ble_message_t message;
-
-      while ((pending = ble_receive_timer (&message)) > 0)
+      do
       {
+        pending = ble_receive_timer (&message);
         ble_state = state_handler[ble_state](&message);
-      }
-
-      while ((pending = ble_receive_serial (&message)) > 0)
+      } while (pending > 0);
+    }
+    
+    if ((ble_check_serial ()) > 0)
+    {
+      do
       {
+        pending = ble_receive_serial (&message);
         ble_state = state_handler[ble_state](&message);
-      }
+      } while (pending > 0);
     }
   }
 }
