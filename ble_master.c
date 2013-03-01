@@ -48,6 +48,7 @@ static ble_state_e ble_scan (ble_message_t *message)
       {
         if (message->data[0] == BLE_TIMER_SCAN)
         {
+          printf ("BLE in scan state\n");
           if ((ble_start_scan ()) > 0)
           {
             (void)ble_set_timer (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP);
@@ -66,12 +67,12 @@ static ble_state_e ble_scan (ble_message_t *message)
           if ((ble_end_procedure ()) > 0)
           {
             /* Check if some devices need service discovery/update */
-            if ((ble_check_devices_status (BLE_DEVICE_UPDATE_PROFILE)) > 0)
+            if ((ble_check_device_status (BLE_DEVICE_UPDATE_PROFILE)) > 0)
             {
               (void)ble_set_timer (10, BLE_TIMER_PROFILE);
               new_state = BLE_STATE_PROFILE;
             }
-            else if ((ble_check_devices_status (BLE_DEVICE_UPDATE_DATA)) > 0)
+            else if ((ble_check_device_status (BLE_DEVICE_UPDATE_DATA)) > 0)
             {
               (void)ble_set_timer (10, BLE_TIMER_DATA);
               new_state = BLE_STATE_DATA;
@@ -124,9 +125,10 @@ static ble_state_e ble_profile (ble_message_t *message)
       {
         if (message->data[0] == BLE_TIMER_PROFILE)
         {
+          printf ("BLE in profile state\n");
           if ((ble_start_profile ()) > 0)
           {
-            (void)ble_set_timer (30000, BLE_TIMER_PROFILE_STOP);
+            (void)ble_set_timer (3000, BLE_TIMER_PROFILE_STOP);
           }
           else
           {
@@ -140,6 +142,8 @@ static ble_state_e ble_profile (ble_message_t *message)
         else if (message->data[0] == BLE_TIMER_PROFILE_STOP)
         {
           /* TODO: Stop all connections */
+          (void)ble_set_timer (1000, BLE_TIMER_SCAN);
+          new_state = BLE_STATE_SCAN;
         }
         
         break;
