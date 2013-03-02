@@ -7,6 +7,12 @@
 /* Convert MS to intervals of 625us */
 #define MS_TO_625US(millisec)  (((millisec * 1000) + 624)/625)
 
+/* Convert MS to intervals of 1.25ms or 1250us */
+#define MS_TO_1250US(millisec)  (((millisec * 1000) + 1249)/1250)
+
+/* Convert MS to intervals of 10ms */
+#define MS_TO_10MS(millisec)  ((millisec + 9)/10)
+
 /* Basic definitions */
 #ifdef __GNUC__
 #define PACKED __attribute__((packed))
@@ -25,18 +31,33 @@ typedef unsigned long int  uint32;
 /* BLE device address */
 #define BLE_DEVICE_ADDRESS_LENGTH  (6)
 
+/* BLE device address type */
+enum
+{
+  BLE_ADDR_PUBLIC = 0,
+  BLE_ADDR_RANDOM = 1
+};
+
 typedef struct PACKED
 {
-    uint8 byte[BLE_DEVICE_ADDRESS_LENGTH];
+  uint8 byte[BLE_DEVICE_ADDRESS_LENGTH];
+  uint8 type;  
 } ble_device_address_t;
+
+/* BLE device status */
+typedef enum
+{
+  BLE_DEVICE_LOST           = 0,
+  BLE_DEVICE_UPDATE_PROFILE = 1,
+  BLE_DEVICE_UPDATE_DATA    = 2
+} ble_device_status_e;
 
 /* BLE device */
 typedef struct
 {
   ble_device_address_t  address;
-  uint8                 address_type;
   char                 *name;
-  int8                  tx_power;
+  ble_device_status_e   status;
 } ble_device_t;
 
 /* Message header definitions */
@@ -260,9 +281,11 @@ enum
 /* Timers */
 enum
 {
-  BLE_TIMER_SCAN      = 0,
-  BLE_TIMER_SCAN_STOP = 1,
-  BLE_TIMER_PROFILE   = 2
+  BLE_TIMER_SCAN         = 0,
+  BLE_TIMER_SCAN_STOP    = 1,
+  BLE_TIMER_PROFILE      = 2,
+  BLE_TIMER_PROFILE_STOP = 3,
+  BLE_TIMER_DATA         = 4
 };
 
 /* Message header */
@@ -394,13 +417,6 @@ enum
   BLE_ADV_SCAN_IND        = 6
 };
 
-/* Advertise address type */
-enum
-{
-  BLE_ADDR_PUBLIC = 0,
-  BLE_ADDR_RANDOM = 1
-};
-
 /* Advertise data types */
 enum
 {
@@ -472,10 +488,16 @@ typedef struct PACKED
 
 typedef struct PACKED
 {
+  uint8 length;
+  uint8 type;
+  uint8 value[];
+} ble_adv_data_t;
+
+typedef struct PACKED
+{
   int8                 rssi;
   uint8                packet_type;
   ble_device_address_t device_address;
-  uint8                address_type;
   uint8                bond;
   uint8                length;
   uint8                data[];
@@ -493,6 +515,79 @@ typedef struct PACKED
   uint16               result;
 } ble_response_end_procedure_t;
 
+/* GAP connect command definitions */
+/* Connection interval, timeout, latency */
+#define BLE_MIN_CONNECT_INTERVAL  MS_TO_1250US(10)
+#define BLE_MAX_CONNECT_INTERVAL  MS_TO_1250US(20)
+
+#define BLE_CONNECT_TIMEOUT  MS_TO_10MS(1000)
+
+#define BLE_CONNECT_LATENCY  (0)
+
+/* Connection status flags */
+enum
+{
+  BLE_CONNECT_STARTED   = 1,
+  BLE_CONNECT_ENCRYPTED = 2,
+  BLE_CONNECT_COMPLETED = 4,
+  BLE_CONNECT_UPDATED   = 8
+};
+
+/* Disconnection cause */
+enum
+{
+  BLE_DISCONNECT_USER = 0
+};
+
+/* Connection definitions */
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  ble_device_address_t address;
+  uint16               min_interval;
+  uint16               max_interval;
+  uint16               timeout;
+  uint16               latency;
+} ble_command_connect_direct_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint16               result;
+  uint8                handle;
+} ble_response_connect_direct_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                handle;
+  uint8                flags;
+  ble_device_address_t address;
+  uint16               interval;
+  uint16               timeout;
+  uint16               latency;
+  uint8                bonding;
+} ble_event_connection_status_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                handle;
+} ble_command_disconnect_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                handle;
+  uint16               result;
+} ble_response_disconnect_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                handle;
+  uint16               cause;
+} ble_event_connection_disconnect_t;
 
 /* Function declarations */
 
@@ -508,6 +603,8 @@ extern int ble_init (void);
 
 extern void ble_deinit (void);
 
+extern int ble_check_device_status (ble_device_status_e status);
+
 extern void ble_print_message (ble_message_t *message);
 
 extern int ble_check_serial (void);
@@ -516,11 +613,13 @@ extern int ble_receive_serial (ble_message_t *message);
 
 extern void ble_flush_serial (void);
 
-extern int ble_scan_start (void);
+extern int ble_start_scan (void);
 
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
 extern int ble_end_procedure (void);
+
+extern int ble_start_profile (void);
 
 #endif
 

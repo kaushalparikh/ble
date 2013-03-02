@@ -48,11 +48,9 @@ static ble_state_e ble_scan (ble_message_t *message)
       {
         if (message->data[0] == BLE_TIMER_SCAN)
         {
-          if ((ble_scan_start ()) > 0)
-          {
-            (void)ble_set_timer (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP);
-          }
-          else
+          printf ("BLE Scan state\n");
+
+          if ((ble_start_scan ()) <= 0)
           {
             /* TODO: try again after sometime */
           }
@@ -63,17 +61,27 @@ static ble_state_e ble_scan (ble_message_t *message)
         }
         else if (message->data[0] == BLE_TIMER_SCAN_STOP)
         {
-          if ((ble_end_procedure ()) > 0)
+          if ((ble_end_procedure ()) <= 0)
           {
-            /* Setup timer to move to profile state */
-            (void)ble_set_timer (10, BLE_TIMER_PROFILE);
-
-            /* Scan stopped, change state to profile */
-            new_state = BLE_STATE_PROFILE;
+            /* TODO: Scan stop failed, set timer to stop sometime later */
           }
           else
           {
-            /* TODO: Scan stop failed, set timer to stop sometime later */
+            /* Check if some devices need service discovery/update */
+            if ((ble_check_device_status (BLE_DEVICE_UPDATE_PROFILE)) > 0)
+            {
+              (void)ble_set_timer (10, BLE_TIMER_PROFILE);
+              new_state = BLE_STATE_PROFILE;
+            }
+            else if ((ble_check_device_status (BLE_DEVICE_UPDATE_DATA)) > 0)
+            {
+              (void)ble_set_timer (10, BLE_TIMER_DATA);
+              new_state = BLE_STATE_DATA;
+            }
+            else
+            {
+              (void)ble_set_timer (10, BLE_TIMER_SCAN);
+            }
           }
         }
         
@@ -96,9 +104,60 @@ static ble_state_e ble_scan (ble_message_t *message)
 
 static ble_state_e ble_profile (ble_message_t *message)
 {
-  (void)ble_set_timer (30000, BLE_TIMER_SCAN);
+  ble_state_e new_state = BLE_STATE_PROFILE;
 
-  return BLE_STATE_SCAN;
+  /* Only accept GAP event or timer messages */
+  if (message->header.type == BLE_EVENT)
+  {
+    switch (message->header.command)
+    {
+      /*
+      case BLE_EVENT_SCAN_RESPONSE:
+      {
+        ble_event_scan_response ((ble_event_scan_response_t *)(message->data));
+        break;
+      }
+      */
+      case BLE_EVENT_SOFT_TIMER:
+      {
+        if (message->data[0] == BLE_TIMER_PROFILE)
+        {
+          printf ("BLE Profile state\n");
+          if ((ble_start_profile ()) <= 0)
+          {
+            /* Exit profile state */
+            if ((ble_check_device_status (BLE_DEVICE_UPDATE_DATA)) > 0)
+            {
+              (void)ble_set_timer (10, BLE_TIMER_DATA);
+              new_state = BLE_STATE_DATA;
+            }
+            else
+            {
+              (void)ble_set_timer (3000, BLE_TIMER_SCAN);
+              new_state = BLE_STATE_SCAN;
+            }
+          }
+          
+          /* Flush rest of message, both from serial & timer */
+          ble_flush_timer ();
+          ble_flush_serial ();    
+        }
+        
+        break;
+      }
+      default:
+      {
+        ble_print_message (message);
+        break;
+      }
+    }
+  }
+  else
+  {
+    ble_print_message (message);
+  }
+
+  return new_state;  
 }
 
 static ble_state_e ble_data (ble_message_t *message)
@@ -112,20 +171,25 @@ void master_loop (void)
 
   while (1)
   {
-    if (((ble_check_serial ()) > 0) || ((ble_check_timer ()) > 0))
+    int pending;
+    ble_message_t message;
+
+    if ((ble_check_timer ()) > 0)
     {
-      int pending;
-      ble_message_t message;
-
-      while ((pending = ble_receive_timer (&message)) > 0)
+      do
       {
+        pending = ble_receive_timer (&message);
         ble_state = state_handler[ble_state](&message);
-      }
-
-      while ((pending = ble_receive_serial (&message)) > 0)
+      } while (pending > 0);
+    }
+    
+    if ((ble_check_serial ()) > 0)
+    {
+      do
       {
+        pending = ble_receive_serial (&message);
         ble_state = state_handler[ble_state](&message);
-      }
+      } while (pending > 0);
     }
   }
 }

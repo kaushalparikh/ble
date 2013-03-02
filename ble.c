@@ -40,6 +40,28 @@ typedef struct ble_device_list_entry ble_device_list_entry_t;
 
 LIST_HEAD_INIT (ble_device_list_entry_t, ble_device_list);
 
+struct ble_list_entry
+{
+  struct ble_list_entry *next;
+  void                  *data;
+};
+
+typedef struct ble_list_entry ble_list_entry_t;
+
+LIST_HEAD_INIT (ble_list_entry_t, ble_update_list);
+
+typedef struct
+{
+  ble_device_t *device;
+  uint8         handle;
+} ble_connection_params_t;
+
+static ble_connection_params_t connection_params = 
+{
+  .device = NULL,
+  .handle = 0
+};
+
 
 static void ble_timer_callback (timer_list_entry_t *timer_list_entry)
 {
@@ -98,15 +120,14 @@ static int ble_command (ble_message_t *message)
   return status;
 }
 
-static ble_device_t * ble_device_find (ble_device_address_t *address, uint8 address_type)
+static ble_device_t * ble_find_device (ble_device_address_t *address)
 {
   ble_device_t *device = NULL;
   ble_device_list_entry_t *device_list_entry = ble_device_list;
 
   while (device_list_entry != NULL)
   {
-    if ((device_list_entry->info.address_type == address_type) &&
-        ((memcmp (address, &(device_list_entry->info.address), BLE_DEVICE_ADDRESS_LENGTH)) == 0))
+    if ((memcmp (address, &(device_list_entry->info.address), sizeof (*address))) == 0)
     {
       device = &(device_list_entry->info);
       break;
@@ -159,7 +180,7 @@ static int ble_hello (void)
 
 int ble_set_timer (int millisec, int cause)
 {
-  int status = 0;
+  int status = 1;
   timer_list_entry_t *timer_list_entry;
 
   timer_list_entry = (timer_list_entry_t *)malloc (sizeof (*timer_list_entry));
@@ -274,6 +295,33 @@ void ble_print_message (ble_message_t *message)
                                                               message->header.command);
 }
 
+int ble_check_device_status (ble_device_status_e status)
+{
+  int num_of_devices = 0;
+  ble_device_list_entry_t *device_list_entry = ble_device_list;
+  ble_list_entry_t *list_entry = ble_update_list;
+
+  while (ble_update_list != NULL)
+  {
+    list_remove ((list_entry_t **)(&ble_update_list), (list_entry_t *)list_entry);
+    free (list_entry);
+  }
+
+  while (device_list_entry != NULL)
+  {
+    if (device_list_entry->info.status == status)
+    {
+      ble_list_entry_t *list_entry = (ble_list_entry_t *)malloc (sizeof (*list_entry));
+      list_entry->data = &(device_list_entry->info);
+      list_add ((list_entry_t **)(&ble_update_list), (list_entry_t *)list_entry);
+      num_of_devices++;
+    }
+    device_list_entry = device_list_entry->next;
+  }
+
+  return num_of_devices;
+}
+
 int ble_check_serial (void)
 {
   int status;
@@ -326,7 +374,7 @@ void ble_flush_serial (void)
   }  
 }
 
-int ble_scan_start (void)
+int ble_start_scan (void)
 {
   int status;
   ble_message_t message;
@@ -401,16 +449,20 @@ int ble_scan_start (void)
     }
   }
 
+  if (status > 0)
+  {
+    status = ble_set_timer (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP);
+  }
+
   return status;
 }
 
 void ble_event_scan_response (ble_event_scan_response_t *scan_response)
 {
   int i;
-  int new_device = 0;
   ble_device_t *device;
 
-  device = ble_device_find (&(scan_response->device_address), scan_response->address_type);
+  device = ble_find_device (&(scan_response->device_address));
   if (device == NULL)
   {
     ble_device_list_entry_t *device_list_entry 
@@ -420,50 +472,51 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
     list_add ((list_entry_t **)(&ble_device_list), (list_entry_t *)device_list_entry);
 
     device->address      = scan_response->device_address;
-    device->address_type = scan_response->address_type;
     device->name         = NULL;
-    device->tx_power     = -127;
-    new_device           = 1;
+    device->status       = BLE_DEVICE_UPDATE_PROFILE;
+    
+    printf ("New device --\n");
+  }
+  else if (device->status == BLE_DEVICE_LOST)
+  {
+    printf ("Found device --\n");
+    device->status = BLE_DEVICE_UPDATE_DATA;
+  }
+  else
+  {
+    printf ("Listed device --\n");
   }
   
-  for (i = 0; i < scan_response->length; )
+  for (i = 0; i < scan_response->length; i += (scan_response->data[i] + 1))
   {
-    if (scan_response->data[i+1] == BLE_ADV_TX_POWER)
-    {
-      device->tx_power = (int8)(scan_response->data[i+2]);
-    }
-    else if (scan_response->data[i+1] == BLE_ADV_LOCAL_NAME)
+    ble_adv_data_t *adv_data = (ble_adv_data_t *)&(scan_response->data[i]);
+
+    if (adv_data->type == BLE_ADV_LOCAL_NAME)
     {
       if (device->name != NULL)
       {
         free (device->name);
       }
-      device->name = (char *)malloc (scan_response->data[i]);
-      device->name[scan_response->data[i]] = '\0';
-      strncpy (device->name, (char *)&(scan_response->data[i+2]), (scan_response->data[i] - 1));
+      device->name = (char *)malloc (adv_data->length);
+      device->name[adv_data->length-1] = '\0';
+      strncpy (device->name, (char *)(adv_data->value), (adv_data->length-1));
     }
-    else if ((scan_response->data[i+1] == BLE_ADV_LOCAL_NAME_SHORT) &&
+    else if ((adv_data->type == BLE_ADV_LOCAL_NAME_SHORT) &&
              (device->name != NULL))
     {
-      device->name = (char *)malloc (scan_response->data[i]);
-      device->name[scan_response->data[i]] = '\0';
-      strncpy (device->name, (char *)&(scan_response->data[i+2]), (scan_response->data[i] - 1));
+      device->name = (char *)malloc (adv_data->length);
+      device->name[adv_data->length-1] = '\0';
+      strncpy (device->name, (char *)(adv_data->value), (adv_data->length-1));
     }
-      
-    i += (1 + scan_response->data[i]);
   }
 
-  if (new_device)
+  printf ("     Name: %s\n", device->name);
+  printf ("  Address: ");
+  for (i = 0; i < BLE_DEVICE_ADDRESS_LENGTH; i++)
   {
-    printf ("Found device: %s\n", device->name);
-    printf ("     Address: ");
-    for (i = 0; i < BLE_DEVICE_ADDRESS_LENGTH; i++)
-    {
-      printf ("%02x", scan_response->device_address.byte[i]);
-    }
-    printf (" (%s)\n", ((device->address_type > 0) ? "random" : "public"));
-    printf ("    Tx power: %d dBm\n", device->tx_power);
+    printf ("%02x", device->address.byte[i]);
   }
+  printf (" (%s)\n", ((device->address.type > 0) ? "random" : "public"));
 }
 
 int ble_end_procedure (void)
@@ -492,6 +545,20 @@ int ble_end_procedure (void)
     printf ("BLE End procedure response failed with %d\n", status);
   }
 
+  return status;
+}
+
+int ble_start_profile (void)
+{
+  int status = 0;
+  ble_device_t *device;
+
+  device = (ble_device_t *)(ble_update_list->data);
+  if (device != NULL)
+  {
+    /* status = ble_connect_direct (device); */
+  }
+  
   return status;
 }
 
