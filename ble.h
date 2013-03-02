@@ -172,7 +172,7 @@ enum
   BLE_COMMAND_SET_PRIVACY_FLAGS         = 0,
   BLE_COMMAND_SET_MODE                  = 1,
   BLE_COMMAND_DISCOVER                  = 2,
-  BLE_COMMAND_CONNEC_DIRECT             = 3,
+  BLE_COMMAND_CONNECT_DIRECT            = 3,
   BLE_COMMAND_END_PROCEDURE             = 4,
   BLE_COMMAND_CONNECT_SELECTIVE         = 5,
   BLE_COMMAND_SET_FILTERING             = 6,
@@ -495,6 +495,7 @@ typedef struct PACKED
 
 typedef struct PACKED
 {
+  ble_message_header_t header;
   int8                 rssi;
   uint8                packet_type;
   ble_device_address_t device_address;
@@ -527,10 +528,10 @@ typedef struct PACKED
 /* Connection status flags */
 enum
 {
-  BLE_CONNECT_STARTED   = 1,
-  BLE_CONNECT_ENCRYPTED = 2,
-  BLE_CONNECT_COMPLETED = 4,
-  BLE_CONNECT_UPDATED   = 8
+  BLE_CONNECT_CREATED     = 0x01,
+  BLE_CONNECT_ENCRYPTED   = 0x02,
+  BLE_CONNECT_ESTABLISHED = 0x04,
+  BLE_CONNECT_UPDATED     = 0x08
 };
 
 /* Disconnection cause */
@@ -587,7 +588,7 @@ typedef struct PACKED
   ble_message_header_t header;
   uint8                handle;
   uint16               cause;
-} ble_event_connection_disconnect_t;
+} ble_event_disconnect_t;
 
 /* Function declarations */
 
@@ -620,6 +621,10 @@ extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 extern int ble_end_procedure (void);
 
 extern int ble_start_profile (void);
+
+extern int ble_event_connection_status (ble_event_connection_status_t *connection_status);
+
+extern void ble_event_disconnect (ble_event_disconnect_t *disconnect);
 
 #endif
 

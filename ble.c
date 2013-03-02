@@ -59,7 +59,7 @@ typedef struct
 static ble_connection_params_t connection_params = 
 {
   .device = NULL,
-  .handle = 0
+  .handle = 0xff
 };
 
 
@@ -138,6 +138,19 @@ static ble_device_t * ble_find_device (ble_device_address_t *address)
   return device;
 }
 
+static void ble_print_device (ble_device_t *device)
+{
+  int i;
+
+  printf ("     Name: %s\n", device->name);
+  printf ("  Address: ");
+  for (i = 0; i < BLE_DEVICE_ADDRESS_LENGTH; i++)
+  {
+    printf ("%02x", device->address.byte[i]);
+  }
+  printf (" (%s)\n", ((device->address.type > 0) ? "random" : "public"));
+}
+
 static int ble_reset (void)
 {
   int status;
@@ -149,6 +162,7 @@ static int ble_reset (void)
   reset->mode = BLE_RESET_NORMAL;
   status = serial_tx (((sizeof (reset->header)) + reset->header.length),
                       (unsigned char *)reset);
+  
   if (status <= 0)
   {
     printf ("BLE Reset failed with %d\n", status);
@@ -169,10 +183,86 @@ static int ble_hello (void)
   hello = (ble_command_hello_t *)(&message);
   BLE_CLASS_SYSTEM_HEADER (hello, BLE_COMMAND_HELLO);
   status = ble_command (&message);  
+  
   if (status <= 0)
   {
     printf ("BLE Hello response failed with %d\n", status);
     status = -1;
+  }
+
+  return status;
+}
+
+static int ble_connect_direct (ble_device_t *device)
+{
+  int status;
+  ble_message_t message;
+  ble_command_connect_direct_t *connect_direct;
+
+  printf ("BLE Connect direct request\n");
+  ble_print_device (device);
+
+  connect_direct = (ble_command_connect_direct_t *)(&message);
+  BLE_CLASS_GAP_HEADER (connect_direct, BLE_COMMAND_CONNECT_DIRECT);
+  connect_direct->address      = device->address;
+  connect_direct->min_interval = BLE_MIN_CONNECT_INTERVAL;
+  connect_direct->max_interval = BLE_MAX_CONNECT_INTERVAL;
+  connect_direct->timeout      = BLE_CONNECT_TIMEOUT;
+  connect_direct->latency      = BLE_CONNECT_LATENCY;
+  status = ble_command (&message);
+
+  if (status > 0)
+  {
+    ble_response_connect_direct_t *connect_direct_rsp = (ble_response_connect_direct_t *)(&message);
+    if (connect_direct_rsp->result == 0)
+    {
+      connection_params.device = device;
+      connection_params.handle = connect_direct_rsp->handle;
+    }
+    else
+    {
+      printf ("BLE Connect direct response received with failure %d\n", connect_direct_rsp->result);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("BLE Connect direct failed with %d\n", status);
+  }
+
+  return status;
+}
+
+static int ble_connect_disconnect (void)
+{
+  int status;
+  ble_message_t message;
+  ble_command_disconnect_t *disconnect;
+
+  printf ("BLE Disconnect request\n");
+
+  disconnect = (ble_command_disconnect_t *)(&message);
+  BLE_CLASS_CONNECTION_HEADER (disconnect, BLE_COMMAND_DISCONNECT);
+  disconnect->handle = connection_params.handle;
+  status = ble_command (&message);
+
+  if (status > 0)
+  {
+    ble_response_disconnect_t *disconnect_rsp = (ble_response_disconnect_t *)(&message);
+    if (disconnect_rsp->result == 0)
+    {
+      connection_params.device = NULL;
+      connection_params.handle = 0xff;
+    }
+    else
+    {
+      printf ("BLE Disconnect response received with failure %d\n", disconnect_rsp->result);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("BLE Disconnect failed with %d\n", status);
   }
 
   return status;
@@ -510,13 +600,7 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
     }
   }
 
-  printf ("     Name: %s\n", device->name);
-  printf ("  Address: ");
-  for (i = 0; i < BLE_DEVICE_ADDRESS_LENGTH; i++)
-  {
-    printf ("%02x", device->address.byte[i]);
-  }
-  printf (" (%s)\n", ((device->address.type > 0) ? "random" : "public"));
+  ble_print_device (device);
 }
 
 int ble_end_procedure (void)
@@ -550,15 +634,36 @@ int ble_end_procedure (void)
 
 int ble_start_profile (void)
 {
-  int status = 0;
+  int status = 1;
   ble_device_t *device;
 
   device = (ble_device_t *)(ble_update_list->data);
   if (device != NULL)
   {
-    /* status = ble_connect_direct (device); */
+    status = ble_connect_direct (device);
   }
   
   return status;
+}
+
+int ble_event_connection_status (ble_event_connection_status_t *connection_status)
+{
+  int status = 1;
+
+  printf ("BLE Connect status flags %02x, interval %d, timeout %d, latency %d, bonding %02x\n",
+             connection_status->flags, connection_status->interval, connection_status->timeout,
+             connection_status->latency, connection_status->bonding);
+
+  if (connection_status->flags & BLE_CONNECT_ESTABLISHED)
+  {
+    status = ble_connect_disconnect ();
+  }
+
+  return status;
+}
+
+void ble_event_disconnect (ble_event_disconnect_t *disconnect)
+{
+  printf ("BLE Disconnect reason %d\n", disconnect->cause);
 }
 

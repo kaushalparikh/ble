@@ -41,7 +41,7 @@ static ble_state_e ble_scan (ble_message_t *message)
     {
       case BLE_EVENT_SCAN_RESPONSE:
       {
-        ble_event_scan_response ((ble_event_scan_response_t *)(message->data));
+        ble_event_scan_response ((ble_event_scan_response_t *)message);
         break;
       }
       case BLE_EVENT_SOFT_TIMER:
@@ -111,13 +111,18 @@ static ble_state_e ble_profile (ble_message_t *message)
   {
     switch (message->header.command)
     {
-      /*
-      case BLE_EVENT_SCAN_RESPONSE:
+      case BLE_EVENT_STATUS:
       {
-        ble_event_scan_response ((ble_event_scan_response_t *)(message->data));
+        ble_event_connection_status ((ble_event_connection_status_t *)message);
         break;
       }
-      */
+      case BLE_EVENT_DISCONNECTED:
+      {
+        ble_event_disconnect ((ble_event_disconnect_t *)message);
+        (void)ble_set_timer (3000, BLE_TIMER_SCAN);
+        new_state = BLE_STATE_SCAN;
+        break;
+      }
       case BLE_EVENT_SOFT_TIMER:
       {
         if (message->data[0] == BLE_TIMER_PROFILE)
