@@ -29,6 +29,24 @@ static ble_state_handler_t state_handler[BLE_STATE_MAX] =
   ble_data
 };
 
+static ble_state_e ble_profile_new_state (void)
+{
+  ble_state_e new_state;
+  
+  /* Exit profile state */
+  if ((ble_check_device_status (BLE_DEVICE_UPDATE_DATA)) > 0)
+  {
+    (void)ble_set_timer (10, BLE_TIMER_DATA);
+    new_state = BLE_STATE_DATA;
+  }
+  else
+  {
+    (void)ble_set_timer (3000, BLE_TIMER_SCAN);
+    new_state = BLE_STATE_SCAN;
+  }
+
+  return new_state;
+}
 
 static ble_state_e ble_scan (ble_message_t *message)
 {
@@ -37,14 +55,14 @@ static ble_state_e ble_scan (ble_message_t *message)
   /* Only accept GAP event or timer messages */
   if (message->header.type == BLE_EVENT)
   {
-    switch (message->header.command)
+    switch ((message->header.class << 8)|message->header.command)
     {
-      case BLE_EVENT_SCAN_RESPONSE:
+      case ((BLE_CLASS_GAP << 8)|BLE_EVENT_SCAN_RESPONSE):
       {
         ble_event_scan_response ((ble_event_scan_response_t *)message);
         break;
       }
-      case BLE_EVENT_SOFT_TIMER:
+      case ((BLE_CLASS_HW << 8)|BLE_EVENT_SOFT_TIMER):
       {
         if (message->data[0] == BLE_TIMER_SCAN)
         {
@@ -109,38 +127,52 @@ static ble_state_e ble_profile (ble_message_t *message)
   /* Only accept GAP event or timer messages */
   if (message->header.type == BLE_EVENT)
   {
-    switch (message->header.command)
+    switch ((message->header.class << 8)|message->header.command)
     {
-      case BLE_EVENT_STATUS:
+      case ((BLE_CLASS_CONNECTION << 8)|BLE_EVENT_STATUS):
       {
-        ble_event_connection_status ((ble_event_connection_status_t *)message);
+        if ((ble_event_connection_status ((ble_event_connection_status_t *)message)) <= 0)
+        {
+          new_state = ble_profile_new_state ();
+
+          /* Flush rest of message, both from serial & timer */
+          ble_flush_timer ();
+          ble_flush_serial ();              
+        }
+        
         break;
       }
-      case BLE_EVENT_DISCONNECTED:
+      case ((BLE_CLASS_CONNECTION << 8)|BLE_EVENT_DISCONNECTED):
       {
-        ble_event_disconnect ((ble_event_disconnect_t *)message);
-        (void)ble_set_timer (3000, BLE_TIMER_SCAN);
-        new_state = BLE_STATE_SCAN;
+        if ((ble_event_disconnect ((ble_event_disconnect_t *)message)) <= 0)
+        {
+          new_state = ble_profile_new_state ();
+
+          /* Flush rest of message, both from serial & timer */
+          ble_flush_timer ();
+          ble_flush_serial ();            
+        }
+        
         break;
       }
-      case BLE_EVENT_SOFT_TIMER:
+      case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_GROUP_FOUND):
+      {
+        ble_event_group_found ((ble_event_group_found_t *)message);
+        break;
+      }
+      case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_PROCEDURE_COMPLETED):
+      {
+        ble_event_procedure_completed ((ble_event_procedure_completed_t *)message);
+        break;
+      }
+      case ((BLE_CLASS_HW << 8)|BLE_EVENT_SOFT_TIMER):
       {
         if (message->data[0] == BLE_TIMER_PROFILE)
         {
           printf ("BLE Profile state\n");
           if ((ble_start_profile ()) <= 0)
           {
-            /* Exit profile state */
-            if ((ble_check_device_status (BLE_DEVICE_UPDATE_DATA)) > 0)
-            {
-              (void)ble_set_timer (10, BLE_TIMER_DATA);
-              new_state = BLE_STATE_DATA;
-            }
-            else
-            {
-              (void)ble_set_timer (3000, BLE_TIMER_SCAN);
-              new_state = BLE_STATE_SCAN;
-            }
+            new_state = ble_profile_new_state ();
           }
           
           /* Flush rest of message, both from serial & timer */

@@ -268,6 +268,39 @@ static int ble_connect_disconnect (void)
   return status;
 }
 
+static int ble_update_profile (void)
+{
+  int status;
+  ble_message_t message;
+  ble_command_read_group_t *read_group;
+
+  read_group = (ble_command_read_group_t *)(&message);
+  BLE_CLASS_ATTR_CLIENT_HEADER (read_group, BLE_COMMAND_READ_BY_GROUP_TYPE);
+  read_group->handle       = connection_params.handle;
+  read_group->start_handle = 0x0001;
+  read_group->end_handle   = 0xffff;
+  read_group->length       = 2;
+  read_group->data[0]      = 0x00;
+  read_group->data[1]      = 0x28;
+  status = ble_command (&message);
+
+  if (status > 0)
+  {
+    ble_response_read_group_t *read_group_rsp = (ble_response_read_group_t *)(&message);
+    if (read_group_rsp->result != 0)
+    {
+      printf ("BLE Read group response received with failure %d\n", read_group_rsp->result);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("BLE Read group failed with %d\n", status);
+  }
+  
+  return status;
+}
+
 int ble_set_timer (int millisec, int cause)
 {
   int status = 1;
@@ -656,14 +689,80 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
 
   if (connection_status->flags & BLE_CONNECT_ESTABLISHED)
   {
-    status = ble_connect_disconnect ();
+    if (connection_params.device->status == BLE_DEVICE_UPDATE_PROFILE)
+    {
+      status = ble_update_profile ();
+
+      if (status <= 0)
+      {
+        status = ble_connect_disconnect ();
+      }
+    }
+    else
+    {
+      /* status = ble_update_data (&(connection_params.device)); */
+    }
+  }
+
+  if (status <= 0)
+  {
+    /* Go to next device */
+    ble_list_entry_t *list_entry = ble_update_list;
+    if (list_entry->next != NULL)
+    {
+      ble_device_t *device;
+      
+      list_remove ((list_entry_t **)(&ble_update_list), (list_entry_t *)list_entry);
+      free (list_entry);
+      device = (ble_device_t *)(ble_update_list->data);
+
+      status = ble_connect_direct (device);
+    }
+    else
+    {
+      status = 0;
+    }
   }
 
   return status;
 }
 
-void ble_event_disconnect (ble_event_disconnect_t *disconnect)
+int ble_event_disconnect (ble_event_disconnect_t *disconnect)
 {
+  int status = 1;
+  
   printf ("BLE Disconnect reason %d\n", disconnect->cause);
+
+  /* Go to next device */
+  ble_list_entry_t *list_entry = ble_update_list;
+  if (list_entry->next != NULL)
+  {
+    ble_device_t *device;
+    
+    list_remove ((list_entry_t **)(&ble_update_list), (list_entry_t *)list_entry);
+    free (list_entry);
+    device = (ble_device_t *)(ble_update_list->data);
+ 
+    status = ble_connect_direct (device);
+  }
+  else
+  {
+    status = 0;
+  }
+
+  return status;
+}
+
+void ble_event_group_found (ble_event_group_found_t *group_found)
+{
+  printf ("BLE Found group start %04x, end %04x, uuid(%d) %02x%02x\n",
+            group_found->start_handle, group_found->end_handle, group_found->length,
+            group_found->data[1], group_found->data[0]);
+}
+
+void ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed)
+{
+  printf ("BLE Procedure completed, char handle %04x\n", procedure_completed->char_handle);
+  (void)ble_connect_disconnect ();
 }
 

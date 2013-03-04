@@ -590,6 +590,43 @@ typedef struct PACKED
   uint16               cause;
 } ble_event_disconnect_t;
 
+/* GATT profile/service discovery command definitions */
+/* Read by group type definitions */
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                handle;
+  uint16               start_handle;
+  uint16               end_handle;
+  uint8                length;
+  uint8                data[2];
+} ble_command_read_group_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                handle;
+  uint16               result;
+} ble_response_read_group_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                handle;
+  uint16               start_handle;
+  uint16               end_handle;
+  uint8                length;
+  uint8                data[];
+} ble_event_group_found_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                conn_handle;
+  uint16               result;
+  uint16               char_handle;
+} ble_event_procedure_completed_t;
+
 /* Function declarations */
 
 extern int ble_set_timer (int millisec, int cause);
@@ -624,7 +661,11 @@ extern int ble_start_profile (void);
 
 extern int ble_event_connection_status (ble_event_connection_status_t *connection_status);
 
-extern void ble_event_disconnect (ble_event_disconnect_t *disconnect);
+extern int ble_event_disconnect (ble_event_disconnect_t *disconnect);
+
+extern void ble_event_group_found (ble_event_group_found_t *group_found);
+
+extern void ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed);
 
 #endif
 
