@@ -5,6 +5,9 @@
 
 #define BLE_GATT_UUID_LENGTH  (2)
 
+#define BLE_MIN_GATT_HANDLE  (0x0001)
+#define BLE_MAX_GATT_HANDLE  (0xffff)
+
 enum
 {
   BLE_GATT_PRI_SERVICE        = 0x2800,

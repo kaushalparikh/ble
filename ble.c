@@ -52,14 +52,16 @@ LIST_HEAD_INIT (ble_list_entry_t, ble_update_list);
 
 typedef struct
 {
-  ble_device_t *device;
-  uint8         handle;
+  ble_device_t  *device;
+  ble_service_t *service;
+  uint8          handle;
 } ble_connection_params_t;
 
 static ble_connection_params_t connection_params = 
 {
-  .device = NULL,
-  .handle = 0xff
+  .device  = NULL,
+  .service = NULL,
+  .handle  = 0xff
 };
 
 
@@ -269,16 +271,15 @@ static int ble_connect_disconnect (void)
   if (status > 0)
   {
     ble_response_disconnect_t *disconnect_rsp = (ble_response_disconnect_t *)(&message);
-    if (disconnect_rsp->result == 0)
-    {
-      connection_params.device = NULL;
-      connection_params.handle = 0xff;
-    }
-    else
+    if (disconnect_rsp->result != 0)
     {
       printf ("BLE Disconnect response received with failure %d\n", disconnect_rsp->result);
       status = -1;
     }
+
+    connection_params.device  = NULL;
+    connection_params.service = NULL;
+    connection_params.handle  = 0xff;
   }
   else
   {
@@ -288,7 +289,7 @@ static int ble_connect_disconnect (void)
   return status;
 }
 
-static int ble_update_profile (void)
+static int ble_read_group (void)
 {
   int status;
   ble_message_t message;
@@ -296,12 +297,12 @@ static int ble_update_profile (void)
 
   read_group = (ble_command_read_group_t *)(&message);
   BLE_CLASS_ATTR_CLIENT_HEADER (read_group, BLE_COMMAND_READ_BY_GROUP_TYPE);
-  read_group->handle       = connection_params.handle;
-  read_group->start_handle = 0x0001;
-  read_group->end_handle   = 0xffff;
-  read_group->length       = 2;
-  read_group->data[0]      = 0x00;
-  read_group->data[1]      = 0x28;
+  read_group->conn_handle  = connection_params.handle;
+  read_group->start_handle = BLE_MIN_GATT_HANDLE;
+  read_group->end_handle   = BLE_MAX_GATT_HANDLE;
+  read_group->length       = BLE_GATT_UUID_LENGTH;
+  read_group->data[0]      = (BLE_GATT_PRI_SERVICE & 0xff);
+  read_group->data[1]      = ((BLE_GATT_PRI_SERVICE & 0xff00) >> 8);
   status = ble_command (&message);
 
   if (status > 0)
@@ -318,6 +319,36 @@ static int ble_update_profile (void)
     printf ("BLE Read group failed with %d\n", status);
   }
   
+  return status;
+}
+
+static int ble_find_information (void)
+{
+  int status;
+  ble_message_t message;
+  ble_command_find_information_t *find_information;
+
+  find_information = (ble_command_find_information_t *)(&message);
+  BLE_CLASS_ATTR_CLIENT_HEADER (find_information, BLE_COMMAND_FIND_INFORMATION);
+  find_information->conn_handle  = connection_params.handle;
+  find_information->start_handle = connection_params.service->start_handle;
+  find_information->end_handle   = connection_params.service->end_handle;
+  status = ble_command (&message);
+
+  if (status > 0)
+  {
+    ble_response_find_information_t *find_information_rsp = (ble_response_find_information_t *)(&message);
+    if (find_information_rsp->result != 0)
+    {
+      printf ("BLE Find information response received with failure %d\n", find_information_rsp->result);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("BLE Find information failed with %d\n", status);
+  }
+
   return status;
 }
 
@@ -600,6 +631,49 @@ int ble_start_scan (void)
   return status;
 }
 
+int ble_end_procedure (void)
+{
+  int status;
+  ble_message_t message;
+  ble_command_end_procedure_t *end_procedure;
+
+  printf ("BLE End procedure request\n");
+
+  end_procedure = (ble_command_end_procedure_t *)(&message);
+  BLE_CLASS_GAP_HEADER (end_procedure, BLE_COMMAND_END_PROCEDURE);
+  status = ble_command (&message);
+
+  if (status > 0)
+  {
+    ble_response_end_procedure_t *end_procedure_rsp = (ble_response_end_procedure_t *)(&message);
+    if (end_procedure_rsp->result != 0)
+    {
+      printf ("BLE End procedure response received with failure %d\n", end_procedure_rsp->result);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("BLE End procedure response failed with %d\n", status);
+  }
+
+  return status;
+}
+
+int ble_start_profile (void)
+{
+  int status = 1;
+  ble_device_t *device;
+
+  device = (ble_device_t *)(ble_update_list->data);
+  if (device != NULL)
+  {
+    status = ble_connect_direct (device);
+  }
+  
+  return status;
+}
+
 void ble_event_scan_response (ble_event_scan_response_t *scan_response)
 {
   int i;
@@ -657,49 +731,6 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
   ble_print_device (device);
 }
 
-int ble_end_procedure (void)
-{
-  int status;
-  ble_message_t message;
-  ble_command_end_procedure_t *end_procedure;
-
-  printf ("BLE End procedure request\n");
-
-  end_procedure = (ble_command_end_procedure_t *)(&message);
-  BLE_CLASS_GAP_HEADER (end_procedure, BLE_COMMAND_END_PROCEDURE);
-  status = ble_command (&message);
-
-  if (status > 0)
-  {
-    ble_response_end_procedure_t *end_procedure_rsp = (ble_response_end_procedure_t *)(&message);
-    if (end_procedure_rsp->result != 0)
-    {
-      printf ("BLE End procedure response received with failure %d\n", end_procedure_rsp->result);
-      status = -1;
-    }
-  }
-  else
-  {
-    printf ("BLE End procedure response failed with %d\n", status);
-  }
-
-  return status;
-}
-
-int ble_start_profile (void)
-{
-  int status = 1;
-  ble_device_t *device;
-
-  device = (ble_device_t *)(ble_update_list->data);
-  if (device != NULL)
-  {
-    status = ble_connect_direct (device);
-  }
-  
-  return status;
-}
-
 int ble_event_connection_status (ble_event_connection_status_t *connection_status)
 {
   int status = 1;
@@ -712,7 +743,7 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
   {
     if (connection_params.device->status == BLE_DEVICE_UPDATE_PROFILE)
     {
-      status = ble_update_profile ();
+      status = ble_read_group ();
 
       if (status <= 0)
       {
@@ -774,7 +805,7 @@ int ble_event_disconnect (ble_event_disconnect_t *disconnect)
   return status;
 }
 
-void ble_event_group_found (ble_event_group_found_t *group_found)
+void ble_event_read_group (ble_event_read_group_t *read_group)
 {
   ble_device_t *device;
   ble_service_t *service_list_entry;
@@ -783,26 +814,67 @@ void ble_event_group_found (ble_event_group_found_t *group_found)
   service_list_entry = (ble_service_t *)malloc (sizeof (*service_list_entry));
   service_list_entry->include_list = NULL;
   service_list_entry->char_list    = NULL;
-  service_list_entry->start_handle = group_found->start_handle;
-  service_list_entry->end_handle   = group_found->end_handle;
+  service_list_entry->start_handle = read_group->start_handle;
+  service_list_entry->end_handle   = read_group->end_handle;
   
-  service_list_entry->attribute.handle       = group_found->start_handle;
+  service_list_entry->attribute.handle       = read_group->start_handle;
   service_list_entry->attribute.uuid_length  = BLE_GATT_UUID_LENGTH;
   service_list_entry->attribute.uuid[0]      = (BLE_GATT_PRI_SERVICE & 0xff);
   service_list_entry->attribute.uuid[1]      = ((BLE_GATT_PRI_SERVICE & 0xff00) >> 8);
-  service_list_entry->attribute.value_length = group_found->length;
-  service_list_entry->attribute.value        = malloc (group_found->length);
-  memcpy (service_list_entry->attribute.value, group_found->data, group_found->length);
+  service_list_entry->attribute.value_length = read_group->length;
+  service_list_entry->attribute.value        = malloc (read_group->length);
+  memcpy (service_list_entry->attribute.value, read_group->data, read_group->length);
   /* service_list_entry->attribute.permission = */
 
   list_add ((list_entry_t **)(&(device->service_list)), (list_entry_t *)service_list_entry);
 }
 
+void ble_event_find_information (ble_event_find_information_t *find_information)
+{
+  int i;
+  printf ("BLE Find information -- handle %04x, uuid(%d) ", find_information->char_handle,
+                                                            find_information->length);
+
+  for (i = (find_information->length - 1); i >= 0; i--)
+  {
+    printf ("%02x", find_information->data[i]);
+  }
+  printf ("\n");
+}
+
 int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed)
 {
+  int status;
+  
   printf ("BLE Procedure completed\n");
-  ble_print_service_list (connection_params.device->service_list);
-  connection_params.device->status = BLE_DEVICE_UPDATE_DATA;
-  return ble_connect_disconnect ();
+
+  if (connection_params.device->status == BLE_DEVICE_UPDATE_PROFILE)
+  {
+    if (connection_params.service != NULL)
+    {
+      connection_params.service = connection_params.service->next;
+    }
+    else
+    {
+      connection_params.service = connection_params.device->service_list;
+    }
+
+    if (connection_params.service != NULL)
+    {
+      status = ble_find_information ();
+    }
+    else
+    {
+      ble_print_service_list (connection_params.device->service_list);
+      connection_params.device->status = BLE_DEVICE_UPDATE_DATA;
+      status = ble_connect_disconnect ();          
+    }
+  }
+  else
+  {
+    status = -1;
+  }
+  
+  return status;
 }
 

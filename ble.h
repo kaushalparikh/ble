@@ -599,11 +599,11 @@ typedef struct PACKED
 typedef struct PACKED
 {
   ble_message_header_t header;
-  uint8                handle;
+  uint8                conn_handle;
   uint16               start_handle;
   uint16               end_handle;
   uint8                length;
-  uint8                data[2];
+  uint8                data[BLE_GATT_UUID_LENGTH];
 } ble_command_read_group_t;
 
 typedef struct PACKED
@@ -621,8 +621,34 @@ typedef struct PACKED
   uint16               end_handle;
   uint8                length;
   uint8                data[];
-} ble_event_group_found_t;
+} ble_event_read_group_t;
 
+/* Find information definitions */
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                conn_handle;
+  uint16               start_handle;
+  uint16               end_handle;
+} ble_command_find_information_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                conn_handle;
+  uint16               result;
+} ble_response_find_information_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                conn_handle;
+  uint16               char_handle;
+  uint8                length;
+  uint8                data[];
+} ble_event_find_information_t;
+
+/* End GATT procedure definition */
 typedef struct PACKED
 {
   ble_message_header_t header;
@@ -657,17 +683,19 @@ extern void ble_flush_serial (void);
 
 extern int ble_start_scan (void);
 
-extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
-
 extern int ble_end_procedure (void);
 
 extern int ble_start_profile (void);
+
+extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
 extern int ble_event_connection_status (ble_event_connection_status_t *connection_status);
 
 extern int ble_event_disconnect (ble_event_disconnect_t *disconnect);
 
-extern void ble_event_group_found (ble_event_group_found_t *group_found);
+extern void ble_event_read_group (ble_event_read_group_t *read_group);
+
+extern void ble_event_find_information (ble_event_find_information_t *find_information);
 
 extern int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed);
 
