@@ -151,6 +151,26 @@ static void ble_print_device (ble_device_t *device)
   printf (" (%s)\n", ((device->address.type > 0) ? "random" : "public"));
 }
 
+static void ble_print_service_list (ble_service_t *service_list)
+{
+  int i;
+  
+  while (service_list != NULL)
+  {
+    printf ("Service UUID -- %04x\n", ((service_list->attribute.uuid[1] << 8)|service_list->attribute.uuid[0]));
+    printf ("  Start handle: %04x\n", service_list->start_handle);
+    printf ("    End handle: %04x\n", service_list->end_handle);
+    printf ("    Value     : ");
+    for (i = (service_list->attribute.value_length - 1); i >= 0; i--)
+    {
+      printf ("%02x", service_list->attribute.value[i]);
+    }
+    printf ("\n");
+    
+    service_list = service_list->next;
+  }
+}
+
 static int ble_reset (void)
 {
   int status;
@@ -597,6 +617,7 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
     device->address      = scan_response->device_address;
     device->name         = NULL;
     device->status       = BLE_DEVICE_UPDATE_PROFILE;
+    device->service_list = NULL;
     
     printf ("New device --\n");
   }
@@ -755,14 +776,33 @@ int ble_event_disconnect (ble_event_disconnect_t *disconnect)
 
 void ble_event_group_found (ble_event_group_found_t *group_found)
 {
-  printf ("BLE Found group start %04x, end %04x, uuid(%d) %02x%02x\n",
-            group_found->start_handle, group_found->end_handle, group_found->length,
-            group_found->data[1], group_found->data[0]);
+  ble_device_t *device;
+  ble_service_t *service_list_entry;
+
+  device = connection_params.device;
+  service_list_entry = (ble_service_t *)malloc (sizeof (*service_list_entry));
+  service_list_entry->include_list = NULL;
+  service_list_entry->char_list    = NULL;
+  service_list_entry->start_handle = group_found->start_handle;
+  service_list_entry->end_handle   = group_found->end_handle;
+  
+  service_list_entry->attribute.handle       = group_found->start_handle;
+  service_list_entry->attribute.uuid_length  = BLE_GATT_UUID_LENGTH;
+  service_list_entry->attribute.uuid[0]      = (BLE_GATT_PRI_SERVICE & 0xff);
+  service_list_entry->attribute.uuid[1]      = ((BLE_GATT_PRI_SERVICE & 0xff00) >> 8);
+  service_list_entry->attribute.value_length = group_found->length;
+  service_list_entry->attribute.value        = malloc (group_found->length);
+  memcpy (service_list_entry->attribute.value, group_found->data, group_found->length);
+  /* service_list_entry->attribute.permission = */
+
+  list_add ((list_entry_t **)(&(device->service_list)), (list_entry_t *)service_list_entry);
 }
 
-void ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed)
+int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed)
 {
-  printf ("BLE Procedure completed, char handle %04x\n", procedure_completed->char_handle);
-  (void)ble_connect_disconnect ();
+  printf ("BLE Procedure completed\n");
+  ble_print_service_list (connection_params.device->service_list);
+  connection_params.device->status = BLE_DEVICE_UPDATE_DATA;
+  return ble_connect_disconnect ();
 }
 

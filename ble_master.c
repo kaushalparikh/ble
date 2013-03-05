@@ -134,10 +134,6 @@ static ble_state_e ble_profile (ble_message_t *message)
         if ((ble_event_connection_status ((ble_event_connection_status_t *)message)) <= 0)
         {
           new_state = ble_profile_new_state ();
-
-          /* Flush rest of message, both from serial & timer */
-          ble_flush_timer ();
-          ble_flush_serial ();              
         }
         
         break;
@@ -147,10 +143,6 @@ static ble_state_e ble_profile (ble_message_t *message)
         if ((ble_event_disconnect ((ble_event_disconnect_t *)message)) <= 0)
         {
           new_state = ble_profile_new_state ();
-
-          /* Flush rest of message, both from serial & timer */
-          ble_flush_timer ();
-          ble_flush_serial ();            
         }
         
         break;
@@ -162,7 +154,11 @@ static ble_state_e ble_profile (ble_message_t *message)
       }
       case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_PROCEDURE_COMPLETED):
       {
-        ble_event_procedure_completed ((ble_event_procedure_completed_t *)message);
+        if ((ble_event_procedure_completed ((ble_event_procedure_completed_t *)message)) <= 0)
+        {
+          new_state = ble_profile_new_state ();
+        }
+        
         break;
       }
       case ((BLE_CLASS_HW << 8)|BLE_EVENT_SOFT_TIMER):
@@ -199,6 +195,10 @@ static ble_state_e ble_profile (ble_message_t *message)
 
 static ble_state_e ble_data (ble_message_t *message)
 {
+  ble_flush_timer ();
+  ble_flush_serial ();    
+  printf ("BLE Data state\n");
+  (void)ble_set_timer (3000, BLE_TIMER_SCAN);
   return BLE_STATE_SCAN;
 }
 

@@ -1,18 +1,6 @@
 #ifndef __BLE_H__
 #define __BLE_H__
 
-/* Maximum message data size */
-#define BLE_MAX_MESSAGE  (256)
-
-/* Convert MS to intervals of 625us */
-#define MS_TO_625US(millisec)  (((millisec * 1000) + 624)/625)
-
-/* Convert MS to intervals of 1.25ms or 1250us */
-#define MS_TO_1250US(millisec)  (((millisec * 1000) + 1249)/1250)
-
-/* Convert MS to intervals of 10ms */
-#define MS_TO_10MS(millisec)  ((millisec + 9)/10)
-
 /* Basic definitions */
 #ifdef __GNUC__
 #define PACKED __attribute__((packed))
@@ -27,6 +15,21 @@ typedef signed char        int8;
 typedef unsigned short int uint16;
 typedef signed short int   int16;
 typedef unsigned long int  uint32;
+
+/* GATT definitions */
+#include "gatt.h"
+
+/* Maximum message data size */
+#define BLE_MAX_MESSAGE  (256)
+
+/* Convert MS to intervals of 625us */
+#define MS_TO_625US(millisec)  (((millisec * 1000) + 624)/625)
+
+/* Convert MS to intervals of 1.25ms or 1250us */
+#define MS_TO_1250US(millisec)  (((millisec * 1000) + 1249)/1250)
+
+/* Convert MS to intervals of 10ms */
+#define MS_TO_10MS(millisec)  ((millisec + 9)/10)
 
 /* BLE device address */
 #define BLE_DEVICE_ADDRESS_LENGTH  (6)
@@ -58,6 +61,7 @@ typedef struct
   ble_device_address_t  address;
   char                 *name;
   ble_device_status_e   status;
+  ble_service_t        *service_list;
 } ble_device_t;
 
 /* Message header definitions */
@@ -612,7 +616,7 @@ typedef struct PACKED
 typedef struct PACKED
 {
   ble_message_header_t header;
-  uint8                handle;
+  uint8                conn_handle;
   uint16               start_handle;
   uint16               end_handle;
   uint8                length;
@@ -665,7 +669,7 @@ extern int ble_event_disconnect (ble_event_disconnect_t *disconnect);
 
 extern void ble_event_group_found (ble_event_group_found_t *group_found);
 
-extern void ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed);
+extern int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed);
 
 #endif
 
