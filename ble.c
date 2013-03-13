@@ -721,12 +721,12 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
 
     device->address      = scan_response->device_address;
     device->name         = NULL;
-    device->status       = BLE_DEVICE_UPDATE_PROFILE;
+    device->status       = BLE_DEVICE_DISCOVER_SERVICE;
     device->service_list = NULL;
     
     printf ("New device --\n");
   }
-  else if (device->status == BLE_DEVICE_LOST)
+  else if (device->status == BLE_DEVICE_DISCOVER)
   {
     printf ("Found device --\n");
     device->status = BLE_DEVICE_UPDATE_DATA;
@@ -772,7 +772,7 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
 
   if (connection_status->flags & BLE_CONNECT_ESTABLISHED)
   {
-    if (connection_params.device->status == BLE_DEVICE_UPDATE_PROFILE)
+    if (connection_params.device->status == BLE_DEVICE_DISCOVER_SERVICE)
     {
       status = ble_read_group ();
 
@@ -970,27 +970,54 @@ int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_co
   
   printf ("BLE Procedure completed\n");
 
-  if (connection_params.device->status == BLE_DEVICE_UPDATE_PROFILE)
+  if (connection_params.device->status == BLE_DEVICE_DISCOVER_SERVICE)
   {
-    if (connection_params.service != NULL)
+    connection_params.service = connection_params.device->service_list;
+    status = ble_find_information ();
+    
+    if (status > 0)
+    {
+      connection_params.device->status = BLE_DEVICE_DISCOVER_CHAR_DESC;
+    }
+    else
+    {
+      /* TODO: Clean-up service list */
+    }
+  }
+  else if (connection_params.device->status == BLE_DEVICE_DISCOVER_CHAR_DESC)
+  {
+    if (connection_params.service->next != NULL)
     {
       connection_params.service = connection_params.service->next;
+      status = ble_find_information ();
+
+      if (status <= 0)
+      {
+        connection_params.device->status = BLE_DEVICE_DISCOVER_SERVICE;
+        /* TODO: Clean-up service list */
+      }
     }
     else
     {
       connection_params.service = connection_params.device->service_list;
+      status = ble_connect_disconnect ();
+      
+      if (status > 0)
+      {
+        connection_params.device->status = BLE_DEVICE_DISCOVER_CHAR;
+      }
+      else
+      {
+        connection_params.device->status = BLE_DEVICE_DISCOVER_SERVICE;
+        /* TODO: Clean-up service list */
+      }
     }
-
-    if (connection_params.service != NULL)
-    {
-      status = ble_find_information ();
-    }
-    else
-    {
-      ble_print_service_list (connection_params.device->service_list);
-      connection_params.device->status = BLE_DEVICE_UPDATE_DATA;
-      status = ble_connect_disconnect ();          
-    }
+  }
+  else if (connection_params.device->status == BLE_DEVICE_DISCOVER_CHAR)
+  {
+    connection_params.device->status = BLE_DEVICE_DISCOVER_SERVICE;
+    /* TODO: Clean-up service list */
+    status = -1;
   }
   else
   {

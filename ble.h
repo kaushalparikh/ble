@@ -50,9 +50,11 @@ typedef struct PACKED
 /* BLE device status */
 typedef enum
 {
-  BLE_DEVICE_LOST           = 0,
-  BLE_DEVICE_UPDATE_PROFILE = 1,
-  BLE_DEVICE_UPDATE_DATA    = 2
+  BLE_DEVICE_DISCOVER           = 0,
+  BLE_DEVICE_DISCOVER_SERVICE   = 1,
+  BLE_DEVICE_DISCOVER_CHAR_DESC = 2,
+  BLE_DEVICE_DISCOVER_CHAR      = 3,
+  BLE_DEVICE_UPDATE_DATA        = 4
 } ble_device_status_e;
 
 /* BLE device */

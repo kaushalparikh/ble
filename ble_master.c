@@ -86,7 +86,7 @@ static ble_state_e ble_scan (ble_message_t *message)
           else
           {
             /* Check if some devices need service discovery/update */
-            if ((ble_check_device_status (BLE_DEVICE_UPDATE_PROFILE)) > 0)
+            if ((ble_check_device_status (BLE_DEVICE_DISCOVER_SERVICE)) > 0)
             {
               (void)ble_set_timer (10, BLE_TIMER_PROFILE);
               new_state = BLE_STATE_PROFILE;
