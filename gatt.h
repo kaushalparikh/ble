@@ -5,8 +5,9 @@
 
 #define BLE_GATT_UUID_LENGTH  (2)
 
-#define BLE_MIN_GATT_HANDLE  (0x0001)
-#define BLE_MAX_GATT_HANDLE  (0xffff)
+#define BLE_INVALID_GATT_HANDLE (0x0000)
+#define BLE_MIN_GATT_HANDLE     (0x0001)
+#define BLE_MAX_GATT_HANDLE     (0xffff)
 
 enum
 {
@@ -37,6 +38,7 @@ struct ble_characteristics
   struct ble_characteristics *next;
   ble_attribute_t             declaration;
   ble_attribute_t             description;
+  ble_attribute_t             client_config;
   ble_attribute_t             value;
   ble_attribute_t             format;
 };
