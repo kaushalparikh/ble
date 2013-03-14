@@ -157,6 +157,12 @@ static ble_state_e ble_profile (ble_message_t *message)
         ble_event_find_information ((ble_event_find_information_t *)message);
         break;
       }      
+      case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_ATTR_CLIENT_VALUE):
+      {
+        ble_event_attr_value ((ble_event_attr_value_t *)message);
+        break;
+      }      
+
       case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_PROCEDURE_COMPLETED):
       {
         if ((ble_event_procedure_completed ((ble_event_procedure_completed_t *)message)) <= 0)

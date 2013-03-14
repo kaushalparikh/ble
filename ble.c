@@ -52,16 +52,18 @@ LIST_HEAD_INIT (ble_list_entry_t, ble_update_list);
 
 typedef struct
 {
-  ble_device_t  *device;
-  ble_service_t *service;
-  uint8          handle;
+  ble_device_t          *device;
+  ble_service_t         *service;
+  ble_characteristics_t *characteristics;
+  uint8                  handle;
 } ble_connection_params_t;
 
 static ble_connection_params_t connection_params = 
 {
-  .device  = NULL,
-  .service = NULL,
-  .handle  = 0xff
+  .device          = NULL,
+  .service         = NULL,
+  .characteristics = NULL,
+  .handle          = 0xff
 };
 
 
@@ -378,6 +380,61 @@ static int ble_find_information (void)
   else
   {
     printf ("BLE Find information failed with %d\n", status);
+  }
+
+  return status;
+}
+
+static int ble_read_type (void)
+{
+  int status;
+  ble_message_t message;
+  ble_command_read_type_t *read_type;
+  ble_attribute_t *attr = NULL;
+
+  if ((connection_params.characteristics->declaration.handle != BLE_INVALID_GATT_HANDLE) &&
+      (connection_params.characteristics->declaration.value_length == 0))
+  {
+    attr = &(connection_params.characteristics->declaration);
+  }
+  else if ((connection_params.characteristics->description.handle != BLE_INVALID_GATT_HANDLE) &&
+           (connection_params.characteristics->description.value_length == 0))
+  {
+    attr = &(connection_params.characteristics->description);
+  }
+  else if ((connection_params.characteristics->client_config.handle != BLE_INVALID_GATT_HANDLE) &&
+           (connection_params.characteristics->client_config.value_length == 0))
+  {
+    attr = &(connection_params.characteristics->client_config);
+  }
+  else if ((connection_params.characteristics->format.handle != BLE_INVALID_GATT_HANDLE) &&
+           (connection_params.characteristics->format.value_length == 0))
+  {
+    attr = &(connection_params.characteristics->format);
+  }
+
+  read_type = (ble_command_read_type_t *)(&message);
+  BLE_CLASS_ATTR_CLIENT_HEADER (read_type, BLE_COMMAND_READ_BY_TYPE);
+  read_type->conn_handle  = connection_params.handle;
+  read_type->start_handle = attr->handle;
+  read_type->end_handle   = attr->handle;
+  read_type->length       = attr->uuid_length;
+  read_type->data[0]      = attr->uuid[0];
+  read_type->data[1]      = attr->uuid[1];
+  status = ble_command (&message);
+
+  if (status > 0)
+  {
+    ble_response_read_type_t *read_type_rsp = (ble_response_read_type_t *)(&message);
+    if (read_type_rsp->result != 0)
+    {
+      printf ("BLE Read type response received with failure %d\n", read_type_rsp->result);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("BLE Read type failed with %d\n", status);
   }
 
   return status;
@@ -885,10 +942,7 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
     /* Characteristics declaration */
     ble_characteristics_t *char_list_entry = (ble_characteristics_t *)malloc (sizeof (*char_list_entry));
 
-    char_list_entry->description.handle      = BLE_INVALID_GATT_HANDLE;
-    char_list_entry->value.handle            = BLE_INVALID_GATT_HANDLE;
-    char_list_entry->format.handle           = BLE_INVALID_GATT_HANDLE;
-    char_list_entry->client_config.handle    = BLE_INVALID_GATT_HANDLE;
+    memset (char_list_entry, 0, sizeof (*char_list_entry));
     char_list_entry->declaration.handle      = find_information->char_handle;
     char_list_entry->declaration.uuid_length = find_information->length;
     memcpy (char_list_entry->declaration.uuid, find_information->data, find_information->length);
@@ -964,6 +1018,13 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
   }
 }
 
+int ble_event_attr_value (ble_event_attr_value_t *attr_value)
+{
+  int status;
+
+  return status;
+}
+
 int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed)
 {
   int status;
@@ -999,8 +1060,9 @@ int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_co
     }
     else
     {
-      connection_params.service = connection_params.device->service_list;
-      status = ble_connect_disconnect ();
+      connection_params.service         = connection_params.device->service_list;
+      connection_params.characteristics = connection_params.service->char_list;
+      status = ble_read_type ();
       
       if (status > 0)
       {

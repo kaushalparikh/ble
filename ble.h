@@ -255,7 +255,7 @@ enum
   BLE_EVENT_GROUP_FOUND            = 2,
   BLE_EVENT_ATTR_FOUND             = 3,
   BLE_EVENT_INFORMATION_FOUND      = 4,
-  BLE_EVENT_ATTR_CLIENT_VALU       = 5,
+  BLE_EVENT_ATTR_CLIENT_VALUE      = 5,
   BLE_EVENT_MULTIPLE_READ_RESPONSE = 6
 };
 
@@ -650,6 +650,34 @@ typedef struct PACKED
   uint8                data[];
 } ble_event_find_information_t;
 
+/* Read by type definitions */
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                conn_handle;
+  uint16               start_handle;
+  uint16               end_handle;
+  uint8                length;
+  uint8                data[BLE_MAX_UUID_LENGTH];
+} ble_command_read_type_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                conn_handle;
+  uint16               result;
+} ble_response_read_type_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                conn_handle;
+  uint16               attr_handle;
+  uint8                attr_type;
+  uint8                length;
+  uint8                data[];
+} ble_event_attr_value_t;
+
 /* End GATT procedure definition */
 typedef struct PACKED
 {
@@ -698,6 +726,8 @@ extern int ble_event_disconnect (ble_event_disconnect_t *disconnect);
 extern void ble_event_read_group (ble_event_read_group_t *read_group);
 
 extern void ble_event_find_information (ble_event_find_information_t *find_information);
+
+extern int ble_event_attr_value (ble_event_attr_value_t *attr_value);
 
 extern int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed);
 
