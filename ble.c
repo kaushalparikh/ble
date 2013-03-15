@@ -177,11 +177,13 @@ static void ble_print_service_list (ble_service_t *service_list)
 
     while (char_list != NULL)
     {
+      ble_char_decl_t *char_decl = (ble_char_decl_t *)(char_list->declaration.value);
+      
       printf ("      Characteristics handle: %04x\n", char_list->declaration.handle);
-      printf ("                       value: ");
-      for (i = 0; i < char_list->declaration.value_length; i++)
+      printf ("                       value: %02x, %04x, ", char_decl->bitfield, char_decl->value_handle);
+      for (i = (char_list->declaration.value_length - 4); i >= 0; i--)
       {
-        printf ("%02x", char_list->declaration.value[i]);
+        printf ("%02x", char_decl->value_uuid[i]);
       }
       printf ("\n");
       if (char_list->description.handle != BLE_INVALID_GATT_HANDLE)
@@ -190,29 +192,23 @@ static void ble_print_service_list (ble_service_t *service_list)
         printf ("                       value: ");
         for (i = 0; i < char_list->description.value_length; i++)
         {
-          printf ("%02x", char_list->description.value[i]);
+          printf ("%c", (int8)(char_list->description.value[i]));
         }
         printf ("\n");
       }
       if (char_list->format.handle != BLE_INVALID_GATT_HANDLE)
       {
+        ble_char_format_t *char_format = (ble_char_format_t *)(char_list->format.value);
+        
         printf ("               format handle: %04x\n", char_list->format.handle);
-        printf ("                       value: ");
-        for (i = 0; i < char_list->format.value_length; i++)
-        {
-          printf ("%02x", char_list->format.value[i]);
-        }
-        printf ("\n");
+        printf ("                       value: %02x, %d\n", char_format->bitfield, char_format->exponent);
       }
       if (char_list->client_config.handle != BLE_INVALID_GATT_HANDLE)
       {
+        ble_char_client_config_t *char_client_config = (ble_char_client_config_t *)(char_list->client_config.value);
+          
         printf ("        client config handle: %04x\n", char_list->client_config.handle);
-        printf ("                       value: ");
-        for (i = 0; i < char_list->client_config.value_length; i++)
-        {
-          printf ("%02x", char_list->client_config.value[i]);
-        }
-        printf ("\n");
+        printf ("                       value: %04x\n", char_client_config->bitfield);
       }
       if (char_list->value.handle != BLE_INVALID_GATT_HANDLE)
       {
@@ -694,7 +690,7 @@ int ble_start_scan (void)
   {
     ble_command_discover_t *discover = (ble_command_discover_t *)(&message);
     BLE_CLASS_GAP_HEADER (discover, BLE_COMMAND_DISCOVER);
-    discover->mode = BLE_DISCOVER_LIMITED;
+    discover->mode = BLE_DISCOVER_GENERIC;
     status = ble_command (&message);
 
     if (status > 0)

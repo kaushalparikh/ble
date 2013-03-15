@@ -23,6 +23,27 @@ enum
   BLE_GATT_CHAR_AGG_FORMAT    = 0x2905
 };
 
+typedef struct PACKED
+{
+  uint8  bitfield;
+  uint16 value_handle;
+  uint8  value_uuid[BLE_MAX_UUID_LENGTH];
+} ble_char_decl_t;
+
+typedef struct PACKED
+{
+  uint16 bitfield;
+} ble_char_client_config_t;
+
+typedef struct PACKED
+{
+  uint8  bitfield;
+  uint8  exponent;
+  uint16 uint;
+  uint8  namespace;
+  uint16 description;
+} ble_char_format_t;
+
 typedef struct
 {
   uint16  handle;
