@@ -650,23 +650,29 @@ typedef struct PACKED
   uint8                data[];
 } ble_event_find_information_t;
 
-/* Read by type definitions */
+/* Read long definitions */
+enum
+{
+  BLE_ATTR_VALUE_READ      = 0,
+  BLE_ATTR_VALUE_NOTIFY    = 1,
+  BLE_ATTR_VALUE_INDICATE  = 2,
+  BLE_ATTR_VALUE_READ_TYPE = 3,
+  BLE_ATTR_VALUE_READ_BLOD = 4
+};
+
 typedef struct PACKED
 {
   ble_message_header_t header;
   uint8                conn_handle;
-  uint16               start_handle;
-  uint16               end_handle;
-  uint8                length;
-  uint8                data[BLE_MAX_UUID_LENGTH];
-} ble_command_read_type_t;
+  uint16               attr_handle;
+} ble_command_read_long_t;
 
 typedef struct PACKED
 {
   ble_message_header_t header;
   uint8                conn_handle;
   uint16               result;
-} ble_response_read_type_t;
+} ble_response_read_long_t;
 
 typedef struct PACKED
 {
@@ -727,7 +733,7 @@ extern void ble_event_read_group (ble_event_read_group_t *read_group);
 
 extern void ble_event_find_information (ble_event_find_information_t *find_information);
 
-extern int ble_event_attr_value (ble_event_attr_value_t *attr_value);
+extern void ble_event_attr_value (ble_event_attr_value_t *attr_value);
 
 extern int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed);
 

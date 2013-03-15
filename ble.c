@@ -55,6 +55,7 @@ typedef struct
   ble_device_t          *device;
   ble_service_t         *service;
   ble_characteristics_t *characteristics;
+  ble_attribute_t       *attribute;
   uint8                  handle;
 } ble_connection_params_t;
 
@@ -63,6 +64,7 @@ static ble_connection_params_t connection_params =
   .device          = NULL,
   .service         = NULL,
   .characteristics = NULL,
+  .attribute       = NULL,
   .handle          = 0xff
 };
 
@@ -176,17 +178,41 @@ static void ble_print_service_list (ble_service_t *service_list)
     while (char_list != NULL)
     {
       printf ("      Characteristics handle: %04x\n", char_list->declaration.handle);
+      printf ("                       value: ");
+      for (i = 0; i < char_list->declaration.value_length; i++)
+      {
+        printf ("%02x", char_list->declaration.value[i]);
+      }
+      printf ("\n");
       if (char_list->description.handle != BLE_INVALID_GATT_HANDLE)
       {
-        printf ("          description handle: %04x\n", char_list->declaration.handle);
+        printf ("          description handle: %04x\n", char_list->description.handle);
+        printf ("                       value: ");
+        for (i = 0; i < char_list->description.value_length; i++)
+        {
+          printf ("%02x", char_list->description.value[i]);
+        }
+        printf ("\n");
       }
       if (char_list->format.handle != BLE_INVALID_GATT_HANDLE)
       {
         printf ("               format handle: %04x\n", char_list->format.handle);
+        printf ("                       value: ");
+        for (i = 0; i < char_list->format.value_length; i++)
+        {
+          printf ("%02x", char_list->format.value[i]);
+        }
+        printf ("\n");
       }
       if (char_list->client_config.handle != BLE_INVALID_GATT_HANDLE)
       {
         printf ("        client config handle: %04x\n", char_list->client_config.handle);
+        printf ("                       value: ");
+        for (i = 0; i < char_list->client_config.value_length; i++)
+        {
+          printf ("%02x", char_list->client_config.value[i]);
+        }
+        printf ("\n");
       }
       if (char_list->value.handle != BLE_INVALID_GATT_HANDLE)
       {
@@ -310,9 +336,10 @@ static int ble_connect_disconnect (void)
       status = -1;
     }
 
-    connection_params.device  = NULL;
-    connection_params.service = NULL;
-    connection_params.handle  = 0xff;
+    connection_params.device          = NULL;
+    connection_params.service         = NULL;
+    connection_params.characteristics = NULL;
+    connection_params.handle          = 0xff;
   }
   else
   {
@@ -385,56 +412,30 @@ static int ble_find_information (void)
   return status;
 }
 
-static int ble_read_type (void)
+static int ble_read_long_handle (void)
 {
   int status;
   ble_message_t message;
-  ble_command_read_type_t *read_type;
-  ble_attribute_t *attr = NULL;
+  ble_command_read_long_t *read_long;
 
-  if ((connection_params.characteristics->declaration.handle != BLE_INVALID_GATT_HANDLE) &&
-      (connection_params.characteristics->declaration.value_length == 0))
-  {
-    attr = &(connection_params.characteristics->declaration);
-  }
-  else if ((connection_params.characteristics->description.handle != BLE_INVALID_GATT_HANDLE) &&
-           (connection_params.characteristics->description.value_length == 0))
-  {
-    attr = &(connection_params.characteristics->description);
-  }
-  else if ((connection_params.characteristics->client_config.handle != BLE_INVALID_GATT_HANDLE) &&
-           (connection_params.characteristics->client_config.value_length == 0))
-  {
-    attr = &(connection_params.characteristics->client_config);
-  }
-  else if ((connection_params.characteristics->format.handle != BLE_INVALID_GATT_HANDLE) &&
-           (connection_params.characteristics->format.value_length == 0))
-  {
-    attr = &(connection_params.characteristics->format);
-  }
-
-  read_type = (ble_command_read_type_t *)(&message);
-  BLE_CLASS_ATTR_CLIENT_HEADER (read_type, BLE_COMMAND_READ_BY_TYPE);
-  read_type->conn_handle  = connection_params.handle;
-  read_type->start_handle = attr->handle;
-  read_type->end_handle   = attr->handle;
-  read_type->length       = attr->uuid_length;
-  read_type->data[0]      = attr->uuid[0];
-  read_type->data[1]      = attr->uuid[1];
+  read_long = (ble_command_read_long_t *)(&message);
+  BLE_CLASS_ATTR_CLIENT_HEADER (read_long, BLE_COMMAND_READ_LONG);
+  read_long->conn_handle = connection_params.handle;
+  read_long->attr_handle = connection_params.attribute->handle;
   status = ble_command (&message);
 
   if (status > 0)
   {
-    ble_response_read_type_t *read_type_rsp = (ble_response_read_type_t *)(&message);
-    if (read_type_rsp->result != 0)
+    ble_response_read_long_t *read_long_rsp = (ble_response_read_long_t *)(&message);
+    if (read_long_rsp->result != 0)
     {
-      printf ("BLE Read type response received with failure %d\n", read_type_rsp->result);
+      printf ("BLE Read long response received with failure %d\n", read_long_rsp->result);
       status = -1;
     }
   }
   else
   {
-    printf ("BLE Read type failed with %d\n", status);
+    printf ("BLE Read long failed with %d\n", status);
   }
 
   return status;
@@ -1018,40 +1019,37 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
   }
 }
 
-int ble_event_attr_value (ble_event_attr_value_t *attr_value)
+void ble_event_attr_value (ble_event_attr_value_t *attr_value)
 {
-  int status;
+  ble_attribute_t *attribute = connection_params.attribute;
 
-  return status;
+  attribute->value_length = attr_value->length;
+  attribute->value        = malloc (attribute->value_length);
+  memcpy (attribute->value, attr_value->data, attribute->value_length);
 }
 
 int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed)
 {
-  int status;
+  int status = -1;
   
   printf ("BLE Procedure completed\n");
 
-  if (connection_params.device->status == BLE_DEVICE_DISCOVER_SERVICE)
+  if ((connection_params.device->status == BLE_DEVICE_DISCOVER_SERVICE)   ||
+      (connection_params.device->status == BLE_DEVICE_DISCOVER_CHAR_DESC))
   {
-    connection_params.service = connection_params.device->service_list;
-    status = ble_find_information ();
-    
-    if (status > 0)
+    if (connection_params.service != NULL)
     {
-      connection_params.device->status = BLE_DEVICE_DISCOVER_CHAR_DESC;
+      connection_params.service = connection_params.service->next;
     }
     else
     {
-      /* TODO: Clean-up service list */
+      connection_params.service = connection_params.device->service_list;
+      connection_params.device->status = BLE_DEVICE_DISCOVER_CHAR_DESC;
     }
-  }
-  else if (connection_params.device->status == BLE_DEVICE_DISCOVER_CHAR_DESC)
-  {
-    if (connection_params.service->next != NULL)
-    {
-      connection_params.service = connection_params.service->next;
-      status = ble_find_information ();
 
+    if (connection_params.service != NULL)
+    {
+      status = ble_find_information ();
       if (status <= 0)
       {
         connection_params.device->status = BLE_DEVICE_DISCOVER_SERVICE;
@@ -1061,29 +1059,62 @@ int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_co
     else
     {
       connection_params.service         = connection_params.device->service_list;
+      connection_params.characteristics = connection_params.service->char_list;      
+      connection_params.device->status  = BLE_DEVICE_DISCOVER_CHAR;
+    }
+  }
+  
+  if (connection_params.device->status == BLE_DEVICE_DISCOVER_CHAR)
+  {
+    connection_params.attribute = NULL;
+    
+    if ((connection_params.characteristics->declaration.handle != BLE_INVALID_GATT_HANDLE) &&
+        (connection_params.characteristics->declaration.value_length == 0))
+    {
+      connection_params.attribute = &(connection_params.characteristics->declaration);
+    }
+    else if ((connection_params.characteristics->description.handle != BLE_INVALID_GATT_HANDLE) &&
+             (connection_params.characteristics->description.value_length == 0))
+    {
+      connection_params.attribute = &(connection_params.characteristics->description);
+    }
+    else if ((connection_params.characteristics->client_config.handle != BLE_INVALID_GATT_HANDLE) &&
+             (connection_params.characteristics->client_config.value_length == 0))
+    {
+      connection_params.attribute = &(connection_params.characteristics->client_config);
+    }
+    else if ((connection_params.characteristics->format.handle != BLE_INVALID_GATT_HANDLE) &&
+             (connection_params.characteristics->format.value_length == 0))
+    {
+      connection_params.attribute = &(connection_params.characteristics->format);
+    }
+    else if (connection_params.characteristics->next != NULL)
+    {
+      connection_params.characteristics = connection_params.characteristics->next;
+      connection_params.attribute = &(connection_params.characteristics->declaration);
+    }
+    else if (connection_params.service->next != NULL)
+    {
+      connection_params.service         = connection_params.service->next;
       connection_params.characteristics = connection_params.service->char_list;
-      status = ble_read_type ();
-      
-      if (status > 0)
-      {
-        connection_params.device->status = BLE_DEVICE_DISCOVER_CHAR;
-      }
-      else
+      connection_params.attribute       = &(connection_params.characteristics->declaration);      
+    }
+
+    if (connection_params.attribute != NULL)
+    {
+      status = ble_read_long_handle ();
+      if (status <= 0)
       {
         connection_params.device->status = BLE_DEVICE_DISCOVER_SERVICE;
         /* TODO: Clean-up service list */
-      }
+      }      
     }
-  }
-  else if (connection_params.device->status == BLE_DEVICE_DISCOVER_CHAR)
-  {
-    connection_params.device->status = BLE_DEVICE_DISCOVER_SERVICE;
-    /* TODO: Clean-up service list */
-    status = -1;
-  }
-  else
-  {
-    status = -1;
+    else
+    {
+      ble_print_service_list (connection_params.device->service_list);
+      connection_params.device->status = BLE_DEVICE_UPDATE_DATA;
+      status = ble_connect_disconnect ();       
+    }
   }
   
   return status;
