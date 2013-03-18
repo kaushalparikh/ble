@@ -54,7 +54,8 @@ typedef enum
   BLE_DEVICE_DISCOVER_SERVICE   = 1,
   BLE_DEVICE_DISCOVER_CHAR_DESC = 2,
   BLE_DEVICE_DISCOVER_CHAR      = 3,
-  BLE_DEVICE_UPDATE_DATA        = 4
+  BLE_DEVICE_UPDATE_DATA        = 4,
+  BLE_DEVICE_IGNORE             = 5
 } ble_device_status_e;
 
 /* BLE device */
@@ -707,7 +708,9 @@ extern int ble_init (void);
 
 extern void ble_deinit (void);
 
-extern int ble_check_device_status (ble_device_status_e status);
+extern int ble_check_profile_list (void);
+
+extern int ble_check_data_list (void);
 
 extern void ble_print_message (ble_message_t *message);
 
@@ -727,7 +730,7 @@ extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
 extern int ble_event_connection_status (ble_event_connection_status_t *connection_status);
 
-extern int ble_event_disconnect (ble_event_disconnect_t *disconnect);
+extern int ble_next_profile (ble_event_disconnect_t *disconnect);
 
 extern void ble_event_read_group (ble_event_read_group_t *read_group);
 

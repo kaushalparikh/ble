@@ -34,7 +34,7 @@ static ble_state_e ble_profile_new_state (void)
   ble_state_e new_state;
   
   /* Exit profile state */
-  if ((ble_check_device_status (BLE_DEVICE_UPDATE_DATA)) > 0)
+  if ((ble_check_data_list ()) > 0)
   {
     (void)ble_set_timer (10, BLE_TIMER_DATA);
     new_state = BLE_STATE_DATA;
@@ -86,12 +86,12 @@ static ble_state_e ble_scan (ble_message_t *message)
           else
           {
             /* Check if some devices need service discovery/update */
-            if ((ble_check_device_status (BLE_DEVICE_DISCOVER_SERVICE)) > 0)
+            if ((ble_check_profile_list ()) > 0)
             {
               (void)ble_set_timer (10, BLE_TIMER_PROFILE);
               new_state = BLE_STATE_PROFILE;
             }
-            else if ((ble_check_device_status (BLE_DEVICE_UPDATE_DATA)) > 0)
+            else if ((ble_check_data_list ()) > 0)
             {
               (void)ble_set_timer (10, BLE_TIMER_DATA);
               new_state = BLE_STATE_DATA;
@@ -140,7 +140,7 @@ static ble_state_e ble_profile (ble_message_t *message)
       }
       case ((BLE_CLASS_CONNECTION << 8)|BLE_EVENT_DISCONNECTED):
       {
-        if ((ble_event_disconnect ((ble_event_disconnect_t *)message)) <= 0)
+        if ((ble_next_profile ((ble_event_disconnect_t *)message)) <= 0)
         {
           new_state = ble_profile_new_state ();
         }
