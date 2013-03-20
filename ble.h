@@ -15,6 +15,7 @@ typedef signed char        int8;
 typedef unsigned short int uint16;
 typedef signed short int   int16;
 typedef unsigned long int  uint32;
+typedef long int           int32;
 
 /* GATT definitions */
 #include "gatt.h"
@@ -61,10 +62,10 @@ typedef enum
 /* BLE device */
 typedef struct
 {
-  ble_device_address_t  address;
-  char                 *name;
-  ble_device_status_e   status;
-  ble_service_t        *service_list;
+  ble_device_address_t      address;
+  char                     *name;
+  ble_device_status_e       status;
+  ble_service_list_entry_t *service_list;
 } ble_device_t;
 
 /* Message header definitions */

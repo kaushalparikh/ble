@@ -40,18 +40,6 @@ typedef struct ble_device_list_entry ble_device_list_entry_t;
 
 LIST_HEAD_INIT (ble_device_list_entry_t, ble_device_list);
 
-struct ble_data_list_entry
-{
-  struct ble_data_list_entry *next;
-  ble_device_t               *device;
-  ble_characteristics_t      *periodic_list;
-  ble_characteristics_t      *oneoff_list;
-}; 
-
-typedef struct ble_data_list_entry ble_data_list_entry_t;
-
-LIST_HEAD_INIT (ble_data_list_entry_t, ble_data_list);
-
 struct ble_list_entry
 {
   struct ble_list_entry *next;
@@ -62,13 +50,24 @@ typedef struct ble_list_entry ble_list_entry_t;
 
 LIST_HEAD_INIT (ble_list_entry_t, ble_profile_list);
 
+struct ble_data_list_entry
+{
+  struct ble_data_list_entry *next;
+  ble_device_t               *device;
+  ble_attr_list_entry_t      *attr_list;
+}; 
+
+typedef struct ble_data_list_entry ble_data_list_entry_t;
+
+LIST_HEAD_INIT (ble_data_list_entry_t, ble_data_list);
+
 typedef struct
 {
-  ble_device_t          *device;
-  ble_service_t         *service;
-  ble_characteristics_t *characteristics;
-  ble_attribute_t       *attribute;
-  uint8                  handle;
+  ble_device_t             *device;
+  ble_service_list_entry_t *service;
+  ble_char_list_entry_t    *characteristics;
+  ble_attribute_t          *attribute;
+  uint8                     handle;
 } ble_connection_params_t;
 
 static ble_connection_params_t connection_params = 
@@ -79,7 +78,6 @@ static ble_connection_params_t connection_params =
   .attribute       = NULL,
   .handle          = 0xff
 };
-
 
 static void ble_timer_callback (timer_list_entry_t *timer_list_entry)
 {
@@ -169,13 +167,14 @@ static void ble_print_device (ble_device_t *device)
   printf (" (%s)\n", ((device->address.type > 0) ? "random" : "public"));
 }
 
-static void ble_print_service_list (ble_service_t *service_list)
+static void ble_print_service_list (ble_service_list_entry_t *service_list)
 {
   int i;
+  ble_data_list_entry_t *data_list_entry = NULL;
   
   while (service_list != NULL)
   {
-    ble_characteristics_t *char_list = service_list->char_list;
+    ble_char_list_entry_t *char_list = service_list->char_list;
       
     printf ("Service type -- %04x\n", ((service_list->attribute.uuid[1] << 8)|service_list->attribute.uuid[0]));
     printf ("  start handle: %04x\n", service_list->start_handle);
@@ -190,14 +189,31 @@ static void ble_print_service_list (ble_service_t *service_list)
     while (char_list != NULL)
     {
       ble_char_decl_t *char_decl = (ble_char_decl_t *)(char_list->declaration.value);
+      ble_attr_list_entry_t *attr_list_entry;
+      uint8 uuid_length = char_list->declaration.value_length - 3;
       
       printf ("      Characteristics handle: %04x\n", char_list->declaration.handle);
       printf ("                       value: %02x, %04x, ", char_decl->bitfield, char_decl->value_handle);
-      for (i = (char_list->declaration.value_length - 4); i >= 0; i--)
+      for (i = (uuid_length - 1); i >= 0; i--)
       {
         printf ("%02x", char_decl->value_uuid[i]);
       }
       printf ("\n");
+      
+      attr_list_entry = ble_lookup_uuid (uuid_length, char_decl->value_uuid, char_decl->value_handle);
+      if (attr_list_entry != NULL)
+      {
+        if (data_list_entry == NULL)
+        {
+          data_list_entry = (ble_data_list_entry_t *)malloc (sizeof (*data_list_entry));
+          data_list_entry->device    = connection_params.device;
+          data_list_entry->attr_list = NULL;
+          list_add ((list_entry_t **)(&ble_data_list), (list_entry_t *)data_list_entry);
+        }
+
+        list_add ((list_entry_t **)(&(data_list_entry->attr_list)), (list_entry_t *)attr_list_entry);
+      }
+
       if (char_list->description.handle != BLE_INVALID_GATT_HANDLE)
       {
         printf ("          description handle: %04x\n", char_list->description.handle);
@@ -221,16 +237,6 @@ static void ble_print_service_list (ble_service_t *service_list)
           
         printf ("        client config handle: %04x\n", char_list->client_config.handle);
         printf ("                       value: %04x\n", char_client_config->bitfield);
-      }
-      if (char_list->value.handle != BLE_INVALID_GATT_HANDLE)
-      {
-        printf ("                value handle: %04x\n", char_list->value.handle);
-        printf ("                value UUID  : ");
-        for (i = (char_list->value.uuid_length - 1); i >= 0; i--)
-        {
-          printf ("%02x", char_list->value.uuid[i]);
-        }
-        printf ("\n");
       }
 
       char_list = char_list->next;
@@ -885,7 +891,7 @@ int ble_next_profile (ble_event_disconnect_t *disconnect)
 {
   int status = 1;
   
-  printf ("BLE Disconnect reason %d\n", disconnect->cause);
+  printf ("BLE Disconnect reason %04x\n", disconnect->cause);
 
   /* Go to next device */
   ble_list_entry_t *list_entry = ble_profile_list;
@@ -910,10 +916,10 @@ int ble_next_profile (ble_event_disconnect_t *disconnect)
 void ble_event_read_group (ble_event_read_group_t *read_group)
 {
   ble_device_t *device;
-  ble_service_t *service_list_entry;
+  ble_service_list_entry_t *service_list_entry;
 
   device = connection_params.device;
-  service_list_entry = (ble_service_t *)malloc (sizeof (*service_list_entry));
+  service_list_entry = (ble_service_list_entry_t *)malloc (sizeof (*service_list_entry));
   service_list_entry->include_list = NULL;
   service_list_entry->char_list    = NULL;
   service_list_entry->start_handle = read_group->start_handle;
@@ -933,14 +939,14 @@ void ble_event_read_group (ble_event_read_group_t *read_group)
 
 void ble_event_find_information (ble_event_find_information_t *find_information)
 {
-  ble_service_t *service = connection_params.service;
+  ble_service_list_entry_t *service = connection_params.service;
   
   if ((find_information->length == BLE_GATT_UUID_LENGTH) &&
       (find_information->data[0] == (BLE_GATT_INCLUDE & 0xff)) &&
       (find_information->data[1] == ((BLE_GATT_INCLUDE & 0xff00) >> 8)))
   {
     /* TODO: Include service declaration */
-    ble_service_t *include_list_entry = (ble_service_t *)malloc (sizeof (*include_list_entry));
+    ble_service_list_entry_t *include_list_entry = (ble_service_list_entry_t *)malloc (sizeof (*include_list_entry));
     
     include_list_entry->attribute.handle      = find_information->char_handle;
     include_list_entry->attribute.uuid_length = BLE_GATT_UUID_LENGTH;
@@ -954,7 +960,7 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
            (find_information->data[1] == ((BLE_GATT_CHAR_DECL & 0xff00) >> 8)))
   {
     /* Characteristics declaration */
-    ble_characteristics_t *char_list_entry = (ble_characteristics_t *)malloc (sizeof (*char_list_entry));
+    ble_char_list_entry_t *char_list_entry = (ble_char_list_entry_t *)malloc (sizeof (*char_list_entry));
 
     memset (char_list_entry, 0, sizeof (*char_list_entry));
     char_list_entry->declaration.handle      = find_information->char_handle;
@@ -968,8 +974,8 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
            (find_information->data[1] == ((BLE_GATT_CHAR_USER_DESC & 0xff00) >> 8)))
   {
     /* Characteristics user description */
-    ble_characteristics_t *char_list_entry
-                        = (ble_characteristics_t *)list_tail ((list_entry_t **)(&(service->char_list)));
+    ble_char_list_entry_t *char_list_entry
+                        = (ble_char_list_entry_t *)list_tail ((list_entry_t **)(&(service->char_list)));
 
     char_list_entry->description.handle      = find_information->char_handle;
     char_list_entry->description.uuid_length = find_information->length;
@@ -980,8 +986,8 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
            (find_information->data[1] == ((BLE_GATT_CHAR_FORMAT & 0xff00) >> 8)))
   {
     /* Characteristics format */
-    ble_characteristics_t *char_list_entry
-                        = (ble_characteristics_t *)list_tail ((list_entry_t **)(&(service->char_list)));
+    ble_char_list_entry_t *char_list_entry
+                        = (ble_char_list_entry_t *)list_tail ((list_entry_t **)(&(service->char_list)));
 
     char_list_entry->format.handle      = find_information->char_handle;
     char_list_entry->format.uuid_length = find_information->length;
@@ -992,8 +998,8 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
            (find_information->data[1] == ((BLE_GATT_CHAR_CLIENT_CONFIG & 0xff00) >> 8)))
   {
     /* Characteristics client configuration */
-    ble_characteristics_t *char_list_entry
-                        = (ble_characteristics_t *)list_tail ((list_entry_t **)(&(service->char_list)));
+    ble_char_list_entry_t *char_list_entry
+                        = (ble_char_list_entry_t *)list_tail ((list_entry_t **)(&(service->char_list)));
 
     char_list_entry->client_config.handle      = find_information->char_handle;
     char_list_entry->client_config.uuid_length = find_information->length;
@@ -1004,31 +1010,26 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
            (find_information->data[1] == ((BLE_GATT_CHAR_EXT & 0xff00) >> 8)))
   {
     /* Characteristics extended */
-    printf ("Characteristics extended declaration not handle\n");
+    printf ("Characteristics extended declaration descriptor not handle\n");
   }
   else if ((find_information->length == BLE_GATT_UUID_LENGTH) &&
            (find_information->data[0] == (BLE_GATT_CHAR_SERVER_CONFIG & 0xff)) &&
            (find_information->data[1] == ((BLE_GATT_CHAR_SERVER_CONFIG & 0xff00) >> 8)))
   {
     /* Characteristics server configuration */
-    printf ("Characteristics server configuration not handled\n");
+    printf ("Characteristics server configuration descriptor not handled\n");
   }
   else if ((find_information->length == BLE_GATT_UUID_LENGTH) &&
            (find_information->data[0] == (BLE_GATT_CHAR_AGG_FORMAT & 0xff)) &&
            (find_information->data[1] == ((BLE_GATT_CHAR_AGG_FORMAT & 0xff00) >> 8)))
   {
     /* Characteristics aggregrate format */
-    printf ("Characteristics aggregrate format not handled\n");
+    printf ("Characteristics aggregrate format descriptor not handled\n");
   }
   else
   {
     /* Characteristics value */
-    ble_characteristics_t *char_list_entry
-                        = (ble_characteristics_t *)list_tail ((list_entry_t **)(&(service->char_list)));
-
-    char_list_entry->value.handle      = find_information->char_handle;
-    char_list_entry->value.uuid_length = find_information->length;
-    memcpy (char_list_entry->value.uuid, find_information->data, find_information->length);
+    printf ("Characteristics value descriptor\n");
   }
 }
 

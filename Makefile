@@ -31,8 +31,8 @@ OBJ_DIR   := $(BUILD_DIR)/obj
 DEP_DIR   := $(BUILD_DIR)/depend
 
 # Input source files
-SRC_MASTER := ble_master.c ble.c serial.c
-SRC_SLAVE  := ble_master.c ble.c serial.c
+SRC_MASTER := ble_master.c ble.c serial.c gatt.c
+SRC_SLAVE  := ble_master.c ble.c serial.c gatt.c
 
 # Object & dependency files
 DEP_MASTER := $(patsubst %.c,$(DEP_DIR)/%.d, $(SRC_MASTER))
