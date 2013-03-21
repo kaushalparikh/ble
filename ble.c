@@ -167,11 +167,11 @@ static void ble_print_device (ble_device_t *device)
   printf (" (%s)\n", ((device->address.type > 0) ? "random" : "public"));
 }
 
-static void ble_print_service_list (ble_service_list_entry_t *service_list)
+static void ble_print_service_list (void)
 {
   int i;
-  ble_data_list_entry_t *data_list_entry = NULL;
-  
+  ble_service_list_entry_t *service_list = ((ble_device_t *)(connection_params.device->data))->service_list;  
+
   while (service_list != NULL)
   {
     ble_char_list_entry_t *char_list = service_list->char_list;
@@ -189,7 +189,6 @@ static void ble_print_service_list (ble_service_list_entry_t *service_list)
     while (char_list != NULL)
     {
       ble_char_decl_t *char_decl = (ble_char_decl_t *)(char_list->declaration.value);
-      ble_attr_list_entry_t *attr_list_entry;
       uint8 uuid_length = char_list->declaration.value_length - 3;
       
       printf ("      Characteristics handle: %04x\n", char_list->declaration.handle);
@@ -199,21 +198,6 @@ static void ble_print_service_list (ble_service_list_entry_t *service_list)
         printf ("%02x", char_decl->value_uuid[i]);
       }
       printf ("\n");
-      
-      attr_list_entry = ble_lookup_uuid (uuid_length, char_decl->value_uuid, char_decl->value_handle);
-      if (attr_list_entry != NULL)
-      {
-        if (data_list_entry == NULL)
-        {
-          data_list_entry = (ble_data_list_entry_t *)malloc (sizeof (*data_list_entry));
-          data_list_entry->device    = (ble_device_t *)(connection_params.device->data);
-          data_list_entry->attr_list = NULL;
-          list_add ((list_entry_t **)(&ble_data_list), (list_entry_t *)data_list_entry);
-        }
-
-        list_add ((list_entry_t **)(&(data_list_entry->attr_list)), (list_entry_t *)attr_list_entry);
-      }
-
       if (char_list->description.handle != BLE_INVALID_GATT_HANDLE)
       {
         printf ("          description handle: %04x\n", char_list->description.handle);
@@ -242,6 +226,40 @@ static void ble_print_service_list (ble_service_list_entry_t *service_list)
       char_list = char_list->next;
     }
     
+    service_list = service_list->next;
+  }
+}
+
+static void ble_update_data_list (void)
+{
+  ble_service_list_entry_t *service_list = ((ble_device_t *)(connection_params.device->data))->service_list;
+  ble_data_list_entry_t *data_list_entry = NULL;
+  
+  while (service_list != NULL)
+  {
+    ble_char_list_entry_t *char_list = service_list->char_list;
+
+    while (char_list != NULL)
+    {
+      ble_char_decl_t *char_decl = (ble_char_decl_t *)(char_list->declaration.value);
+      ble_attr_list_entry_t *attr_list_entry;
+      uint8 uuid_length = char_list->declaration.value_length - 3;
+
+      attr_list_entry = ble_lookup_uuid (uuid_length, char_decl->value_uuid, char_decl->value_handle);
+      if (attr_list_entry != NULL)
+      {
+        if (data_list_entry == NULL)
+        {
+          data_list_entry = (ble_data_list_entry_t *)malloc (sizeof (*data_list_entry));
+          data_list_entry->device    = (ble_device_t *)(connection_params.device->data);
+          data_list_entry->attr_list = NULL;
+          list_add ((list_entry_t **)(&ble_data_list), (list_entry_t *)data_list_entry);
+        }
+
+        list_add ((list_entry_t **)(&(data_list_entry->attr_list)), (list_entry_t *)attr_list_entry);
+      }
+      char_list = char_list->next;
+    }
     service_list = service_list->next;
   }
 }
@@ -288,11 +306,12 @@ static int ble_hello (void)
   return status;
 }
 
-static int ble_connect_direct (ble_device_t *device)
+static int ble_connect_direct (void)
 {
   int status;
   ble_message_t message;
   ble_command_connect_direct_t *connect_direct;
+  ble_device_t *device = (ble_device_t *)(connection_params.device->data);
 
   printf ("BLE Connect direct request\n");
   ble_print_device (device);
@@ -746,15 +765,10 @@ int ble_end_procedure (void)
 
 int ble_start_profile (void)
 {
-  int status = 1;
-  ble_device_t *device;
+  int status;
 
   connection_params.device = ble_profile_list;
-  device = (ble_device_t *)(connection_params.device->data);
-  if (device != NULL)
-  {
-    status = ble_connect_direct (device);
-  }
+  status = ble_connect_direct ();
   
   return status;
 }
@@ -846,26 +860,6 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
     }
   }
 
-  if (status <= 0)
-  {
-    /* Go to next device */
-    ble_list_entry_t *list_entry = ble_profile_list;
-    if (list_entry->next != NULL)
-    {
-      ble_device_t *device;
-      
-      list_remove ((list_entry_t **)(&ble_profile_list), (list_entry_t *)list_entry);
-      free (list_entry);
-      device = (ble_device_t *)(ble_profile_list->data);
-
-      status = ble_connect_direct (device);
-    }
-    else
-    {
-      status = 0;
-    }
-  }
-
   return status;
 }
 
@@ -886,7 +880,7 @@ int ble_next_profile (ble_event_disconnect_t *disconnect)
 
   if (connection_params.device != NULL)
   {
-    status = ble_connect_direct ((ble_device_t *)(connection_params.device->data));
+    status = ble_connect_direct ();
   }
   else
   {
@@ -1052,6 +1046,7 @@ int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_co
       {
         device->status = BLE_DEVICE_DISCOVER_SERVICE;
         /* TODO: Clean-up service list */
+        status = ble_connect_disconnect ();
       }
     }
     else
@@ -1105,12 +1100,13 @@ int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_co
       {
         device->status = BLE_DEVICE_DISCOVER_SERVICE;
         /* TODO: Clean-up service list */
+        status = ble_connect_disconnect ();
       }      
     }
     else
     {
-      /* ble_update_data_list (); */
-      ble_print_service_list (device->service_list);
+      ble_update_data_list ();
+      ble_print_service_list ();
       device->status = BLE_DEVICE_UPDATE_DATA;
       status = ble_connect_disconnect ();
     }
