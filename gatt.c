@@ -22,7 +22,7 @@ static ble_attr_list_entry_t temperature =
     .value        = NULL,
   },
   .update_type     = BLE_ATTR_UPDATE_READ,
-  .update_timer    = -1,
+  .update_timer    = 0,
   .update_callback = ble_update_temperature,
 };
 
@@ -37,7 +37,6 @@ ble_attr_list_entry_t * ble_lookup_uuid (uint8 uuid_length, uint8 *uuid, uint16 
 
   if ((memcmp (uuid, temperature.attribute.uuid, uuid_length)) == 0)
   {
-    printf ("Found temperature device\n");
     temperature.attribute.handle = handle;
     attr_list_entry = &temperature;
   }
