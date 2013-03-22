@@ -29,24 +29,6 @@ static ble_state_handler_t state_handler[BLE_STATE_MAX] =
   ble_data
 };
 
-static ble_state_e ble_profile_new_state (void)
-{
-  ble_state_e new_state;
-  
-  /* Exit profile state */
-  if ((ble_check_data_list ()) > 0)
-  {
-    (void)ble_set_timer (10, BLE_TIMER_DATA);
-    new_state = BLE_STATE_DATA;
-  }
-  else
-  {
-    (void)ble_set_timer (3000, BLE_TIMER_SCAN);
-    new_state = BLE_STATE_SCAN;
-  }
-
-  return new_state;
-}
 
 static ble_state_e ble_scan (ble_message_t *message)
 {
@@ -79,7 +61,7 @@ static ble_state_e ble_scan (ble_message_t *message)
         }
         else if (message->data[0] == BLE_TIMER_SCAN_STOP)
         {
-          if ((ble_end_procedure ()) <= 0)
+          if ((ble_stop_scan ()) <= 0)
           {
             /* TODO: Scan stop failed, set timer to stop sometime later */
           }
@@ -124,7 +106,6 @@ static ble_state_e ble_profile (ble_message_t *message)
 {
   ble_state_e new_state = BLE_STATE_PROFILE;
 
-  /* Only accept GAP event or timer messages */
   if (message->header.type == BLE_EVENT)
   {
     switch ((message->header.class << 8)|message->header.command)
@@ -155,7 +136,17 @@ static ble_state_e ble_profile (ble_message_t *message)
         
         if ((ble_next_profile ()) <= 0)
         {
-          new_state = ble_profile_new_state ();
+          /* Exit profile state */
+          if ((ble_check_data_list ()) > 0)
+          {
+            (void)ble_set_timer (10, BLE_TIMER_DATA);
+            new_state = BLE_STATE_DATA;
+          }
+          else
+          {
+            (void)ble_set_timer (3000, BLE_TIMER_SCAN);
+            new_state = BLE_STATE_SCAN;
+          }
         }
         
         break;
@@ -209,11 +200,67 @@ static ble_state_e ble_profile (ble_message_t *message)
 
 static ble_state_e ble_data (ble_message_t *message)
 {
-  ble_flush_timer ();
-  ble_flush_serial ();    
-  printf ("BLE Data state\n");
-  (void)ble_set_timer (3000, BLE_TIMER_SCAN);
-  return BLE_STATE_SCAN;
+  ble_state_e new_state = BLE_STATE_DATA;
+
+  if (message->header.type == BLE_EVENT)
+  {
+    switch ((message->header.class << 8)|message->header.command)
+    {
+      case ((BLE_CLASS_CONNECTION << 8)|BLE_EVENT_STATUS):
+      {
+        if ((ble_event_connection_status ((ble_event_connection_status_t *)message)) > 0)
+        {
+          if ((ble_read_data ()) <= 0)
+          {
+            /* TODO: */
+          }
+        }
+
+        break;
+      }
+      case ((BLE_CLASS_CONNECTION << 8)|BLE_EVENT_DISCONNECTED):
+      {
+        ble_event_disconnect ((ble_event_disconnect_t *)message);
+        
+        if ((ble_next_data ()) <= 0)
+        {
+          /* Exit data state */
+          (void)ble_set_timer (10000, BLE_TIMER_SCAN);
+          new_state = BLE_STATE_SCAN;
+        }
+        
+        break;
+      }
+      case ((BLE_CLASS_HW << 8)|BLE_EVENT_SOFT_TIMER):
+      {
+        if (message->data[0] == BLE_TIMER_DATA)
+        {
+          printf ("BLE Data state\n");
+          if ((ble_start_data ()) <= 0)
+          {
+            /* TODO: try again after sometime */
+          }
+          
+          /* Flush rest of message, both from serial & timer */
+          ble_flush_timer ();
+          ble_flush_serial ();    
+        }
+        
+        break;
+      }
+      default:
+      {
+        ble_print_message (message);
+        break;
+      }
+    }
+  }
+  else
+  {
+    ble_print_message (message);
+  }
+
+  return new_state;
 }
 
 void master_loop (void)

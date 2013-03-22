@@ -66,6 +66,7 @@ typedef struct
   char                     *name;
   ble_device_status_e       status;
   ble_service_list_entry_t *service_list;
+  ble_attr_list_entry_t    *update_list;
 } ble_device_t;
 
 /* Message header definitions */
@@ -373,7 +374,7 @@ typedef struct PACKED
 #define BLE_SCAN_WINDOW    MS_TO_625US(200)
 #define BLE_SCAN_INTERVAL  MS_TO_625US(1000)
 
-#define BLE_SCAN_DURATION  (10000)
+#define BLE_SCAN_DURATION  (2000)
 
 /* Scan modes */
 enum
@@ -723,13 +724,19 @@ extern void ble_flush_serial (void);
 
 extern int ble_start_scan (void);
 
-extern int ble_end_procedure (void);
+extern int ble_stop_scan (void);
 
 extern int ble_start_profile (void);
 
 extern int ble_next_profile (void);
 
 extern int ble_read_profile (void);
+
+extern int ble_start_data (void);
+
+extern int ble_next_data (void);
+
+extern int ble_read_data (void);
 
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
