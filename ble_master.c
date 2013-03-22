@@ -131,16 +131,29 @@ static ble_state_e ble_profile (ble_message_t *message)
     {
       case ((BLE_CLASS_CONNECTION << 8)|BLE_EVENT_STATUS):
       {
-        if ((ble_event_connection_status ((ble_event_connection_status_t *)message)) <= 0)
+        if ((ble_event_connection_status ((ble_event_connection_status_t *)message)) > 0)
         {
-          new_state = ble_profile_new_state ();
+          if ((ble_read_profile ()) <= 0)
+          {
+            /* TODO: */
+          }
         }
-        
+
         break;
       }
+      case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_PROCEDURE_COMPLETED):
+      {
+        if ((ble_read_profile ()) <= 0)
+        {
+          /* TODO: */
+        }
+        break;
+      }      
       case ((BLE_CLASS_CONNECTION << 8)|BLE_EVENT_DISCONNECTED):
       {
-        if ((ble_next_profile ((ble_event_disconnect_t *)message)) <= 0)
+        ble_event_disconnect ((ble_event_disconnect_t *)message);
+        
+        if ((ble_next_profile ()) <= 0)
         {
           new_state = ble_profile_new_state ();
         }
@@ -161,16 +174,6 @@ static ble_state_e ble_profile (ble_message_t *message)
       {
         ble_event_attr_value ((ble_event_attr_value_t *)message);
         break;
-      }      
-
-      case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_PROCEDURE_COMPLETED):
-      {
-        if ((ble_event_procedure_completed ((ble_event_procedure_completed_t *)message)) <= 0)
-        {
-          new_state = ble_profile_new_state ();
-        }
-        
-        break;
       }
       case ((BLE_CLASS_HW << 8)|BLE_EVENT_SOFT_TIMER):
       {
@@ -179,7 +182,7 @@ static ble_state_e ble_profile (ble_message_t *message)
           printf ("BLE Profile state\n");
           if ((ble_start_profile ()) <= 0)
           {
-            new_state = ble_profile_new_state ();
+            /* TODO: try again after sometime */
           }
           
           /* Flush rest of message, both from serial & timer */

@@ -727,19 +727,21 @@ extern int ble_end_procedure (void);
 
 extern int ble_start_profile (void);
 
+extern int ble_next_profile (void);
+
+extern int ble_read_profile (void);
+
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
 extern int ble_event_connection_status (ble_event_connection_status_t *connection_status);
 
-extern int ble_next_profile (ble_event_disconnect_t *disconnect);
+extern void ble_event_disconnect (ble_event_disconnect_t *disconnect);
 
 extern void ble_event_read_group (ble_event_read_group_t *read_group);
 
 extern void ble_event_find_information (ble_event_find_information_t *find_information);
 
 extern void ble_event_attr_value (ble_event_attr_value_t *attr_value);
-
-extern int ble_event_procedure_completed (ble_event_procedure_completed_t *procedure_completed);
 
 #endif
 
