@@ -166,13 +166,13 @@ static void ble_print_service_list (void)
   {
     ble_char_list_entry_t *char_list = service_list->char_list;
       
-    printf ("Service type -- %04x\n", ((service_list->attribute.uuid[1] << 8)|service_list->attribute.uuid[0]));
+    printf ("Service type -- %04x\n", ((service_list->declaration.uuid[1] << 8)|service_list->declaration.uuid[0]));
     printf ("  start handle: %04x\n", service_list->start_handle);
     printf ("    end handle: %04x\n", service_list->end_handle);
     printf ("    value     : ");
-    for (i = (service_list->attribute.value_length - 1); i >= 0; i--)
+    for (i = (service_list->declaration.value_length - 1); i >= 0; i--)
     {
-      printf ("%02x", service_list->attribute.value[i]);
+      printf ("%02x", service_list->declaration.value[i]);
     }
     printf ("\n");
 
@@ -233,11 +233,12 @@ static void ble_update_data_list (void)
     while (char_list != NULL)
     {
       ble_char_decl_t *char_decl = (ble_char_decl_t *)(char_list->declaration.value);
-      ble_attr_list_entry_t *attr_list_entry;
-      uint8 uuid_length = char_list->declaration.value_length - 3;
 
-      attr_list_entry = ble_lookup_uuid (uuid_length, char_decl->value_uuid, char_decl->value_handle);
-      if (attr_list_entry != NULL)
+      char_list->value.uuid_length = char_list->declaration.value_length - 3;
+      char_list->value.handle      = char_decl->value_handle;
+      memcpy (char_list->value.uuid, char_decl->value_uuid, char_list->value.uuid_length);
+
+      if ((ble_lookup_uuid (char_list)) > 0)
       {
         if (list_entry == NULL)
         {
@@ -246,7 +247,7 @@ static void ble_update_data_list (void)
           list_add ((list_entry_t **)(&ble_data_list), (list_entry_t *)list_entry);
         }
 
-        list_add ((list_entry_t **)(&(device->update_list)), (list_entry_t *)attr_list_entry);
+        list_add ((list_entry_t **)(&(device->update_list)), (list_entry_t *)char_list);
       }
       char_list = char_list->next;
     }
@@ -1021,13 +1022,13 @@ void ble_event_read_group (ble_event_read_group_t *read_group)
   service_list_entry->start_handle = read_group->start_handle;
   service_list_entry->end_handle   = read_group->end_handle;
   
-  service_list_entry->attribute.handle       = read_group->start_handle;
-  service_list_entry->attribute.uuid_length  = BLE_GATT_UUID_LENGTH;
-  service_list_entry->attribute.uuid[0]      = (BLE_GATT_PRI_SERVICE & 0xff);
-  service_list_entry->attribute.uuid[1]      = ((BLE_GATT_PRI_SERVICE & 0xff00) >> 8);
-  service_list_entry->attribute.value_length = read_group->length;
-  service_list_entry->attribute.value        = malloc (read_group->length);
-  memcpy (service_list_entry->attribute.value, read_group->data, read_group->length);
+  service_list_entry->declaration.handle       = read_group->start_handle;
+  service_list_entry->declaration.uuid_length  = BLE_GATT_UUID_LENGTH;
+  service_list_entry->declaration.uuid[0]      = (BLE_GATT_PRI_SERVICE & 0xff);
+  service_list_entry->declaration.uuid[1]      = ((BLE_GATT_PRI_SERVICE & 0xff00) >> 8);
+  service_list_entry->declaration.value_length = read_group->length;
+  service_list_entry->declaration.value        = malloc (read_group->length);
+  memcpy (service_list_entry->declaration.value, read_group->data, read_group->length);
   /* service_list_entry->attribute.permission = */
 
   list_add ((list_entry_t **)(&(device->service_list)), (list_entry_t *)service_list_entry);
@@ -1044,10 +1045,10 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
     /* TODO: Include service declaration */
     ble_service_list_entry_t *include_list_entry = (ble_service_list_entry_t *)malloc (sizeof (*include_list_entry));
     
-    include_list_entry->attribute.handle      = find_information->char_handle;
-    include_list_entry->attribute.uuid_length = BLE_GATT_UUID_LENGTH;
-    include_list_entry->attribute.uuid[0]     = (BLE_GATT_INCLUDE & 0xff);
-    include_list_entry->attribute.uuid[1]     = ((BLE_GATT_INCLUDE & 0xff00) >> 8);
+    include_list_entry->declaration.handle      = find_information->char_handle;
+    include_list_entry->declaration.uuid_length = BLE_GATT_UUID_LENGTH;
+    include_list_entry->declaration.uuid[0]     = (BLE_GATT_INCLUDE & 0xff);
+    include_list_entry->declaration.uuid[1]     = ((BLE_GATT_INCLUDE & 0xff00) >> 8);
 
     list_add ((list_entry_t **)(&(service->include_list)), (list_entry_t *)include_list_entry);
   }

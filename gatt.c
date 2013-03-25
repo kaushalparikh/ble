@@ -5,14 +5,19 @@
 #include "ble.h"
 #include "gatt.h"
 
+typedef struct
+{
+  ble_attribute_t   attribute;
+  ble_char_update_t update;
+} ble_char_value_t;
+
 /* Temperature update interval in min. */
 #define BLE_TEMPERATURE_MEAS_INTERVAL  (15)
 
 static void ble_update_temperature (ble_attribute_t *attr);
 
-static ble_attr_list_entry_t temperature = 
+static ble_char_value_t temperature = 
 {
-  .next            = NULL,
   .attribute =
   {
     .handle       = BLE_INVALID_GATT_HANDLE,
@@ -21,9 +26,12 @@ static ble_attr_list_entry_t temperature =
     .value_length = 0,
     .value        = NULL,
   },
-  .update_type     = BLE_ATTR_UPDATE_READ,
-  .update_timer    = 0,
-  .update_callback = ble_update_temperature,
+  .update =
+  {
+    .type     = BLE_ATTR_UPDATE_READ,
+    .timer    = 0,
+    .callback = ble_update_temperature,
+  },
 };
 
 
@@ -31,16 +39,19 @@ static void ble_update_temperature (ble_attribute_t *attribute)
 {
 }
 
-ble_attr_list_entry_t * ble_lookup_uuid (uint8 uuid_length, uint8 *uuid, uint16 handle)
+int ble_lookup_uuid (ble_char_list_entry_t *characteristics)
 {
-  ble_attr_list_entry_t *attr_list_entry = NULL;
+  int found = 0;
+  ble_attribute_t *value = &(characteristics->value);
 
-  if ((memcmp (uuid, temperature.attribute.uuid, uuid_length)) == 0)
+  if ((value->uuid_length == temperature.attribute.uuid_length) &&
+      ((memcmp (value->uuid, temperature.attribute.uuid, value->uuid_length)) == 0))
   {
-    temperature.attribute.handle = handle;
-    attr_list_entry = &temperature;
+    temperature.attribute.handle = value->handle;
+    characteristics->update = temperature.update;
+    found = 1;
   }
 
-  return attr_list_entry;
+  return found;
 }
 

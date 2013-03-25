@@ -53,6 +53,19 @@ typedef struct
   uint8  *value;
 } ble_attribute_t;
 
+enum
+{
+  BLE_ATTR_UPDATE_READ  = 0x01,
+  BLE_ATTR_UPDATE_WRITE = 0x02
+};
+
+typedef struct
+{
+  uint8   type;
+  int32   timer;
+  void  (*callback)(ble_attribute_t *attribute);  
+} ble_char_update_t;
+
 struct ble_char_list_entry
 {
   struct ble_char_list_entry *next;
@@ -60,6 +73,8 @@ struct ble_char_list_entry
   ble_attribute_t             description;
   ble_attribute_t             client_config;
   ble_attribute_t             format;
+  ble_attribute_t             value;
+  ble_char_update_t           update;
 };
 
 typedef struct ble_char_list_entry ble_char_list_entry_t;
@@ -69,31 +84,14 @@ struct ble_service_list_entry
   struct ble_service_list_entry *next;
   struct ble_service_list_entry *include_list;
   ble_char_list_entry_t         *char_list;
+  ble_attribute_t                declaration;
   uint16                         start_handle;
   uint16                         end_handle;
-  ble_attribute_t                attribute;
 };
 
 typedef struct ble_service_list_entry ble_service_list_entry_t;
 
-enum
-{
-  BLE_ATTR_UPDATE_READ  = 0x01,
-  BLE_ATTR_UPDATE_WRITE = 0x02
-};
-
-struct ble_attr_list_entry
-{
-  struct ble_attr_list_entry  *next;
-  ble_attribute_t              attribute;
-  uint8                        update_type;
-  int32                        update_timer;
-  void                       (*update_callback)(ble_attribute_t *attribute);
-};
-
-typedef struct ble_attr_list_entry ble_attr_list_entry_t;
-
-extern ble_attr_list_entry_t * ble_lookup_uuid (uint8 uuid_length, uint8 *uuid, uint16 handle);
+extern int ble_lookup_uuid (ble_char_list_entry_t *characteristics);
 
 #endif
 
