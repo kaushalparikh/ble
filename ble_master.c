@@ -210,7 +210,7 @@ static ble_state_e ble_data (ble_message_t *message)
       {
         if ((ble_event_connection_status ((ble_event_connection_status_t *)message)) > 0)
         {
-          if ((ble_read_data ()) <= 0)
+          if ((ble_update_data ()) <= 0)
           {
             /* TODO: */
           }
@@ -231,6 +231,16 @@ static ble_state_e ble_data (ble_message_t *message)
         
         break;
       }
+      case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_ATTR_CLIENT_VALUE):
+      {
+        ble_event_attr_value ((ble_event_attr_value_t *)message);
+
+        if ((ble_update_data ()) <= 0)
+        {
+          /* TODO: */
+        }
+        break;
+      }      
       case ((BLE_CLASS_HW << 8)|BLE_EVENT_SOFT_TIMER):
       {
         if (message->data[0] == BLE_TIMER_DATA)

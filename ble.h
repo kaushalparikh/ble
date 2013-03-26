@@ -653,7 +653,7 @@ typedef struct PACKED
   uint8                data[];
 } ble_event_find_information_t;
 
-/* Read long definitions */
+/* Read handle definitions */
 enum
 {
   BLE_ATTR_VALUE_READ      = 0,
@@ -668,14 +668,14 @@ typedef struct PACKED
   ble_message_header_t header;
   uint8                conn_handle;
   uint16               attr_handle;
-} ble_command_read_long_t;
+} ble_command_read_handle_t;
 
 typedef struct PACKED
 {
   ble_message_header_t header;
   uint8                conn_handle;
   uint16               result;
-} ble_response_read_long_t;
+} ble_response_read_handle_t;
 
 typedef struct PACKED
 {
@@ -686,6 +686,23 @@ typedef struct PACKED
   uint8                length;
   uint8                data[];
 } ble_event_attr_value_t;
+
+/* Write handle definitions */
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                conn_handle;
+  uint16               attr_handle;
+  uint8                length;
+  uint8                data[];
+} ble_command_write_handle_t;
+
+typedef struct PACKED
+{
+  ble_message_header_t header;
+  uint8                conn_handle;
+  uint16               result;
+} ble_response_write_handle_t;
 
 /* End GATT procedure definition */
 typedef struct PACKED
@@ -736,7 +753,7 @@ extern int ble_start_data (void);
 
 extern int ble_next_data (void);
 
-extern int ble_read_data (void);
+extern int ble_update_data (void);
 
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 

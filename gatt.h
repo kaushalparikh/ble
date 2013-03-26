@@ -55,15 +55,15 @@ typedef struct
 
 enum
 {
-  BLE_ATTR_UPDATE_READ  = 0x01,
-  BLE_ATTR_UPDATE_WRITE = 0x02
+  BLE_CHAR_UPDATE_READ  = 0x01,
+  BLE_CHAR_UPDATE_WRITE = 0x02
 };
 
 typedef struct
 {
   uint8   type;
   int32   timer;
-  void  (*callback)(ble_attribute_t *attribute);  
+  void  (*callback)(void *data);  
 } ble_char_update_t;
 
 struct ble_char_list_entry
@@ -73,7 +73,7 @@ struct ble_char_list_entry
   ble_attribute_t             description;
   ble_attribute_t             client_config;
   ble_attribute_t             format;
-  ble_attribute_t             value;
+  ble_attribute_t             data;
   ble_char_update_t           update;
 };
 

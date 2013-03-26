@@ -69,6 +69,9 @@ static ble_connection_params_t connection_params =
   .handle          = 0xff
 };
 
+static int32 sleep_interval = 0;
+  
+
 static void ble_timer_callback (timer_list_entry_t *timer_list_entry)
 {
   list_add ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
@@ -234,9 +237,9 @@ static void ble_update_data_list (void)
     {
       ble_char_decl_t *char_decl = (ble_char_decl_t *)(char_list->declaration.value);
 
-      char_list->value.uuid_length = char_list->declaration.value_length - 3;
-      char_list->value.handle      = char_decl->value_handle;
-      memcpy (char_list->value.uuid, char_decl->value_uuid, char_list->value.uuid_length);
+      char_list->data.uuid_length = char_list->declaration.value_length - 3;
+      char_list->data.handle      = char_decl->value_handle;
+      memcpy (char_list->data.uuid, char_decl->value_uuid, char_list->data.uuid_length);
 
       if ((ble_lookup_uuid (char_list)) > 0)
       {
@@ -257,6 +260,22 @@ static void ble_update_data_list (void)
   if (list_entry == NULL)
   {
     device->status = BLE_DEVICE_IGNORE;
+  }
+}
+
+static void ble_data_callback (void)
+{
+  ble_device_t *device = (ble_device_t *)(connection_params.device->data);
+  ble_char_list_entry_t *char_list = device->update_list;
+
+  while (char_list != NULL)
+  {
+    if (char_list->update.timer == 0)
+    {
+      char_list->update.callback (char_list);
+    }
+    
+    char_list = char_list->next;
   }
 }
 
@@ -363,11 +382,6 @@ static int ble_connect_disconnect (void)
       printf ("BLE Disconnect response received with failure %d\n", disconnect_rsp->result);
       status = -1;
     }
-
-    connection_params.service         = NULL;
-    connection_params.characteristics = NULL;
-    connection_params.attribute       = NULL;
-    connection_params.handle          = 0xff;
   }
   else
   {
@@ -448,22 +462,22 @@ static int ble_read_long_handle (void)
 {
   int status;
   ble_message_t message;
-  ble_command_read_long_t *read_long;
+  ble_command_read_handle_t *read_handle;
 
   printf ("BLE Read long request\n");
   
-  read_long = (ble_command_read_long_t *)(&message);
-  BLE_CLASS_ATTR_CLIENT_HEADER (read_long, BLE_COMMAND_READ_LONG);
-  read_long->conn_handle = connection_params.handle;
-  read_long->attr_handle = connection_params.attribute->handle;
+  read_handle = (ble_command_read_handle_t *)(&message);
+  BLE_CLASS_ATTR_CLIENT_HEADER (read_handle, BLE_COMMAND_READ_LONG);
+  read_handle->conn_handle = connection_params.handle;
+  read_handle->attr_handle = connection_params.attribute->handle;
   status = ble_command (&message);
 
   if (status > 0)
   {
-    ble_response_read_long_t *read_long_rsp = (ble_response_read_long_t *)(&message);
-    if (read_long_rsp->result != 0)
+    ble_response_read_handle_t *read_handle_rsp = (ble_response_read_handle_t *)(&message);
+    if (read_handle_rsp->result != 0)
     {
-      printf ("BLE Read long response received with failure %d\n", read_long_rsp->result);
+      printf ("BLE Read long response received with failure %d\n", read_handle_rsp->result);
       status = -1;
     }
   }
@@ -473,6 +487,70 @@ static int ble_read_long_handle (void)
   }
 
   return status;
+}
+
+static int ble_read_handle (void)
+{
+  int status;
+  ble_message_t message;
+  ble_command_read_handle_t *read_handle;
+
+  printf ("BLE Read request\n");
+  
+  read_handle = (ble_command_read_handle_t *)(&message);
+  BLE_CLASS_ATTR_CLIENT_HEADER (read_handle, BLE_COMMAND_READ_BY_HANDLE);
+  read_handle->conn_handle = connection_params.handle;
+  read_handle->attr_handle = connection_params.attribute->handle;
+  status = ble_command (&message);
+
+  if (status > 0)
+  {
+    ble_response_read_handle_t *read_handle_rsp = (ble_response_read_handle_t *)(&message);
+    if (read_handle_rsp->result != 0)
+    {
+      printf ("BLE Read response received with failure %d\n", read_handle_rsp->result);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("BLE Read failed with %d\n", status);
+  }
+
+  return status;
+}
+
+static int ble_write_handle (void)
+{
+  int status;
+  ble_message_t message;
+  ble_command_write_handle_t *write_handle;
+
+  printf ("BLE Write request\n");
+  
+  write_handle = (ble_command_write_handle_t *)(&message);
+  BLE_CLASS_ATTR_CLIENT_HEADER (write_handle, BLE_COMMAND_READ_BY_HANDLE);
+  write_handle->conn_handle = connection_params.handle;
+  write_handle->attr_handle = connection_params.attribute->handle;
+  write_handle->length      = connection_params.attribute->value_length;
+  memcpy (write_handle->data, connection_params.attribute->value, write_handle->length);
+  status = ble_command (&message);
+
+  if (status > 0)
+  {
+    ble_response_write_handle_t *write_handle_rsp = (ble_response_write_handle_t *)(&message);
+    if (write_handle_rsp->result != 0)
+    {
+      printf ("BLE Write response received with failure %d\n", write_handle_rsp->result);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("BLE Write failed with %d\n", status);
+  }
+
+  return status;  
 }
 
 int ble_set_timer (int millisec, int cause)
@@ -778,7 +856,7 @@ int ble_start_profile (void)
 
 int ble_next_profile (void)
 {
-  int status = 1;
+  int status;
   ble_list_entry_t *list_entry = connection_params.device;
   
   /* Go to next device */
@@ -913,14 +991,61 @@ int ble_start_data (void)
   return status;
 }
 
-int ble_read_data (void)
+int ble_update_data (void)
 {
-  return ble_connect_disconnect ();
+  int status;
+  ble_device_t *device = (ble_device_t *)(connection_params.device->data);
+
+  do
+  {
+    if (connection_params.characteristics == NULL)
+    {
+      connection_params.characteristics = device->update_list;
+    }
+    else
+    {
+      connection_params.characteristics = connection_params.characteristics->next;
+    }
+  } while ((connection_params.characteristics != NULL) &&
+           (connection_params.characteristics->update.timer != 0));
+
+  if (connection_params.characteristics != NULL)
+  {
+    connection_params.attribute = &(connection_params.characteristics->data);
+    if (connection_params.characteristics->update.type == BLE_CHAR_UPDATE_READ)
+    {
+      status = ble_read_handle ();
+    }
+    else
+    {
+      status = ble_write_handle ();
+    }
+  }
+  else
+  {
+    ble_data_callback ();
+    status = ble_connect_disconnect ();
+  }
+    
+  return status;
 }
 
 int ble_next_data (void)
 {
-  return 0;
+  int status;
+  
+  /* Go to next device */
+  connection_params.device = connection_params.device->next;
+  if (connection_params.device != NULL)
+  {
+    status = ble_connect_direct ();
+  }
+  else
+  {
+    status = 0;
+  }
+  
+  return status;
 }
 
 void ble_event_scan_response (ble_event_scan_response_t *scan_response)
@@ -1008,6 +1133,11 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
 void ble_event_disconnect (ble_event_disconnect_t *disconnect)
 {
   printf ("BLE Disconnect reason %04x\n", disconnect->cause);
+
+  connection_params.service         = NULL;
+  connection_params.characteristics = NULL;
+  connection_params.attribute       = NULL;
+  connection_params.handle          = 0xff;
 }
 
 void ble_event_read_group (ble_event_read_group_t *read_group)
@@ -1135,7 +1265,10 @@ void ble_event_attr_value (ble_event_attr_value_t *attr_value)
   ble_attribute_t *attribute = connection_params.attribute;
 
   attribute->value_length = attr_value->length;
-  attribute->value        = malloc (attribute->value_length);
+  if (attribute->value == NULL)
+  {
+    attribute->value = malloc (attribute->value_length);
+  }
   memcpy (attribute->value, attr_value->data, attribute->value_length);
 }
 
