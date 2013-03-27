@@ -61,7 +61,7 @@ static ble_state_e ble_scan (ble_message_t *message)
         }
         else if (message->data[0] == BLE_TIMER_SCAN_STOP)
         {
-          if ((ble_stop_scan ()) <= 0)
+          if ((ble_end_procedure ()) <= 0)
           {
             /* TODO: Scan stop failed, set timer to stop sometime later */
           }
@@ -180,6 +180,13 @@ static ble_state_e ble_profile (ble_message_t *message)
           ble_flush_timer ();
           ble_flush_serial ();    
         }
+        else if (message->data[0] == BLE_TIMER_CONNECT_STOP)
+        {
+          if ((ble_end_procedure ()) <= 0)
+          {
+            /* TODO: */
+          }
+        }        
         
         break;
       }
@@ -254,6 +261,13 @@ static ble_state_e ble_data (ble_message_t *message)
           /* Flush rest of message, both from serial & timer */
           ble_flush_timer ();
           ble_flush_serial ();    
+        }
+        else if (message->data[0] == BLE_TIMER_CONNECT_STOP)
+        {
+          if ((ble_end_procedure ()) <= 0)
+          {
+            /* TODO: */
+          }
         }
         
         break;

@@ -17,6 +17,8 @@ typedef signed short int   int16;
 typedef unsigned long int  uint32;
 typedef long int           int32;
 
+typedef int *timer_handle_t;
+
 /* GATT definitions */
 #include "gatt.h"
 
@@ -294,7 +296,8 @@ enum
   BLE_TIMER_SCAN_STOP    = 1,
   BLE_TIMER_PROFILE      = 2,
   BLE_TIMER_PROFILE_STOP = 3,
-  BLE_TIMER_DATA         = 4
+  BLE_TIMER_DATA         = 4,
+  BLE_TIMER_CONNECT_STOP = 5
 };
 
 /* Message header */
@@ -530,7 +533,8 @@ typedef struct PACKED
 #define BLE_MIN_CONNECT_INTERVAL  MS_TO_1250US(10)
 #define BLE_MAX_CONNECT_INTERVAL  MS_TO_1250US(20)
 
-#define BLE_CONNECT_TIMEOUT  MS_TO_10MS(1000)
+#define BLE_CONNECT_SETUP_TIMEOUT  (10000)
+#define BLE_CONNECT_TIMEOUT        MS_TO_10MS(1000)
 
 #define BLE_CONNECT_LATENCY  (0)
 
@@ -715,7 +719,7 @@ typedef struct PACKED
 
 /* Function declarations */
 
-extern int ble_set_timer (int millisec, int cause);
+extern timer_handle_t ble_set_timer (int millisec, int cause);
 
 extern int ble_check_timer (void);
 
@@ -741,7 +745,7 @@ extern void ble_flush_serial (void);
 
 extern int ble_start_scan (void);
 
-extern int ble_stop_scan (void);
+extern int ble_end_procedure (void);
 
 extern int ble_start_profile (void);
 

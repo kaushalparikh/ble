@@ -58,6 +58,7 @@ typedef struct
   ble_char_list_entry_t    *characteristics;
   ble_attribute_t          *attribute;
   uint8                     handle;
+  timer_handle_t            timer;
 } ble_connection_params_t;
 
 static ble_connection_params_t connection_params = 
@@ -66,7 +67,8 @@ static ble_connection_params_t connection_params =
   .service         = NULL,
   .characteristics = NULL,
   .attribute       = NULL,
-  .handle          = 0xff
+  .handle          = 0xff,
+  .timer           = NULL,
 };
 
 static int32 sleep_interval = 0;
@@ -358,6 +360,12 @@ static int ble_connect_direct (void)
     printf ("BLE Connect direct failed with %d\n", status);
   }
 
+  if ((status > 0) &&
+      ((connection_params.timer = ble_set_timer (BLE_CONNECT_SETUP_TIMEOUT, BLE_TIMER_CONNECT_STOP)) == NULL))
+  {
+    status = -1;
+  }
+
   return status;
 }
 
@@ -553,9 +561,8 @@ static int ble_write_handle (void)
   return status;  
 }
 
-int ble_set_timer (int millisec, int cause)
+timer_handle_t ble_set_timer (int millisec, int cause)
 {
-  int status = 1;
   timer_list_entry_t *timer_list_entry;
 
   timer_list_entry = (timer_list_entry_t *)malloc (sizeof (*timer_list_entry));
@@ -566,10 +573,10 @@ int ble_set_timer (int millisec, int cause)
   if ((timer_start (&(timer_list_entry->info))) != 0)
   {
     free (timer_list_entry);
-    status = -1;
+    timer_list_entry = NULL;
   }
 
-  return status;
+  return (timer_handle_t)timer_list_entry;
 }
 
 int ble_check_timer (void)
@@ -807,21 +814,22 @@ int ble_start_scan (void)
     }
   }
 
-  if (status > 0)
+  if ((status > 0) &&
+      ((ble_set_timer (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP)) == NULL))
   {
-    status = ble_set_timer (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP);
+    status = -1;
   }
 
   return status;
 }
 
-int ble_stop_scan (void)
+int ble_end_procedure (void)
 {
   int status;
   ble_message_t message;
   ble_command_end_procedure_t *end_procedure;
 
-  printf ("BLE Stop scan request\n");
+  printf ("BLE End procedure request\n");
 
   end_procedure = (ble_command_end_procedure_t *)(&message);
   BLE_CLASS_GAP_HEADER (end_procedure, BLE_COMMAND_END_PROCEDURE);
@@ -1120,6 +1128,9 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
 
   if (connection_status->flags & BLE_CONNECT_ESTABLISHED)
   {
+    timer_stop (&(((timer_list_entry_t *)connection_params.timer)->info));
+    free (connection_params.timer);
+    connection_params.timer = NULL;
     status = 1;
   }
   else
@@ -1138,6 +1149,7 @@ void ble_event_disconnect (ble_event_disconnect_t *disconnect)
   connection_params.characteristics = NULL;
   connection_params.attribute       = NULL;
   connection_params.handle          = 0xff;
+  connection_params.timer           = NULL;
 }
 
 void ble_event_read_group (ble_event_read_group_t *read_group)
