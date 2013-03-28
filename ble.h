@@ -544,7 +544,8 @@ enum
   BLE_CONNECT_CREATED     = 0x01,
   BLE_CONNECT_ENCRYPTED   = 0x02,
   BLE_CONNECT_ESTABLISHED = 0x04,
-  BLE_CONNECT_UPDATED     = 0x08
+  BLE_CONNECT_UPDATED     = 0x08,
+  BLE_CONNECT_FAILED      = 0x10
 };
 
 /* Disconnection cause */
@@ -730,6 +731,8 @@ extern void ble_flush_timer (void);
 extern int ble_init (void);
 
 extern void ble_deinit (void);
+
+extern int ble_check_scan_list (void);
 
 extern int ble_check_profile_list (void);
 

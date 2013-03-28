@@ -182,7 +182,10 @@ static ble_state_e ble_profile (ble_message_t *message)
         }
         else if (message->data[0] == BLE_TIMER_CONNECT_STOP)
         {
-          if ((ble_end_procedure ()) <= 0)
+          ble_event_connection_status_t *connection_status = (ble_event_connection_status_t *)message;
+          connection_status->flags = BLE_CONNECT_FAILED;
+          
+          if ((ble_event_connection_status ((ble_event_connection_status_t *)message)) <= 0)
           {
             /* TODO: */
           }
@@ -232,8 +235,15 @@ static ble_state_e ble_data (ble_message_t *message)
         if ((ble_next_data ()) <= 0)
         {
           /* Exit data state */
-          (void)ble_set_timer (10000, BLE_TIMER_SCAN);
-          new_state = BLE_STATE_SCAN;
+          if ((ble_check_scan_list ()) > 0)
+          {
+            (void)ble_set_timer (10000, BLE_TIMER_SCAN);
+            new_state = BLE_STATE_SCAN;
+          }
+          else
+          {
+            (void)ble_set_timer (10000, BLE_TIMER_DATA);
+          }
         }
         
         break;
@@ -260,11 +270,14 @@ static ble_state_e ble_data (ble_message_t *message)
           
           /* Flush rest of message, both from serial & timer */
           ble_flush_timer ();
-          ble_flush_serial ();    
+          ble_flush_serial ();
         }
         else if (message->data[0] == BLE_TIMER_CONNECT_STOP)
         {
-          if ((ble_end_procedure ()) <= 0)
+          ble_event_connection_status_t *connection_status = (ble_event_connection_status_t *)message;
+          connection_status->flags = BLE_CONNECT_FAILED;
+          
+          if ((ble_event_connection_status ((ble_event_connection_status_t *)message)) <= 0)
           {
             /* TODO: */
           }
