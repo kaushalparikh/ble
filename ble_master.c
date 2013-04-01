@@ -80,7 +80,7 @@ static ble_state_e ble_scan (ble_message_t *message)
             }
             else
             {
-              (void)ble_set_timer (10, BLE_TIMER_SCAN);
+              (void)ble_set_timer ((ble_update_sleep ()), BLE_TIMER_SCAN);
             }
           }
         }
@@ -234,16 +234,16 @@ static ble_state_e ble_data (ble_message_t *message)
         
         if ((ble_next_data ()) <= 0)
         {
+          int cause = BLE_TIMER_DATA;
+          
           /* Exit data state */
           if ((ble_check_scan_list ()) > 0)
           {
-            (void)ble_set_timer (10000, BLE_TIMER_SCAN);
             new_state = BLE_STATE_SCAN;
+            cause     = BLE_TIMER_SCAN;
           }
-          else
-          {
-            (void)ble_set_timer (10000, BLE_TIMER_DATA);
-          }
+
+          (void)ble_set_timer ((ble_update_sleep ()), cause);
         }
         
         break;

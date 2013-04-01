@@ -12,7 +12,7 @@ typedef struct
 } ble_char_value_t;
 
 /* Temperature update interval in min. */
-#define BLE_TEMPERATURE_MEAS_INTERVAL  (15)
+#define BLE_TEMPERATURE_MEAS_INTERVAL  (1)
 #define BLE_TEMPERATURE_VALUE_LENGTH   (20)
 
 static void ble_update_temperature (void *data);
@@ -47,6 +47,8 @@ static void ble_update_temperature (void *data)
     printf ("%02x", characteristics->data.value[i]);
   }
   printf ("\n");
+
+  characteristics->update.timer = BLE_TEMPERATURE_MEAS_INTERVAL;
 }
 
 int ble_lookup_uuid (ble_char_list_entry_t *characteristics)

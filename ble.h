@@ -762,6 +762,8 @@ extern int ble_next_data (void);
 
 extern int ble_update_data (void);
 
+extern int ble_update_sleep (void);
+
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
 extern int ble_event_connection_status (ble_event_connection_status_t *connection_status);

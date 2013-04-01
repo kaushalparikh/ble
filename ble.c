@@ -71,7 +71,7 @@ static ble_connection_params_t connection_params =
   .timer           = NULL,
 };
 
-static int32 sleep_interval = 0;
+static int sleep_interval = 0;
   
 
 static void ble_timer_callback (timer_list_entry_t *timer_list_entry)
@@ -1129,6 +1129,54 @@ int ble_next_data (void)
   }
   
   return status;
+}
+
+int ble_update_sleep (void)
+{
+  ble_device_list_entry_t *device_list;
+
+  device_list = ble_device_list;
+  sleep_interval = 0x7FFFFFFF;
+  
+  /* Loop through update list to find the minimum sleep interval */
+  while (device_list != NULL)
+  {
+    ble_char_list_entry_t *char_list = device_list->info.update_list;
+    while (char_list != NULL)
+    {
+      sleep_interval = (sleep_interval > char_list->update.timer) ? char_list->update.timer
+                                                                  : sleep_interval;
+      char_list = char_list->next;
+    }
+    device_list = device_list->next;
+  }
+
+  /* Subtract the sleep interval from timer. All characteristics
+     with timer value 0 will be updated on wake-up */
+  device_list = ble_device_list;
+  while (device_list != NULL)
+  {
+    ble_char_list_entry_t *char_list = device_list->info.update_list;
+    while (char_list != NULL)
+    {
+      char_list->update.timer -= sleep_interval;
+      char_list = char_list->next;
+    }
+    device_list = device_list->next;
+  }
+
+  if (sleep_interval != 0x7FFFFFFF)
+  {
+    sleep_interval *= (60*1000);
+  }
+  else
+  {
+    sleep_interval = 10;
+  }
+
+  printf ("BLE sleep interval %d (ms)\n", sleep_interval);
+
+  return sleep_interval;
 }
 
 void ble_event_scan_response (ble_event_scan_response_t *scan_response)
