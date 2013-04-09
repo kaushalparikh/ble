@@ -258,11 +258,6 @@ static void ble_update_data_list (void)
     }
     service_list = service_list->next;
   }
-
-  if (list_entry == NULL)
-  {
-    device->status = BLE_DEVICE_IGNORE;
-  }
 }
 
 static void ble_data_callback (void)
@@ -1038,7 +1033,17 @@ int ble_read_profile (void)
     {
       ble_update_data_list ();
       ble_print_service_list ();
-      device->status = BLE_DEVICE_UPDATE_DATA;
+      
+      if (device->update_list != NULL)
+      {
+        device->id     = ble_identify_device (device->update_list);
+        device->status = BLE_DEVICE_UPDATE_DATA;
+      }
+      else
+      {
+        device->status = BLE_DEVICE_IGNORE;
+      }
+
       status = ble_connect_disconnect ();
     }
   }
@@ -1090,7 +1095,7 @@ int ble_update_data (void)
   if (connection_params.characteristics != NULL)
   {
     connection_params.attribute = &(connection_params.characteristics->data);
-    if (connection_params.characteristics->update.type == BLE_CHAR_UPDATE_READ)
+    if (connection_params.characteristics->update.type == BLE_CHAR_READ_DATA)
     {
       status = ble_read_handle ();
     }

@@ -57,13 +57,15 @@ typedef enum
   BLE_DEVICE_DISCOVER_SERVICE   = 1,
   BLE_DEVICE_DISCOVER_CHAR_DESC = 2,
   BLE_DEVICE_DISCOVER_CHAR      = 3,
-  BLE_DEVICE_UPDATE_DATA        = 4,
-  BLE_DEVICE_IGNORE             = 5
+  BLE_DEVICE_CONFIGURE_CHAR     = 4,
+  BLE_DEVICE_UPDATE_DATA        = 5,
+  BLE_DEVICE_IGNORE             = 6
 } ble_device_status_e;
 
 /* BLE device */
 typedef struct
 {
+  uint32                    id;
   ble_device_address_t      address;
   char                     *name;
   ble_device_status_e       status;

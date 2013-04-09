@@ -29,7 +29,7 @@ static ble_char_value_t temperature =
   },
   .update =
   {
-    .type     = BLE_CHAR_UPDATE_READ,
+    .type     = (BLE_CHAR_INDICATE_DATA | BLE_CHAR_WRITE_CLIENT_CONFIG),
     .timer    = 0,
     .callback = ble_update_temperature,
   },
@@ -71,3 +71,7 @@ int ble_lookup_uuid (ble_char_list_entry_t *characteristics)
   return found;
 }
 
+uint32 ble_identify_device (ble_char_list_entry_t *update_list)
+{
+  return 0;
+}

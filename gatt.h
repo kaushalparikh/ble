@@ -55,8 +55,11 @@ typedef struct
 
 enum
 {
-  BLE_CHAR_UPDATE_READ  = 0x01,
-  BLE_CHAR_UPDATE_WRITE = 0x02
+  BLE_CHAR_READ_DATA           = 0x01,
+  BLE_CHAR_NOTIFY_DATA         = 0x02,
+  BLE_CHAR_INDICATE_DATA       = 0x04,
+  BLE_CHAR_WRITE_DATA          = 0x08,
+  BLE_CHAR_WRITE_CLIENT_CONFIG = 0x10
 };
 
 typedef struct
@@ -65,6 +68,14 @@ typedef struct
   int32   timer;
   void  (*callback)(void *data);  
 } ble_char_update_t;
+
+struct ble_desc_list_entry
+{
+  struct ble_desc_list_entry *next;
+  ble_attribute_t             attribute;
+};
+
+typedef struct ble_desc_list_entry ble_desc_list_entry_t;
 
 struct ble_char_list_entry
 {
@@ -92,6 +103,8 @@ struct ble_service_list_entry
 typedef struct ble_service_list_entry ble_service_list_entry_t;
 
 extern int ble_lookup_uuid (ble_char_list_entry_t *characteristics);
+
+extern uint32 ble_identify_device (ble_char_list_entry_t *update_list);
 
 #endif
 

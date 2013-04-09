@@ -248,9 +248,13 @@ static ble_state_e ble_data (ble_message_t *message)
         
         break;
       }
+      case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_PROCEDURE_COMPLETED):
       case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_ATTR_CLIENT_VALUE):
       {
-        ble_event_attr_value ((ble_event_attr_value_t *)message);
+        if (message->header.command == BLE_EVENT_ATTR_CLIENT_VALUE)
+        {
+          ble_event_attr_value ((ble_event_attr_value_t *)message);
+        }
 
         if ((ble_update_data ()) <= 0)
         {
