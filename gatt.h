@@ -1,6 +1,8 @@
 #ifndef __GATT_H__
 #define __GATT_H__
 
+#include "ble_types.h"
+
 #define BLE_MAX_UUID_LENGTH  (16)
 
 #define BLE_GATT_UUID_LENGTH  (2)
@@ -23,9 +25,21 @@ enum
   BLE_GATT_CHAR_AGG_FORMAT    = 0x2905
 };
 
+enum
+{
+  BLE_CHAR_PROPERTY_BROADCAST    = 0x01,
+  BLE_CHAR_PROPERTY_READ         = 0x02,
+  BLE_CHAR_PROPERTY_WRITE_NO_RSP = 0x04,
+  BLE_CHAR_PROPERTY_WRITE        = 0x08,
+  BLE_CHAR_PROPERTY_NOTIFY       = 0x10,
+  BLE_CHAR_PROPERTY_INDICATE     = 0x20,
+  BLE_CHAR_PROPERTY_WRITE_SIGNED = 0x40,
+  BLE_CHAR_PROPERTY_EXT          = 0x80
+};
+
 typedef struct PACKED
 {
-  uint8  bitfield;
+  uint8  properties;
   uint16 value_handle;
   uint8  value_uuid[BLE_MAX_UUID_LENGTH];
 } ble_char_decl_t;
@@ -44,22 +58,12 @@ typedef struct PACKED
   uint16 description;
 } ble_char_format_t;
 
-typedef struct
-{
-  uint16  handle;
-  uint8   uuid_length;
-  uint8   uuid[BLE_MAX_UUID_LENGTH];
-  uint8   value_length;
-  uint8  *value;
-} ble_attribute_t;
-
 enum
 {
   BLE_CHAR_READ_DATA           = 0x01,
   BLE_CHAR_NOTIFY_DATA         = 0x02,
   BLE_CHAR_INDICATE_DATA       = 0x04,
-  BLE_CHAR_WRITE_DATA          = 0x08,
-  BLE_CHAR_WRITE_CLIENT_CONFIG = 0x10
+  BLE_CHAR_WRITE_DATA          = 0x08
 };
 
 typedef struct
@@ -69,22 +73,22 @@ typedef struct
   void  (*callback)(void *data);  
 } ble_char_update_t;
 
-struct ble_desc_list_entry
+struct ble_attr_list_entry
 {
-  struct ble_desc_list_entry *next;
-  ble_attribute_t             attribute;
+  struct ble_attr_list_entry *next;
+  uint16                      handle;
+  uint8                       uuid_length;
+  uint8                       uuid[BLE_MAX_UUID_LENGTH];
+  uint8                       value_length;
+  uint8                       *value;
 };
 
-typedef struct ble_desc_list_entry ble_desc_list_entry_t;
+typedef struct ble_attr_list_entry ble_attr_list_entry_t;
 
 struct ble_char_list_entry
 {
   struct ble_char_list_entry *next;
-  ble_attribute_t             declaration;
-  ble_attribute_t             description;
-  ble_attribute_t             client_config;
-  ble_attribute_t             format;
-  ble_attribute_t             data;
+  ble_attr_list_entry_t      *desc_list;
   ble_char_update_t           update;
 };
 
@@ -95,7 +99,7 @@ struct ble_service_list_entry
   struct ble_service_list_entry *next;
   struct ble_service_list_entry *include_list;
   ble_char_list_entry_t         *char_list;
-  ble_attribute_t                declaration;
+  ble_attr_list_entry_t          declaration;
   uint16                         start_handle;
   uint16                         end_handle;
 };

@@ -1,25 +1,8 @@
 #ifndef __BLE_H__
 #define __BLE_H__
 
-/* Basic definitions */
-#ifdef __GNUC__
-#define PACKED __attribute__((packed))
-#define ALIGNED __attribute__((aligned(0x4)))
-#else
-#define PACKED
-#define ALIGNED
-#endif
-
-typedef unsigned char      uint8;
-typedef signed char        int8;
-typedef unsigned short int uint16;
-typedef signed short int   int16;
-typedef unsigned long int  uint32;
-typedef long int           int32;
-
-typedef int *timer_handle_t;
-
 /* GATT definitions */
+#include "ble_types.h"
 #include "gatt.h"
 
 /* Maximum message data size */
@@ -689,7 +672,7 @@ typedef struct PACKED
   ble_message_header_t header;
   uint8                conn_handle;
   uint16               attr_handle;
-  uint8                attr_type;
+  uint8                type;
   uint8                length;
   uint8                data[];
 } ble_event_attr_value_t;
