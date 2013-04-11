@@ -52,6 +52,21 @@ static inline void list_add (list_entry_t **head, list_entry_t *new_entry)
   }
 }
 
+static inline void list_concat (list_entry_t **head, list_entry_t *new_list)
+{
+  list_entry_t *tail;
+
+  tail = list_tail (head);
+  if (tail != NULL)
+  {
+    tail->next = new_list;
+  }
+  else
+  {
+    *head = new_list;
+  }
+}
+
 static inline void list_remove (list_entry_t **head, list_entry_t *del_entry)
 {
   list_entry_t *entry, *prev_entry;

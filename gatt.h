@@ -44,6 +44,12 @@ typedef struct PACKED
   uint8  value_uuid[BLE_MAX_UUID_LENGTH];
 } ble_char_decl_t;
 
+enum
+{
+  BLE_CHAR_CLIENT_NOTIFY   = 0x0001,
+  BLE_CHAR_CLIENT_INDICATE = 0x0002
+};
+
 typedef struct PACKED
 {
   uint16 bitfield;

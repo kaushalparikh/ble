@@ -81,20 +81,54 @@ int ble_lookup_uuid (ble_char_list_entry_t *characteristics)
   {
     if (char_decl->properties & BLE_CHAR_PROPERTY_READ)
     {
-      characteristics->update.type |= BLE_CHAR_READ_DATA;
+      characteristics->update.type = BLE_CHAR_PROPERTY_READ;
     }
     else if (char_decl->properties & BLE_CHAR_PROPERTY_INDICATE)
     {
-      characteristics->update.type |= BLE_CHAR_INDICATE_DATA;
+      characteristics->update.type = BLE_CHAR_PROPERTY_INDICATE;
     }
     else if (char_decl->properties & BLE_CHAR_PROPERTY_NOTIFY)
     {
-      characteristics->update.type |= BLE_CHAR_NOTIFY_DATA;
+      characteristics->update.type = BLE_CHAR_PROPERTY_NOTIFY;
     }
-
-    if (char_decl->properties & BLE_CHAR_PROPERTY_WRITE)
+    else if (char_decl->properties & BLE_CHAR_PROPERTY_WRITE)
     {
-      characteristics->update.type |= BLE_CHAR_WRITE_DATA;
+      characteristics->update.type = BLE_CHAR_PROPERTY_WRITE;
+    }
+    else if (char_decl->properties & BLE_CHAR_PROPERTY_WRITE_NO_RSP)
+    {
+      characteristics->update.type = BLE_CHAR_PROPERTY_WRITE_NO_RSP;
+    }
+    else if (char_decl->properties & BLE_CHAR_PROPERTY_WRITE_SIGNED)
+    {
+      characteristics->update.type = BLE_CHAR_PROPERTY_WRITE_SIGNED;
+    }
+    else if (char_decl->properties & BLE_CHAR_PROPERTY_BROADCAST)
+    {
+      characteristics->update.type = BLE_CHAR_PROPERTY_BROADCAST;
+    }
+  
+    if (characteristics->update.type & (BLE_CHAR_PROPERTY_NOTIFY | BLE_CHAR_PROPERTY_INDICATE))
+    {
+      desc_list = characteristics->desc_list;
+      
+      while (desc_list != NULL)
+      {
+        uint16 uuid = ((desc_list->uuid[1]) << 8) | desc_list->uuid[0];
+        
+        if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
+        {
+          ble_char_client_config_t *client_config = (ble_char_client_config_t *)malloc (sizeof (*client_config));
+
+          client_config->bitfield = (characteristics->update.type & BLE_CHAR_PROPERTY_INDICATE)
+                                    ? BLE_CHAR_CLIENT_INDICATE : BLE_CHAR_CLIENT_NOTIFY;
+          desc_list->value_length = sizeof (*client_config);
+          desc_list->value        = (uint8 *)client_config;
+          break;
+        }
+
+        desc_list = desc_list->next;
+      }
     }
   }
 
