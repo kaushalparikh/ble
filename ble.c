@@ -42,20 +42,9 @@ typedef struct ble_device_list_entry ble_device_list_entry_t;
 
 LIST_HEAD_INIT (ble_device_list_entry_t, ble_device_list);
 
-struct ble_list_entry
-{
-  struct ble_list_entry *next;
-  void                  *data;
-};
-
-typedef struct ble_list_entry ble_list_entry_t;
-
-LIST_HEAD_INIT (ble_list_entry_t, ble_profile_list);
-LIST_HEAD_INIT (ble_list_entry_t, ble_data_list);
-
 typedef struct
 {
-  ble_list_entry_t         *device;
+  ble_device_list_entry_t  *device;
   ble_service_list_entry_t *service;
   ble_char_list_entry_t    *characteristics;
   ble_attr_list_entry_t    *attribute;
@@ -165,7 +154,7 @@ static void ble_print_device (ble_device_t *device)
 static void ble_print_service_list (void)
 {
   int i;
-  ble_service_list_entry_t *service_list = ((ble_device_t *)(connection_params.device->data))->service_list;  
+  ble_service_list_entry_t *service_list = connection_params.device->info.service_list;  
 
   while (service_list != NULL)
   {
@@ -233,9 +222,8 @@ static void ble_print_service_list (void)
 
 static void ble_update_data_list (void)
 {
-  ble_device_t *device = (ble_device_t *)(connection_params.device->data);
+  ble_device_t *device = &(connection_params.device->info);
   ble_service_list_entry_t *service_list = device->service_list;
-  ble_list_entry_t *list_entry = NULL;
   ble_char_list_entry_t *read_write_list = NULL;
   ble_char_list_entry_t *notify_indicate_list = NULL;
   
@@ -249,13 +237,6 @@ static void ble_update_data_list (void)
       {
         ble_char_list_entry_t *update_list_entry = (ble_char_list_entry_t *)malloc (sizeof (*update_list_entry));
         
-        if (list_entry == NULL)
-        {
-          list_entry       = (ble_list_entry_t *)malloc (sizeof (*list_entry));
-          list_entry->data = device;
-          list_add ((list_entry_t **)(&ble_data_list), (list_entry_t *)list_entry);
-        }
-
         *update_list_entry = *char_list;
         if ((update_list_entry->update.type == BLE_CHAR_PROPERTY_READ) ||
             (update_list_entry->update.type == BLE_CHAR_PROPERTY_WRITE))
@@ -284,7 +265,7 @@ static void ble_update_data_list (void)
 
 static void ble_data_callback (void)
 {
-  ble_device_t *device = (ble_device_t *)(connection_params.device->data);
+  ble_device_t *device = &(connection_params.device->info);
   ble_char_list_entry_t *char_list = device->update_list;
 
   while (char_list != NULL)
@@ -345,7 +326,7 @@ static int ble_connect_direct (void)
   int status;
   ble_message_t message;
   ble_command_connect_direct_t *connect_direct;
-  ble_device_t *device = (ble_device_t *)(connection_params.device->data);
+  ble_device_t *device = &(connection_params.device->info);
 
   printf ("BLE Connect direct request\n");
   ble_print_device (device);
@@ -697,15 +678,15 @@ void ble_print_message (ble_message_t *message)
 int ble_check_scan_list (void)
 {
   int found = 0;
-  ble_list_entry_t *list_entry = ble_data_list;
+  ble_device_list_entry_t *device_list = ble_device_list;
 
-  while (list_entry != NULL)
+  while (device_list != NULL)
   {
-    if (((ble_device_t *)(list_entry->data))->status == BLE_DEVICE_DISCOVER)
+    if (device_list->info.status == BLE_DEVICE_DISCOVER)
     {
       found++;
     }
-    list_entry = list_entry->next;
+    device_list = device_list->next;
   }
   
   return found;  
@@ -714,15 +695,15 @@ int ble_check_scan_list (void)
 int ble_check_profile_list (void)
 {
   int found = 0;
-  ble_list_entry_t *list_entry = ble_profile_list;
+  ble_device_list_entry_t *device_list = ble_device_list;
 
-  while (list_entry != NULL)
+  while (device_list != NULL)
   {
-    if (((ble_device_t *)(list_entry->data))->status == BLE_DEVICE_DISCOVER_SERVICE)
+    if (device_list->info.status == BLE_DEVICE_DISCOVER_SERVICE)
     {
       found++;
     }
-    list_entry = list_entry->next;
+    device_list = device_list->next;
   }
   
   return found;  
@@ -731,15 +712,15 @@ int ble_check_profile_list (void)
 int ble_check_data_list (void)
 {
   int found = 0;
-  ble_list_entry_t *list_entry = ble_data_list;
+  ble_device_list_entry_t *device_list = ble_device_list;
 
-  while (list_entry != NULL)
+  while (device_list != NULL)
   {
-    if (((ble_device_t *)(list_entry->data))->status == BLE_DEVICE_UPDATE_DATA)
+    if (device_list->info.status == BLE_DEVICE_DATA)
     {
       found++;
     }
-    list_entry = list_entry->next;
+    device_list = device_list->next;
   }
   
   return found;
@@ -912,7 +893,12 @@ int ble_start_profile (void)
 {
   int status;
 
-  connection_params.device = ble_profile_list;
+  connection_params.device = ble_device_list;
+  while ((connection_params.device != NULL) &&
+         (connection_params.device->info.status != BLE_DEVICE_DISCOVER_SERVICE))
+  {
+    connection_params.device = connection_params.device->next;
+  }  
   status = ble_connect_direct ();
   
   return status;
@@ -921,11 +907,14 @@ int ble_start_profile (void)
 int ble_next_profile (void)
 {
   int status;
-  ble_list_entry_t *list_entry = connection_params.device;
-  ble_device_t *device = (ble_device_t *)(list_entry->data);
-  
-  /* Go to next device */
-  connection_params.device = connection_params.device->next;
+  ble_device_list_entry_t *device_list_entry = connection_params.device;
+
+  do
+  {
+    connection_params.device = connection_params.device->next;
+  } while ((connection_params.device != NULL) &&
+           (connection_params.device->info.status != BLE_DEVICE_DISCOVER_SERVICE));
+
   if (connection_params.device != NULL)
   {
     status = ble_connect_direct ();
@@ -935,34 +924,19 @@ int ble_next_profile (void)
     status = 0;
   }
 
-  if (device->status != BLE_DEVICE_DISCOVER_SERVICE)
+  if (device_list_entry->info.status == BLE_DEVICE_DISCOVER)
   {
-    list_remove ((list_entry_t **)(&ble_profile_list), (list_entry_t *)list_entry);
-    free (list_entry);
-
-    if (device->status == BLE_DEVICE_DISCOVER)
-    {
-      ble_device_list_entry_t *device_list_entry = ble_device_list;
-      while (device_list_entry != NULL)
-      {
-        if (device == (&(device_list_entry->info)))
-        {
-          list_remove ((list_entry_t **)(&ble_device_list), (list_entry_t *)device_list_entry);
-          free (device_list_entry);
-          break;
-        }
-        device_list_entry = device_list_entry->next;
-      }
-    }
+    list_remove ((list_entry_t **)(&ble_device_list), (list_entry_t *)device_list_entry);
+    free (device_list_entry);
   }
-
+  
   return status;
 }
 
 int ble_read_profile (void)
 {
   int status;
-  ble_device_t *device = (ble_device_t *)(connection_params.device->data);
+  ble_device_t *device = &(connection_params.device->info);
 
   if (device->status == BLE_DEVICE_DISCOVER_SERVICE)
   {
@@ -1057,7 +1031,7 @@ int ble_read_profile (void)
     if (device->update_list != NULL)
     {
       device->id     = ble_identify_device (device->update_list);
-      device->status = BLE_DEVICE_UPDATE_DATA;
+      device->status = BLE_DEVICE_DATA;
     }
     else
     {
@@ -1074,12 +1048,27 @@ int ble_start_data (void)
 {
   int status;
 
-  connection_params.device = (ble_list_entry_t *)ble_data_list;
+  connection_params.device = ble_device_list;
   while ((connection_params.device != NULL) &&
-         (((ble_device_t *)(connection_params.device->data))->status != BLE_DEVICE_UPDATE_DATA))
+         (connection_params.device->info.status != BLE_DEVICE_DATA))
   {
     connection_params.device = connection_params.device->next;
   }
+  status = ble_connect_direct ();
+  
+  return status;
+}
+
+int ble_next_data (void)
+{
+  int status;
+  
+  /* Go to next device */
+  do
+  {
+    connection_params.device = connection_params.device->next;
+  } while ((connection_params.device != NULL) &&
+           (connection_params.device->info.status != BLE_DEVICE_DATA));
 
   if (connection_params.device != NULL)
   {
@@ -1096,7 +1085,7 @@ int ble_start_data (void)
 int ble_update_data (void)
 {
   int status;
-  ble_device_t *device = (ble_device_t *)(connection_params.device->data);
+  ble_device_t *device = &(connection_params.device->info);
 
   do
   {
@@ -1170,29 +1159,6 @@ int ble_update_data (void)
   return status;
 }
 
-int ble_next_data (void)
-{
-  int status;
-  
-  /* Go to next device */
-  do
-  {
-    connection_params.device = connection_params.device->next;
-  } while ((connection_params.device != NULL) &&
-           (((ble_device_t *)(connection_params.device->data))->status != BLE_DEVICE_UPDATE_DATA));
-  
-  if (connection_params.device != NULL)
-  {
-    status = ble_connect_direct ();
-  }
-  else
-  {
-    status = 0;
-  }
-  
-  return status;
-}
-
 int ble_update_sleep (void)
 {
   ble_device_list_entry_t *device_list;
@@ -1203,13 +1169,21 @@ int ble_update_sleep (void)
   /* Loop through update list to find the minimum sleep interval */
   while (device_list != NULL)
   {
-    ble_char_list_entry_t *char_list = device_list->info.update_list;
-    while (char_list != NULL)
+    if ((device_list->info.status == BLE_DEVICE_DATA) ||
+        (device_list->info.status == BLE_DEVICE_SLEEP))
     {
-      sleep_interval = (sleep_interval > char_list->update.timer) ? char_list->update.timer
-                                                                  : sleep_interval;
-      char_list = char_list->next;
+      ble_char_list_entry_t *char_list = device_list->info.update_list;
+
+      while (char_list != NULL)
+      {
+        sleep_interval = (sleep_interval > char_list->update.timer) ? char_list->update.timer
+                                                                    : sleep_interval;
+        char_list = char_list->next;
+      }
+
+      device_list->info.status = BLE_DEVICE_SLEEP;
     }
+    
     device_list = device_list->next;
   }
 
@@ -1218,12 +1192,21 @@ int ble_update_sleep (void)
   device_list = ble_device_list;
   while (device_list != NULL)
   {
-    ble_char_list_entry_t *char_list = device_list->info.update_list;
-    while (char_list != NULL)
+    if (device_list->info.status == BLE_DEVICE_SLEEP)
     {
-      char_list->update.timer -= sleep_interval;
-      char_list = char_list->next;
+      ble_char_list_entry_t *char_list = device_list->info.update_list;
+      
+      while (char_list != NULL)
+      {
+        char_list->update.timer -= sleep_interval;
+        if (char_list->update.timer == 0)
+        {
+          device_list->info.status = BLE_DEVICE_DATA;
+        }
+        char_list = char_list->next;
+      }
     }
+    
     device_list = device_list->next;
   }
 
@@ -1253,7 +1236,6 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
   {
     ble_device_list_entry_t *device_list_entry 
         = (ble_device_list_entry_t *)malloc (sizeof (*device_list_entry));
-    ble_list_entry_t *profile_list_entry = (ble_list_entry_t *)malloc (sizeof (*profile_list_entry));
 
     device               = &(device_list_entry->info);
     device->address      = scan_response->device_address;
@@ -1261,18 +1243,14 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
     device->status       = BLE_DEVICE_DISCOVER_SERVICE;
     device->service_list = NULL;
     device->update_list  = NULL;
-
-    profile_list_entry->data = device;
     
     list_add ((list_entry_t **)(&ble_device_list), (list_entry_t *)device_list_entry);
-    list_add ((list_entry_t **)(&ble_profile_list), (list_entry_t *)profile_list_entry);
-    
     printf ("New device --\n");
   }
   else if (device->status == BLE_DEVICE_DISCOVER)
   {
+    device->status = BLE_DEVICE_DATA;
     printf ("Found device --\n");
-    device->status = BLE_DEVICE_UPDATE_DATA;
   }
   else
   {
@@ -1322,7 +1300,7 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
   }
   else if (connection_status->flags & BLE_CONNECT_FAILED)
   {
-    ((ble_device_t *)(connection_params.device->data))->status = BLE_DEVICE_DISCOVER;
+    connection_params.device->info.status = BLE_DEVICE_DISCOVER;
     status = ble_end_procedure ();
   }
   else
@@ -1346,12 +1324,11 @@ void ble_event_disconnect (ble_event_disconnect_t *disconnect)
 
 void ble_event_read_group (ble_event_read_group_t *read_group)
 {
-  ble_device_t *device;
   ble_service_list_entry_t *service_list_entry;
+  ble_device_t *device = &(connection_params.device->info);
 
   printf ("BLE Read group event\n");
 
-  device = (ble_device_t *)(connection_params.device->data);
   service_list_entry = (ble_service_list_entry_t *)malloc (sizeof (*service_list_entry));
   service_list_entry->include_list = NULL;
   service_list_entry->char_list    = NULL;

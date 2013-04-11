@@ -76,7 +76,7 @@ typedef struct
 {
   uint8   type;
   int32   timer;
-  void  (*callback)(void *data);  
+  void  (*callback)(void *data);
 } ble_char_update_t;
 
 struct ble_attr_list_entry
