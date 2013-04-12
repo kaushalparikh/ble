@@ -1,4 +1,5 @@
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -12,9 +13,9 @@ typedef struct
   ble_char_update_t     update;
 } ble_char_value_t;
 
-/* Temperature update interval in min. */
-#define BLE_TEMPERATURE_MEAS_INTERVAL  (1)
-#define BLE_TEMPERATURE_VALUE_LENGTH   (20)
+/* Temperature update interval in ms. */
+#define BLE_TEMPERATURE_MEAS_INTERVAL  (20*1000)
+#define BLE_TEMPERATURE_VALUE_LENGTH   (32)
 
 static void ble_update_temperature (void *data);
 
@@ -26,13 +27,13 @@ static ble_char_value_t temperature =
     .handle       = BLE_INVALID_GATT_HANDLE,
     .uuid_length  = BLE_GATT_UUID_LENGTH,
     .uuid         = {0x01, 0xe1},
-    .value_length = BLE_TEMPERATURE_VALUE_LENGTH,
+    .value_length = 0,
     .value        = NULL,
   },
   .update =
   {
     .type     = 0,
-    .timer    = 0,
+    .timer    = 10,
     .callback = ble_update_temperature,
   },
 };
@@ -43,14 +44,25 @@ static void ble_update_temperature (void *data)
   int i;
   ble_char_list_entry_t *characteristics = (ble_char_list_entry_t *)data;
   ble_attr_list_entry_t *attribute = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(characteristics->desc_list)));
-
-  printf ("Temperature value ");
-  for (i = (attribute->value_length - 1); i >= 0; i--)
+  
+  if (attribute->value_length != 0)
   {
-    printf ("%02x", attribute->value[i]);
-  }
-  printf ("\n");
+    printf ("Temperature value ");
+    for (i = (attribute->value_length - 1); i >= 0; i--)
+    {
+      printf ("%02x", attribute->value[i]);
+    }
+    printf ("\n");
 
+    free (attribute->value);
+    attribute->value        = NULL;
+    attribute->value_length = 0;
+  }
+  else
+  {
+    printf ("Temperature value not read\n");
+  }
+    
   characteristics->update.timer = BLE_TEMPERATURE_MEAS_INTERVAL;
 }
 
@@ -69,8 +81,8 @@ int ble_lookup_uuid (ble_char_list_entry_t *characteristics)
     desc_list_entry->handle       = char_decl->value_handle;
     desc_list_entry->uuid_length  = value_uuid_length;
     memcpy (desc_list_entry->uuid, char_decl->value_uuid, value_uuid_length);
-    desc_list_entry->value_length = temperature.attribute.value_length;
-    desc_list_entry->value        = malloc (temperature.attribute.value_length);
+    desc_list_entry->value_length = 0;
+    desc_list_entry->value        = NULL;
     list_add ((list_entry_t **)(&(characteristics->desc_list)), (list_entry_t *)desc_list_entry);
 
     characteristics->update = temperature.update;

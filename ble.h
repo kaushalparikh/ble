@@ -278,12 +278,13 @@ enum
 /* Timers */
 enum
 {
-  BLE_TIMER_SCAN         = 0,
-  BLE_TIMER_SCAN_STOP    = 1,
-  BLE_TIMER_PROFILE      = 2,
-  BLE_TIMER_PROFILE_STOP = 3,
-  BLE_TIMER_DATA         = 4,
-  BLE_TIMER_CONNECT_STOP = 5
+  BLE_TIMER_SCAN          = 0,
+  BLE_TIMER_SCAN_STOP     = 1,
+  BLE_TIMER_PROFILE       = 2,
+  BLE_TIMER_PROFILE_STOP  = 3,
+  BLE_TIMER_DATA          = 4,
+  BLE_TIMER_CONNECT_SETUP = 5,
+  BLE_TIMER_CONNECT_DATA  = 6
 };
 
 /* Message header */
@@ -520,6 +521,7 @@ typedef struct PACKED
 #define BLE_MAX_CONNECT_INTERVAL  MS_TO_1250US(20)
 
 #define BLE_CONNECT_SETUP_TIMEOUT  (10000)
+#define BLE_CONNECT_DATA_TIMEOUT   (30000)
 #define BLE_CONNECT_TIMEOUT        MS_TO_10MS(1000)
 
 #define BLE_CONNECT_LATENCY  (0)
@@ -527,11 +529,12 @@ typedef struct PACKED
 /* Connection status flags */
 enum
 {
-  BLE_CONNECT_CREATED     = 0x01,
-  BLE_CONNECT_ENCRYPTED   = 0x02,
-  BLE_CONNECT_ESTABLISHED = 0x04,
-  BLE_CONNECT_UPDATED     = 0x08,
-  BLE_CONNECT_FAILED      = 0x10
+  BLE_CONNECT_CREATED      = 0x01,
+  BLE_CONNECT_ENCRYPTED    = 0x02,
+  BLE_CONNECT_ESTABLISHED  = 0x04,
+  BLE_CONNECT_UPDATED      = 0x08,
+  BLE_CONNECT_SETUP_FAILED = 0x10,
+  BLE_CONNECT_DATA_FAILED  = 0x20
 };
 
 /* Disconnection cause */
@@ -651,7 +654,7 @@ enum
   BLE_ATTR_VALUE_NOTIFY    = 1,
   BLE_ATTR_VALUE_INDICATE  = 2,
   BLE_ATTR_VALUE_READ_TYPE = 3,
-  BLE_ATTR_VALUE_READ_BLOD = 4
+  BLE_ATTR_VALUE_READ_BLOB = 4
 };
 
 typedef struct PACKED
@@ -748,6 +751,8 @@ extern int ble_next_data (void);
 
 extern int ble_update_data (void);
 
+extern int ble_wait_data (void);
+
 extern int ble_update_sleep (void);
 
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
@@ -760,7 +765,7 @@ extern void ble_event_read_group (ble_event_read_group_t *read_group);
 
 extern void ble_event_find_information (ble_event_find_information_t *find_information);
 
-extern void ble_event_attr_value (ble_event_attr_value_t *attr_value);
+extern int ble_event_attr_value (ble_event_attr_value_t *attr_value);
 
 #endif
 
