@@ -67,24 +67,23 @@ static ble_state_e ble_scan (ble_message_t *message)
           }
           else
           {
+            int cause;
+            
             /* Check if some devices need service discovery/update */
             if ((ble_check_profile_list ()) > 0)
             {
-              (void)ble_set_timer (10, BLE_TIMER_PROFILE);
               new_state = BLE_STATE_PROFILE;
-            }
-            else if ((ble_check_data_list ()) > 0)
-            {
-              (void)ble_set_timer (10, BLE_TIMER_DATA);
-              new_state = BLE_STATE_DATA;
+              cause     = BLE_TIMER_PROFILE;
             }
             else
             {
-              (void)ble_set_timer ((ble_update_sleep ()), BLE_TIMER_SCAN);
+              new_state = BLE_STATE_DATA;
+              cause     = BLE_TIMER_DATA;
             }
+
+            (void)ble_set_timer (10, cause);
           }
         }
-        
         break;
       }
       default:
@@ -119,7 +118,6 @@ static ble_state_e ble_profile (ble_message_t *message)
             /* TODO: */
           }
         }
-
         break;
       }
       case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_PROCEDURE_COMPLETED):
@@ -136,23 +134,9 @@ static ble_state_e ble_profile (ble_message_t *message)
         
         if ((ble_next_profile ()) <= 0)
         {
-          int cause;
-
-          /* Exit profile state */
-          if ((ble_check_data_list ()) > 0)
-          {
-            cause     = BLE_TIMER_DATA;
-            new_state = BLE_STATE_DATA;
-          }
-          else
-          {
-            cause     = BLE_TIMER_SCAN;
-            new_state = BLE_STATE_SCAN;
-          }
-            
-          (void)ble_set_timer ((ble_update_sleep ()), cause);
-        }
-        
+          new_state = BLE_STATE_DATA;
+          (void)ble_set_timer (10, BLE_TIMER_DATA);
+        }        
         break;
       }
       case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_GROUP_FOUND):
@@ -178,14 +162,16 @@ static ble_state_e ble_profile (ble_message_t *message)
         if (message->data[0] == BLE_TIMER_PROFILE)
         {
           printf ("BLE Profile state\n");
-          if ((ble_start_profile ()) <= 0)
-          {
-            /* TODO: try again after sometime */
-          }
           
           /* Flush rest of message, both from serial & timer */
           ble_flush_timer ();
           ble_flush_serial ();    
+
+          if ((ble_start_profile ()) <= 0)
+          {
+            new_state = BLE_STATE_DATA;
+            (void)ble_set_timer (10, BLE_TIMER_DATA);
+          }
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
                  (message->data[0] == BLE_TIMER_CONNECT_DATA))
@@ -199,7 +185,6 @@ static ble_state_e ble_profile (ble_message_t *message)
             /* TODO: */
           }
         }        
-        
         break;
       }
       default:
@@ -234,7 +219,6 @@ static ble_state_e ble_data (ble_message_t *message)
             /* TODO: */
           }
         }
-
         break;
       }
       case ((BLE_CLASS_CONNECTION << 8)|BLE_EVENT_DISCONNECTED):
@@ -254,7 +238,6 @@ static ble_state_e ble_data (ble_message_t *message)
 
           (void)ble_set_timer ((ble_update_sleep ()), cause);
         }
-        
         break;
       }
       case ((BLE_CLASS_ATTR_CLIENT << 8)|BLE_EVENT_PROCEDURE_COMPLETED):
@@ -278,14 +261,24 @@ static ble_state_e ble_data (ble_message_t *message)
         if (message->data[0] == BLE_TIMER_DATA)
         {
           printf ("BLE Data state\n");
-          if ((ble_start_data ()) <= 0)
-          {
-            /* TODO: try again after sometime */
-          }
           
           /* Flush rest of message, both from serial & timer */
           ble_flush_timer ();
           ble_flush_serial ();
+
+          if ((ble_start_data ()) <= 0)
+          {
+            int cause = BLE_TIMER_DATA;
+            
+            /* Exit data state */
+            if ((ble_check_scan_list ()) > 0)
+            {
+              new_state = BLE_STATE_SCAN;
+              cause     = BLE_TIMER_SCAN;
+            }
+            
+            (void)ble_set_timer ((ble_update_sleep ()), cause);
+          }
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
                  (message->data[0] == BLE_TIMER_CONNECT_DATA))
@@ -299,7 +292,6 @@ static ble_state_e ble_data (ble_message_t *message)
             /* TODO: */
           }
         }
-        
         break;
       }
       default:
@@ -359,7 +351,10 @@ int main (int argc, char * argv[])
     status = ble_init ();
   } while ((status <= 0) && (init_attempt < 2));
 
-  master_loop ();
+  if (status > 0)
+  {
+    master_loop ();
+  }
 
   ble_deinit ();
 

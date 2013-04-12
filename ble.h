@@ -42,8 +42,7 @@ typedef enum
   BLE_DEVICE_DISCOVER_CHAR      = 3,
   BLE_DEVICE_CONFIGURE_CHAR     = 4,
   BLE_DEVICE_DATA               = 5,
-  BLE_DEVICE_SLEEP              = 6,
-  BLE_DEVICE_IGNORE             = 7
+  BLE_DEVICE_IGNORE             = 6
 } ble_device_status_e;
 
 /* BLE device */
@@ -724,8 +723,6 @@ extern void ble_deinit (void);
 extern int ble_check_scan_list (void);
 
 extern int ble_check_profile_list (void);
-
-extern int ble_check_data_list (void);
 
 extern void ble_print_message (ble_message_t *message);
 
