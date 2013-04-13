@@ -13,9 +13,31 @@ typedef struct
   ble_char_update_t     update;
 } ble_char_value_t;
 
-/* Temperature update interval in ms. */
+/* Time service definitions */
+/* Invalid date */
+#define BLE_INVALID_DATE_PARAMETER  (0)
+
+typedef struct PACKED
+{
+  uint16 year;
+  uint8  month;
+  uint8  day;
+  uint8  hour;
+  uint8  minute;
+  uint8  second;
+} ble_char_time_t;
+
+/* Temperature service definitions */
+/* Update interval in millisec */
 #define BLE_TEMPERATURE_MEAS_INTERVAL  (60*1000)
-#define BLE_TEMPERATURE_VALUE_LENGTH   (32)
+
+typedef struct PACKED
+{
+  uint8           flags;
+  float           meas_value;
+  ble_char_time_t meas_time;
+  uint8           type;
+} ble_char_temperature_t;
 
 static void ble_update_temperature (void *data);
 

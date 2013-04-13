@@ -181,9 +181,10 @@ static void ble_print_service_list (void)
 
   while (service_list != NULL)
   {
+    uint16 uuid = ((service_list->declaration.uuid[1]) << 8) | service_list->declaration.uuid[0];
     ble_char_list_entry_t *char_list = service_list->char_list;
       
-    printf ("Service type -- %04x\n", ((service_list->declaration.uuid[1] << 8)|service_list->declaration.uuid[0]));
+    printf ("Service -- %s\n", ((uuid == BLE_GATT_PRI_SERVICE) ? "primary" : "secondary"));
     printf ("  handle range: %04x to %04x\n", service_list->start_handle, service_list->end_handle);
     printf ("          uuid: ");
     for (i = (service_list->declaration.value_length - 1); i >= 0; i--)
@@ -198,10 +199,31 @@ static void ble_print_service_list (void)
 
       while (desc_list != NULL)
       {
-        uint16 uuid = ((desc_list->uuid[1]) << 8) | desc_list->uuid[0];
-        printf ("    Characteristics descriptor -- %04x\n", uuid);
-        printf ("      handle: %04x\n", desc_list->handle);
-        printf ("       value: ");
+        uuid = ((desc_list->uuid[1]) << 8) | desc_list->uuid[0];
+        if (uuid == BLE_GATT_CHAR_DECL)
+        {
+          printf ("    Characteristics -- declaration\n");
+          printf ("      handle: %04x\n", desc_list->handle);
+          printf ("       value: ");
+        }
+        else
+        {
+          if (uuid == BLE_GATT_CHAR_USER_DESC)
+          {
+            printf ("        Descriptor -- description\n");
+          }
+          else if (uuid == BLE_GATT_CHAR_FORMAT)
+          {
+            printf ("        Descriptor -- format\n");
+          }
+          else if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
+          {
+            printf ("        Descriptor -- client configuration\n");
+          }
+
+          printf ("          handle: %04x\n", desc_list->handle);
+          printf ("           value: ");
+        }
 
         if (uuid == BLE_GATT_CHAR_DECL)
         {
@@ -1519,7 +1541,8 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
     }
     else if ((uuid == BLE_GATT_CHAR_EXT)           ||
              (uuid == BLE_GATT_CHAR_SERVER_CONFIG) ||
-             (uuid == BLE_GATT_CHAR_AGG_FORMAT))
+             (uuid == BLE_GATT_CHAR_AGG_FORMAT)    ||
+             (uuid == BLE_GATT_CHAR_VALID_RANGE))
     {
       printf ("Characteristics descriptor %u not handled\n", uuid);
     }
