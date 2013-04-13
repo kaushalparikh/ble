@@ -14,7 +14,7 @@ typedef struct
 } ble_char_value_t;
 
 /* Temperature update interval in ms. */
-#define BLE_TEMPERATURE_MEAS_INTERVAL  (20*1000)
+#define BLE_TEMPERATURE_MEAS_INTERVAL  (60*1000)
 #define BLE_TEMPERATURE_VALUE_LENGTH   (32)
 
 static void ble_update_temperature (void *data);

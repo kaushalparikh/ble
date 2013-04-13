@@ -727,13 +727,20 @@ int ble_check_scan_list (void)
   int found = 0;
   ble_device_list_entry_t *device_list = ble_device_list;
 
-  while (device_list != NULL)
+  if (device_list != NULL)
   {
-    if (device_list->info.status == BLE_DEVICE_DISCOVER)
+    while (device_list != NULL)
     {
-      found++;
+      if (device_list->info.status == BLE_DEVICE_DISCOVER)
+      {
+        found++;
+      }
+      device_list = device_list->next;
     }
-    device_list = device_list->next;
+  }
+  else
+  {
+    found = 1;
   }
   
   return found;  
