@@ -363,7 +363,7 @@ typedef struct PACKED
 #define BLE_SCAN_WINDOW    MS_TO_625US(200)
 #define BLE_SCAN_INTERVAL  MS_TO_625US(1000)
 
-#define BLE_SCAN_DURATION  (2000)
+#define BLE_SCAN_DURATION  (5000)
 
 /* Scan modes */
 enum

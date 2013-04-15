@@ -41,6 +41,7 @@ struct ble_device_list_entry
 typedef struct ble_device_list_entry ble_device_list_entry_t;
 
 LIST_HEAD_INIT (ble_device_list_entry_t, ble_device_list);
+LIST_HEAD_INIT (ble_device_list_entry_t, ble_ignore_list);
 
 typedef struct
 {
@@ -146,8 +147,9 @@ static int ble_command (ble_message_t *message)
 static ble_device_t * ble_find_device (ble_device_address_t *address)
 {
   ble_device_t *device = NULL;
-  ble_device_list_entry_t *device_list_entry = ble_device_list;
+  ble_device_list_entry_t *device_list_entry;
 
+  device_list_entry = ble_device_list;
   while (device_list_entry != NULL)
   {
     if ((memcmp (address, &(device_list_entry->info.address), sizeof (*address))) == 0)
@@ -156,6 +158,20 @@ static ble_device_t * ble_find_device (ble_device_address_t *address)
       break;
     }
     device_list_entry = device_list_entry->next;
+  }
+
+  if (device == NULL)
+  {
+    device_list_entry = ble_ignore_list;
+    while (device_list_entry != NULL)
+    {
+      if ((memcmp (address, &(device_list_entry->info.address), sizeof (*address))) == 0)
+      {
+        device = &(device_list_entry->info);
+        break;
+      }
+      device_list_entry = device_list_entry->next;
+    }
   }
 
   return device;
@@ -604,7 +620,9 @@ static int ble_write_handle (void)
   printf ("BLE Write request\n");
   
   write_handle = (ble_command_write_handle_t *)(&message);
-  BLE_CLASS_ATTR_CLIENT_HEADER (write_handle, BLE_COMMAND_READ_BY_HANDLE);
+  BLE_CLASS_ATTR_CLIENT_HEADER (write_handle, BLE_COMMAND_WRITE_ATTR_CLIENT);
+  write_handle->header.length += connection_params.attribute->value_length;
+
   write_handle->conn_handle = connection_params.handle;
   write_handle->attr_handle = connection_params.attribute->handle;
   write_handle->length      = connection_params.attribute->value_length;
@@ -749,23 +767,17 @@ int ble_check_scan_list (void)
   int found = 0;
   ble_device_list_entry_t *device_list = ble_device_list;
 
-  if (device_list != NULL)
+  while (device_list != NULL)
   {
-    while (device_list != NULL)
+    if (device_list->info.status == BLE_DEVICE_DISCOVER)
     {
-      if (device_list->info.status == BLE_DEVICE_DISCOVER)
-      {
-        found++;
-      }
-      device_list = device_list->next;
+      found++;
     }
-  }
-  else
-  {
-    found = 1;
+    
+    device_list = device_list->next;
   }
   
-  return found;  
+  return ((ble_device_list != NULL) ? found : 1);
 }
 
 int ble_check_profile_list (void)
@@ -996,6 +1008,11 @@ int ble_next_profile (void)
   {
     list_remove ((list_entry_t **)(&ble_device_list), (list_entry_t *)device_list_entry);
     free (device_list_entry);
+  }
+  else if (device_list_entry->info.status == BLE_DEVICE_IGNORE)
+  {
+    list_remove ((list_entry_t **)(&ble_device_list), (list_entry_t *)device_list_entry);
+    list_add ((list_entry_t **)(&ble_ignore_list), (list_entry_t *)device_list_entry);
   }
   
   return status;
@@ -1326,6 +1343,11 @@ int ble_update_sleep (void)
 
   /* Subtract the sleep interval from timer. All characteristics
      with timer value 0 will be updated on wake-up */
+  if (sleep_interval == 0x7fffffff)
+  {
+    sleep_interval = 10;
+  }
+  
   device_list = ble_device_list;
   while (device_list != NULL)
   {
@@ -1342,11 +1364,6 @@ int ble_update_sleep (void)
     }
     
     device_list = device_list->next;
-  }
-
-  if (sleep_interval == 0x7fffffff)
-  {
-    sleep_interval = 10;
   }
 
   printf ("BLE Sleep interval %d millisec\n", sleep_interval);
@@ -1384,7 +1401,7 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
   }
   else
   {
-    printf ("Listed device --\n");
+    printf ("Ignored device --\n");
   }
   
   for (i = 0; i < scan_response->length; i += (scan_response->data[i] + 1))

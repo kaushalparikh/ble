@@ -48,7 +48,7 @@ static ble_char_value_t temperature =
     .next         = NULL,
     .handle       = BLE_INVALID_GATT_HANDLE,
     .uuid_length  = BLE_GATT_UUID_LENGTH,
-    .uuid         = {0x01, 0xe1},
+    .uuid         = {0x1c, 0x2a},
     .value_length = 0,
     .value        = NULL,
   },
@@ -63,18 +63,13 @@ static ble_char_value_t temperature =
 
 static void ble_update_temperature (void *data)
 {
-  int i;
   ble_char_list_entry_t *characteristics = (ble_char_list_entry_t *)data;
   ble_attr_list_entry_t *attribute = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(characteristics->desc_list)));
   
   if (attribute->value_length != 0)
   {
-    printf ("Temperature value ");
-    for (i = (attribute->value_length - 1); i >= 0; i--)
-    {
-      printf ("%02x", attribute->value[i]);
-    }
-    printf ("\n");
+    ble_char_temperature_t *temperature = (ble_char_temperature_t *)(attribute->value);
+    printf ("Temperature value %f\n", temperature->meas_value);
 
     free (attribute->value);
     attribute->value        = NULL;
