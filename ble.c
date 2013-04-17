@@ -1399,6 +1399,10 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
     device->status = BLE_DEVICE_DATA;
     printf ("Found device --\n");
   }
+  else if (device->status != BLE_DEVICE_IGNORE)
+  {
+    printf ("Listed device --\n");
+  }
   else
   {
     printf ("Ignored device --\n");
