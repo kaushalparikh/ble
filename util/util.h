@@ -34,6 +34,8 @@ typedef struct
 
 extern int timer_start (timer_info_t *timer_info);
 
+extern int timer_status (timer_info_t *timer_info);
+
 extern int timer_stop (timer_info_t *timer_info);
 
 #endif

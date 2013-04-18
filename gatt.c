@@ -54,9 +54,9 @@ static ble_char_value_t temperature =
   },
   .update =
   {
-    .type     = 0,
-    .timer    = 0,
-    .callback = ble_update_temperature,
+    .type             = 0,
+    .timer            = 0,
+    .callback         = ble_update_temperature,
   },
 };
 

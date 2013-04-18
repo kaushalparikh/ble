@@ -66,6 +66,22 @@ int timer_start (timer_info_t *timer_info)
   return status;
 }
 
+int timer_status (timer_info_t *timer_info)
+{
+  int current_count = -1;
+
+  struct itimerspec timer_spec;
+  
+  if ((timer_gettime ((timer_t)(timer_info->id), &timer_spec)) == 0)
+  {
+    current_count = timer_info->millisec
+                     - ((timer_spec.it_value.tv_sec * 1000)
+                         + (timer_spec.it_value.tv_nsec / 1000000));
+  }
+
+  return current_count;
+}
+
 int timer_stop (timer_info_t *timer_info)
 {
   return timer_delete ((timer_t)(timer_info->id));

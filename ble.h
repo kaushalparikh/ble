@@ -54,6 +54,7 @@ typedef struct
   ble_device_status_e       status;
   ble_service_list_entry_t *service_list;
   ble_char_list_entry_t    *update_list;
+  int32                     wait_time;
 } ble_device_t;
 
 /* Message header definitions */
@@ -519,7 +520,7 @@ typedef struct PACKED
 #define BLE_MIN_CONNECT_INTERVAL  MS_TO_1250US(10)
 #define BLE_MAX_CONNECT_INTERVAL  MS_TO_1250US(20)
 
-#define BLE_CONNECT_SETUP_TIMEOUT  (10000)
+#define BLE_CONNECT_SETUP_TIMEOUT  (5000)
 #define BLE_CONNECT_DATA_TIMEOUT   (30000)
 #define BLE_CONNECT_TIMEOUT        MS_TO_10MS(1000)
 

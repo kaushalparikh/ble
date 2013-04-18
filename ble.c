@@ -84,6 +84,11 @@ static void ble_callback_data (void)
         if (update_list->update.timer <= 0)
         {
           update_list->update.callback (update_list);
+          
+          if (device_list->info.wait_time < 2000)
+          {
+            update_list->update.timer -= 5000;
+          }
         }
         
         update_list = update_list->next;        
@@ -1343,27 +1348,29 @@ int ble_update_sleep (void)
 
   /* Subtract the sleep interval from timer. All characteristics
      with timer value 0 will be updated on wake-up */
-  if (sleep_interval == 0x7fffffff)
+  if (sleep_interval != 0x7fffffff)
+  {
+    device_list = ble_device_list;
+    while (device_list != NULL)
+    {
+      if ((device_list->info.status == BLE_DEVICE_DATA)  ||
+          (device_list->info.status == BLE_DEVICE_DISCOVER))
+      {
+        ble_char_list_entry_t *update_list = device_list->info.update_list;
+        
+        while (update_list != NULL)
+        {
+          update_list->update.timer -= sleep_interval;
+          update_list = update_list->next;
+        }
+      }
+      
+      device_list = device_list->next;
+    }
+  }
+  else
   {
     sleep_interval = 10;
-  }
-  
-  device_list = ble_device_list;
-  while (device_list != NULL)
-  {
-    if ((device_list->info.status == BLE_DEVICE_DATA)  ||
-        (device_list->info.status == BLE_DEVICE_DISCOVER))
-    {
-      ble_char_list_entry_t *update_list = device_list->info.update_list;
-      
-      while (update_list != NULL)
-      {
-        update_list->update.timer -= sleep_interval;
-        update_list = update_list->next;
-      }
-    }
-    
-    device_list = device_list->next;
   }
 
   printf ("BLE Sleep interval %d millisec\n", sleep_interval);
@@ -1444,6 +1451,11 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
 
   if (connection_status->flags & BLE_CONNECT_ESTABLISHED)
   {
+    connection_params.device->info.wait_time
+        = timer_status (&(((timer_list_entry_t *)connection_params.timer)->info));
+
+    printf ("BLE Connect wait %d (ms)\n", (int)(connection_params.device->info.wait_time));
+
     timer_stop (&(((timer_list_entry_t *)connection_params.timer)->info));
     free (connection_params.timer);
 
@@ -1565,7 +1577,7 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
              (uuid == BLE_GATT_CHAR_AGG_FORMAT)    ||
              (uuid == BLE_GATT_CHAR_VALID_RANGE))
     {
-      printf ("Characteristics descriptor %u not handled\n", uuid);
+      printf ("Characteristics descriptor %x not handled\n", uuid);
     }
     else
     {
