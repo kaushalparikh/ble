@@ -71,14 +71,14 @@ static void ble_update_temperature (void *data)
     ble_char_temperature_t *temperature = (ble_char_temperature_t *)(attribute->value);
     
     printf ("Temperature flags: %02x\n", temperature->flags);
-    printf ("            value: %.1f", temperature->meas_value);
+    printf ("            value: %.1f\n", temperature->meas_value);
     printf ("             date: %02d/%02d/%04d\n", temperature->meas_time.day,
                                                   temperature->meas_time.month,
                                                   temperature->meas_time.year);
-    printf ("             time:  %02d:%02d:%02d\n", temperature->meas_time.hour,
+    printf ("             time: %02d:%02d:%02d\n", temperature->meas_time.hour,
                                                   temperature->meas_time.minute,
                                                   temperature->meas_time.second);
-    printf ("             type:  %02x\n", temperature->type);
+    printf ("             type: %02x\n", temperature->type);
 
     free (attribute->value);
     attribute->value        = NULL;
