@@ -87,6 +87,20 @@ int timer_stop (timer_info_t *timer_info)
   return timer_delete ((timer_t)(timer_info->id));
 }
 
+int clock_current_time (void)
+{
+  int millisec = -1;
+  struct timespec current_time;
+
+  if ((clock_gettime (CLOCK_MONOTONIC, &current_time)) == 0)
+  {
+    millisec = (current_time.tv_sec * 1000)
+               + (current_time.tv_nsec / 1000000);
+  }
+
+  return millisec;
+}
+
 #ifdef UTIL_TIMER_TEST
 
 void callback (timer_info_t *timer_info)

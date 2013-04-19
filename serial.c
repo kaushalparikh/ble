@@ -24,7 +24,7 @@ typedef struct
 } serial_device_t;
 
 /* Defines, 1000 ms */
-#define SERIAL_TIMEOUT  (500)
+#define SERIAL_TIMEOUT  (100)
 
 /* File scope global variables */
 static serial_device_t serial_device =

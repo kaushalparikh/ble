@@ -54,7 +54,8 @@ typedef struct
   ble_device_status_e       status;
   ble_service_list_entry_t *service_list;
   ble_char_list_entry_t    *update_list;
-  int32                     wait_time;
+  int32                     setup_time;
+  int32                     data_time;
 } ble_device_t;
 
 /* Message header definitions */

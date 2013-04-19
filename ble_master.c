@@ -343,6 +343,8 @@ int main (int argc, char * argv[])
   int status = -1;
   int init_attempt = 0;
 
+  setlinebuf (stdout);
+    
   do
   {
     init_attempt++;

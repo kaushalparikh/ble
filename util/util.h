@@ -38,5 +38,7 @@ extern int timer_status (timer_info_t *timer_info);
 
 extern int timer_stop (timer_info_t *timer_info);
 
+extern int clock_current_time (void);
+
 #endif
 

@@ -50,6 +50,7 @@ typedef struct
   ble_char_list_entry_t    *characteristics;
   ble_attr_list_entry_t    *attribute;
   uint8                     handle;
+  int32                     current_time;
   timer_handle_t            timer;
 } ble_connection_params_t;
 
@@ -60,6 +61,7 @@ static ble_connection_params_t connection_params =
   .characteristics = NULL,
   .attribute       = NULL,
   .handle          = 0xff,
+  .current_time    = 0,
   .timer           = NULL,
 };
 
@@ -72,7 +74,7 @@ static void ble_callback_timer (timer_list_entry_t *timer_list_entry)
 static void ble_callback_data (void)
 {
   ble_device_list_entry_t *device_list = ble_device_list;
-  
+
   while (device_list != NULL)
   {
     if ((device_list->info.status == BLE_DEVICE_DISCOVER) ||
@@ -85,9 +87,10 @@ static void ble_callback_data (void)
         {
           update_list->update.callback (update_list);
           
-          if (device_list->info.wait_time < 2000)
+          update_list->update.timer -= (connection_params.current_time - device_list->info.data_time);
+          if (device_list->info.setup_time < 2000)
           {
-            update_list->update.timer -= 5000;
+            update_list->update.timer -= 1000;
           }
         }
         
@@ -187,7 +190,7 @@ static void ble_print_device (ble_device_t *device)
   int i;
 
   printf ("     Name: %s\n", device->name);
-  printf ("  Address: ");
+  printf ("  Address: 0x");
   for (i = 0; i < BLE_DEVICE_ADDRESS_LENGTH; i++)
   {
     printf ("%02x", device->address.byte[i]);
@@ -206,8 +209,8 @@ static void ble_print_service_list (void)
     ble_char_list_entry_t *char_list = service_list->char_list;
       
     printf ("Service -- %s\n", ((uuid == BLE_GATT_PRI_SERVICE) ? "primary" : "secondary"));
-    printf ("  handle range: %04x to %04x\n", service_list->start_handle, service_list->end_handle);
-    printf ("          uuid: ");
+    printf ("  handle range: 0x%04x to 0x%04x\n", service_list->start_handle, service_list->end_handle);
+    printf ("          uuid: 0x");
     for (i = (service_list->declaration.value_length - 1); i >= 0; i--)
     {
       printf ("%02x", service_list->declaration.value[i]);
@@ -224,7 +227,7 @@ static void ble_print_service_list (void)
         if (uuid == BLE_GATT_CHAR_DECL)
         {
           printf ("    Characteristics -- declaration\n");
-          printf ("      handle: %04x\n", desc_list->handle);
+          printf ("      handle: 0x%04x\n", desc_list->handle);
           printf ("       value: ");
         }
         else
@@ -242,7 +245,7 @@ static void ble_print_service_list (void)
             printf ("        Descriptor -- client configuration\n");
           }
 
-          printf ("          handle: %04x\n", desc_list->handle);
+          printf ("          handle: 0x%04x\n", desc_list->handle);
           printf ("           value: ");
         }
 
@@ -250,7 +253,7 @@ static void ble_print_service_list (void)
         {
           ble_char_decl_t *char_decl = (ble_char_decl_t *)(desc_list->value);
           uint8 value_uuid_length = desc_list->value_length - 3;
-          printf ("%02x, %04x, ", char_decl->properties, char_decl->value_handle);
+          printf ("0x%02x, 0x%04x, 0x", char_decl->properties, char_decl->value_handle);
           for (i = (value_uuid_length - 1); i >= 0; i--)
           {
             printf ("%02x", char_decl->value_uuid[i]);
@@ -268,12 +271,12 @@ static void ble_print_service_list (void)
         else if (uuid == BLE_GATT_CHAR_FORMAT)
         {
           ble_char_format_t *char_format = (ble_char_format_t *)(desc_list->value);
-          printf ("%02x, %d\n", char_format->bitfield, char_format->exponent);
+          printf ("0x%02x, %d\n", char_format->bitfield, char_format->exponent);
         }
         else if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
         {
           ble_char_client_config_t *char_client_config = (ble_char_client_config_t *)(desc_list->value);
-          printf ("%04x\n", char_client_config->bitfield);
+          printf ("0x%04x\n", char_client_config->bitfield);
         }
         
         desc_list = desc_list->next;
@@ -528,7 +531,9 @@ static int ble_find_information (void)
   ble_message_t message;
   ble_command_find_information_t *find_information;
 
-  printf ("BLE Find information request\n");
+  printf ("BLE Find information request, handle range 0x%04x to 0x%04x\n",
+               connection_params.service->start_handle + 1,
+               connection_params.service->end_handle);
 
   find_information = (ble_command_find_information_t *)(&message);
   BLE_CLASS_ATTR_CLIENT_HEADER (find_information, BLE_COMMAND_FIND_INFORMATION);
@@ -560,7 +565,7 @@ static int ble_read_long_handle (void)
   ble_message_t message;
   ble_command_read_handle_t *read_handle;
 
-  printf ("BLE Read long request\n");
+  printf ("BLE Read long request, handle 0x%04x\n", connection_params.attribute->handle);
   
   read_handle = (ble_command_read_handle_t *)(&message);
   BLE_CLASS_ATTR_CLIENT_HEADER (read_handle, BLE_COMMAND_READ_LONG);
@@ -591,7 +596,7 @@ static int ble_read_handle (void)
   ble_message_t message;
   ble_command_read_handle_t *read_handle;
 
-  printf ("BLE Read request\n");
+  printf ("BLE Read request, handle 0x%04x\n", connection_params.attribute->handle);
   
   read_handle = (ble_command_read_handle_t *)(&message);
   BLE_CLASS_ATTR_CLIENT_HEADER (read_handle, BLE_COMMAND_READ_BY_HANDLE);
@@ -622,7 +627,7 @@ static int ble_write_handle (void)
   ble_message_t message;
   ble_command_write_handle_t *write_handle;
 
-  printf ("BLE Write request\n");
+  printf ("BLE Write request, handle 0x%04x\n", connection_params.attribute->handle);
   
   write_handle = (ble_command_write_handle_t *)(&message);
   BLE_CLASS_ATTR_CLIENT_HEADER (write_handle, BLE_COMMAND_WRITE_ATTR_CLIENT);
@@ -761,10 +766,10 @@ void ble_deinit (void)
 void ble_print_message (ble_message_t *message)
 {
  printf ("Message not handled\n");
- printf (" type 0x%x, length %d, class 0x%x, command 0x%x\n", message->header.type,
-                                                              message->header.length,
-                                                              message->header.class,
-                                                              message->header.command);
+ printf (" type 0x%02x, length %d, class 0x%02x, command 0x%02x\n", message->header.type,
+                                                                    message->header.length,
+                                                                    message->header.class,
+                                                                    message->header.command);
 }
 
 int ble_check_scan_list (void)
@@ -1167,6 +1172,7 @@ int ble_start_data (void)
   }
   else
   {
+    connection_params.current_time = clock_current_time ();
     ble_callback_data ();
     status = 0;
   }
@@ -1206,6 +1212,7 @@ int ble_next_data (void)
   }
   else
   {
+    connection_params.current_time = clock_current_time ();
     ble_callback_data ();
     status = 0;
   }
@@ -1325,9 +1332,9 @@ int ble_update_sleep (void)
 {
   int sleep_interval = 0x7fffffff;
   ble_device_list_entry_t *device_list;
-  
+
   /* Loop through update list to find the minimum sleep interval */
-  device_list = ble_device_list;  
+  device_list = ble_device_list;
   while (device_list != NULL)
   {
     if ((device_list->info.status == BLE_DEVICE_DATA)  ||
@@ -1445,16 +1452,16 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
 {
   int status;
 
-  printf ("BLE Connect event, status flags %02x, interval %d, timeout %d, latency %d, bonding %02x\n",
+  printf ("BLE Connect event, status flags 0x%02x, interval %d, timeout %d, latency %d, bonding 0x%02x\n",
              connection_status->flags, connection_status->interval, connection_status->timeout,
              connection_status->latency, connection_status->bonding);
 
   if (connection_status->flags & BLE_CONNECT_ESTABLISHED)
   {
-    connection_params.device->info.wait_time
+    connection_params.device->info.setup_time
         = timer_status (&(((timer_list_entry_t *)connection_params.timer)->info));
 
-    printf ("BLE Connect wait %d (ms)\n", (int)(connection_params.device->info.wait_time));
+    connection_params.device->info.data_time = clock_current_time ();
 
     timer_stop (&(((timer_list_entry_t *)connection_params.timer)->info));
     free (connection_params.timer);
@@ -1464,6 +1471,10 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
   }
   else if (connection_status->flags & BLE_CONNECT_SETUP_FAILED)
   {
+    connection_params.device->info.setup_time = BLE_CONNECT_SETUP_TIMEOUT;
+
+    connection_params.device->info.data_time = clock_current_time ();
+
     connection_params.timer = NULL;
     connection_params.device->info.status = BLE_DEVICE_DISCOVER;
     status = ble_end_procedure ();
@@ -1490,7 +1501,7 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
 
 void ble_event_disconnect (ble_event_disconnect_t *disconnect)
 {
-  printf ("BLE Disconnect event, reason %04x\n", disconnect->cause);
+  printf ("BLE Disconnect event, reason 0x%04x\n", disconnect->cause);
 
   connection_params.service         = NULL;
   connection_params.characteristics = NULL;
@@ -1577,7 +1588,7 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
              (uuid == BLE_GATT_CHAR_AGG_FORMAT)    ||
              (uuid == BLE_GATT_CHAR_VALID_RANGE))
     {
-      printf ("Characteristics descriptor %x not handled\n", uuid);
+      printf ("Characteristics descriptor 0x%04x not handled\n", uuid);
     }
     else
     {
@@ -1595,7 +1606,7 @@ int ble_event_attr_value (ble_event_attr_value_t *attr_value)
   int status = 1;
   ble_attr_list_entry_t *attribute = NULL;
 
-  printf ("BLE Attribute value event, type %d\n", attr_value->type);
+  printf ("BLE Attribute value event, type %d, handle 0x%04x\n", attr_value->type, attr_value->attr_handle);
 
   if ((attr_value->type == BLE_ATTR_VALUE_NOTIFY) ||
       (attr_value->type == BLE_ATTR_VALUE_INDICATE))
