@@ -23,6 +23,9 @@ typedef struct
   usb_info_t  usb_info;
 } serial_device_t;
 
+/* Verbose serial output */
+/* #define DEBUG_VERBOSE  (1) */
+
 /* Defines, 1000 ms */
 #define SERIAL_TIMEOUT  (100)
 
