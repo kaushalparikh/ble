@@ -1460,7 +1460,6 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
   {
     connection_params.device->info.setup_time
         = timer_status (&(((timer_list_entry_t *)connection_params.timer)->info));
-
     connection_params.device->info.data_time = clock_current_time ();
 
     timer_stop (&(((timer_list_entry_t *)connection_params.timer)->info));
@@ -1472,11 +1471,10 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
   else if (connection_status->flags & BLE_CONNECT_SETUP_FAILED)
   {
     connection_params.device->info.setup_time = BLE_CONNECT_SETUP_TIMEOUT;
-
-    connection_params.device->info.data_time = clock_current_time ();
+    connection_params.device->info.data_time  = (clock_current_time ()) - BLE_CONNECT_SETUP_TIMEOUT;
 
     connection_params.timer = NULL;
-    connection_params.device->info.status = BLE_DEVICE_DISCOVER;
+    /* connection_params.device->info.status = BLE_DEVICE_DISCOVER; */
     status = ble_end_procedure ();
   }
   else if (connection_status->flags & BLE_CONNECT_DATA_FAILED)
