@@ -31,7 +31,7 @@ typedef struct PACKED
 /* Update interval in millisec */
 #define BLE_TEMPERATURE_MEAS_INTERVAL  (2*60*1000)
 #define BLE_MEAS_INTERVAL_LENGTH       (2)
-#define BLE_INVALID_MEAS_INTERVAL      (20*24*60*1000)
+#define BLE_INVALID_MEAS_INTERVAL      (0x7fffffff)
 
 typedef struct PACKED
 {
