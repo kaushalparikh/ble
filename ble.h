@@ -285,7 +285,8 @@ enum
   BLE_TIMER_PROFILE_STOP  = 3,
   BLE_TIMER_DATA          = 4,
   BLE_TIMER_CONNECT_SETUP = 5,
-  BLE_TIMER_CONNECT_DATA  = 6
+  BLE_TIMER_CONNECT_DATA  = 6,
+  BLE_TIMER_INVALID       = 7
 };
 
 /* Message header */
@@ -710,7 +711,7 @@ typedef struct PACKED
 
 /* Function declarations */
 
-extern timer_handle_t ble_set_timer (int millisec, int cause);
+extern timer_handle_t ble_set_timer (int millisec, int event);
 
 extern int ble_check_timer (void);
 

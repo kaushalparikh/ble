@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "util.h"
 #include "ble.h"
 
 typedef enum
@@ -20,14 +21,18 @@ static ble_state_e ble_scan (ble_message_t *message);
 static ble_state_e ble_profile (ble_message_t *message);
 static ble_state_e ble_data (ble_message_t *message);
 
-static ble_state_e ble_state = BLE_STATE_SCAN;
+static ble_state_e ble_state = BLE_STATE_DATA;
 
-static ble_state_handler_t state_handler[BLE_STATE_MAX] =
+static ble_state_handler_t ble_state_handler[BLE_STATE_MAX] =
 {
   ble_scan,
   ble_profile,
   ble_data
 };
+
+static int32 ble_state_processing = 0;
+
+static int32 ble_sleep_interval = 0;
 
 
 static ble_state_e ble_scan (ble_message_t *message)
@@ -48,6 +53,8 @@ static ble_state_e ble_scan (ble_message_t *message)
       {
         if (message->data[0] == BLE_TIMER_SCAN)
         {
+          ble_state_processing = clock_current_time ();
+            
           printf ("BLE Scan state\n");
 
           if ((ble_start_scan ()) <= 0)
@@ -67,21 +74,26 @@ static ble_state_e ble_scan (ble_message_t *message)
           }
           else
           {
-            int cause;
+            ble_state_processing = (clock_current_time ()) - ble_state_processing;
+            
+            ble_sleep_interval -= ble_state_processing;
+            if (ble_sleep_interval <= 0)
+            {
+              ble_sleep_interval = 10;
+            }
             
             /* Check if some devices need service discovery/update */
             if ((ble_check_profile_list ()) > 0)
             {
               new_state = BLE_STATE_PROFILE;
-              cause     = BLE_TIMER_PROFILE;
+              (void)ble_set_timer (10, BLE_TIMER_PROFILE);
             }
             else
             {
               new_state = BLE_STATE_DATA;
-              cause     = BLE_TIMER_DATA;
+              (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
+              ble_sleep_interval = 0;
             }
-
-            (void)ble_set_timer (10, cause);
           }
         }
         break;
@@ -134,8 +146,17 @@ static ble_state_e ble_profile (ble_message_t *message)
         
         if ((ble_next_profile ()) <= 0)
         {
+          ble_state_processing = (clock_current_time ()) - ble_state_processing;
+          
+          ble_sleep_interval -= ble_state_processing;
+          if (ble_sleep_interval <= 0)
+          {
+            ble_sleep_interval = 10;
+          }
+          
           new_state = BLE_STATE_DATA;
-          (void)ble_set_timer (10, BLE_TIMER_DATA);
+          (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
+          ble_sleep_interval = 0;
         }        
         break;
       }
@@ -161,6 +182,8 @@ static ble_state_e ble_profile (ble_message_t *message)
       {
         if (message->data[0] == BLE_TIMER_PROFILE)
         {
+          ble_state_processing = clock_current_time ();
+          
           printf ("BLE Profile state\n");
           
           /* Flush rest of message, both from serial & timer */
@@ -169,8 +192,17 @@ static ble_state_e ble_profile (ble_message_t *message)
 
           if ((ble_start_profile ()) <= 0)
           {
+            ble_state_processing = (clock_current_time ()) - ble_state_processing;
+            
+            ble_sleep_interval -= ble_state_processing;
+            if (ble_sleep_interval <= 0)
+            {
+              ble_sleep_interval = 10;
+            }            
+
             new_state = BLE_STATE_DATA;
-            (void)ble_set_timer (10, BLE_TIMER_DATA);
+            (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
+            ble_sleep_interval = 0;
           }
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
@@ -227,16 +259,19 @@ static ble_state_e ble_data (ble_message_t *message)
         
         if ((ble_next_data ()) <= 0)
         {
-          int cause = BLE_TIMER_DATA;
+          ble_sleep_interval = ble_update_sleep ();
           
           /* Exit data state */
           if ((ble_check_scan_list ()) > 0)
           {
-            new_state = BLE_STATE_SCAN;
-            cause     = BLE_TIMER_SCAN;
+            new_state      = BLE_STATE_SCAN;
+            (void)ble_set_timer (10, BLE_TIMER_SCAN);
           }
-
-          (void)ble_set_timer ((ble_update_sleep ()), cause);
+          else
+          {
+            (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
+            ble_sleep_interval = 0;
+          }
         }
         break;
       }
@@ -268,16 +303,19 @@ static ble_state_e ble_data (ble_message_t *message)
 
           if ((ble_start_data ()) <= 0)
           {
-            int cause = BLE_TIMER_DATA;
+            ble_sleep_interval = ble_update_sleep ();
             
             /* Exit data state */
             if ((ble_check_scan_list ()) > 0)
             {
-              new_state = BLE_STATE_SCAN;
-              cause     = BLE_TIMER_SCAN;
+              new_state      = BLE_STATE_SCAN;
+              (void)ble_set_timer (10, BLE_TIMER_SCAN);
             }
-            
-            (void)ble_set_timer ((ble_update_sleep ()), cause);
+            else
+            {
+              (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
+              ble_sleep_interval = 0;
+            }
           }
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
@@ -311,7 +349,7 @@ static ble_state_e ble_data (ble_message_t *message)
 
 void master_loop (void)
 {
-  (void)ble_set_timer (10, BLE_TIMER_SCAN);
+  (void)ble_set_timer (10, BLE_TIMER_DATA);
 
   while (1)
   {
@@ -323,7 +361,7 @@ void master_loop (void)
       do
       {
         pending = ble_receive_timer (&message);
-        ble_state = state_handler[ble_state](&message);
+        ble_state = ble_state_handler[ble_state](&message);
       } while (pending > 0);
     }
     
@@ -332,7 +370,7 @@ void master_loop (void)
       do
       {
         pending = ble_receive_serial (&message);
-        ble_state = state_handler[ble_state](&message);
+        ble_state = ble_state_handler[ble_state](&message);
       } while (pending > 0);
     }
   }

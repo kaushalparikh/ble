@@ -15,7 +15,7 @@ struct timer_list_entry
 {
   struct timer_list_entry *next;
   timer_info_t             info;
-  int                      cause;
+  int                      event;
 };
 
 typedef struct timer_list_entry timer_list_entry_t;
@@ -656,7 +656,7 @@ static int ble_write_handle (void)
   return status;  
 }
 
-timer_handle_t ble_set_timer (int millisec, int cause)
+timer_handle_t ble_set_timer (int millisec, int event)
 {
   timer_list_entry_t *timer_list_entry;
 
@@ -664,7 +664,7 @@ timer_handle_t ble_set_timer (int millisec, int cause)
   timer_list_entry->info.millisec = millisec;
   timer_list_entry->info.callback = (void (*)(void *))ble_callback_timer;
   timer_list_entry->info.data     = timer_list_entry;
-  timer_list_entry->cause         = cause;
+  timer_list_entry->event         = event;
   if ((timer_start (&(timer_list_entry->info))) != 0)
   {
     free (timer_list_entry);
@@ -689,7 +689,7 @@ int ble_receive_timer (ble_message_t *message)
     message->header.length  = 1;
     message->header.class   = BLE_CLASS_HW;
     message->header.command = BLE_EVENT_SOFT_TIMER;
-    message->data[0]        = (uint8)(timer_list_entry->cause);
+    message->data[0]        = (uint8)(timer_list_entry->event);
     
     list_remove ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
     free (timer_list_entry);
