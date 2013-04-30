@@ -779,7 +779,7 @@ int ble_check_scan_list (void)
 
   while (device_list != NULL)
   {
-    if (device_list->info.status == BLE_DEVICE_DISCOVER)
+    if (device_list->info.status == BLE_DEVICE_DATA)
     {
       found++;
     }
@@ -1379,8 +1379,6 @@ int ble_update_sleep (void)
   {
     sleep_interval = 10;
   }
-
-  printf ("BLE Sleep interval %d millisec\n", sleep_interval);
 
   return sleep_interval;
 }

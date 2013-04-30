@@ -30,9 +30,9 @@ static ble_state_handler_t ble_state_handler[BLE_STATE_MAX] =
   ble_data
 };
 
-static int32 ble_state_processing = 0;
+static int ble_state_processing = 0;
 
-static int32 ble_sleep_interval = 0;
+static int ble_sleep_interval = 0;
 
 
 static ble_state_e ble_scan (ble_message_t *message)
@@ -90,6 +90,7 @@ static ble_state_e ble_scan (ble_message_t *message)
             }
             else
             {
+              printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
               new_state = BLE_STATE_DATA;
               (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
               ble_sleep_interval = 0;
@@ -153,7 +154,8 @@ static ble_state_e ble_profile (ble_message_t *message)
           {
             ble_sleep_interval = 10;
           }
-          
+           
+          printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
           new_state = BLE_STATE_DATA;
           (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
           ble_sleep_interval = 0;
@@ -200,6 +202,7 @@ static ble_state_e ble_profile (ble_message_t *message)
               ble_sleep_interval = 10;
             }            
 
+            printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
             new_state = BLE_STATE_DATA;
             (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
             ble_sleep_interval = 0;
@@ -269,6 +272,7 @@ static ble_state_e ble_data (ble_message_t *message)
           }
           else
           {
+            printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
             (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
             ble_sleep_interval = 0;
           }
@@ -313,6 +317,7 @@ static ble_state_e ble_data (ble_message_t *message)
             }
             else
             {
+              printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
               (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
               ble_sleep_interval = 0;
             }
