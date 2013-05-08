@@ -50,7 +50,6 @@ typedef struct
   ble_char_list_entry_t    *characteristics;
   ble_attr_list_entry_t    *attribute;
   uint8                     handle;
-  int32                     current_time;
   timer_handle_t            timer;
 } ble_connection_params_t;
 
@@ -61,9 +60,11 @@ static ble_connection_params_t connection_params =
   .characteristics = NULL,
   .attribute       = NULL,
   .handle          = 0xff,
-  .current_time    = 0,
   .timer           = NULL,
 };
+
+static int ble_sleep_interval = 0;
+static int ble_wakeup_time = 0;
 
 
 static void ble_callback_timer (timer_list_entry_t *timer_list_entry)
@@ -73,7 +74,11 @@ static void ble_callback_timer (timer_list_entry_t *timer_list_entry)
 
 static void ble_callback_data (void)
 {
-  ble_device_list_entry_t *device_list = ble_device_list;
+  int32 current_time;
+  ble_device_list_entry_t *device_list;
+
+  device_list = ble_device_list;
+  current_time = clock_current_time ();
 
   while (device_list != NULL)
   {
@@ -87,7 +92,7 @@ static void ble_callback_data (void)
         {
           update_list->update.callback (update_list);
           
-          update_list->update.timer -= (connection_params.current_time - device_list->info.data_time);
+          update_list->update.timer -= (current_time - device_list->info.data_time);
           if (device_list->info.setup_time < 2000)
           {
             update_list->update.timer -= 1000;
@@ -403,6 +408,35 @@ static int ble_hello (void)
   {
     printf ("BLE Hello response failed with %d\n", status);
     status = -1;
+  }
+
+  return status;
+}
+
+static int ble_end_procedure (void)
+{
+  int status;
+  ble_message_t message;
+  ble_command_end_procedure_t *end_procedure;
+
+  printf ("BLE End procedure request\n");
+
+  end_procedure = (ble_command_end_procedure_t *)(&message);
+  BLE_CLASS_GAP_HEADER (end_procedure, BLE_COMMAND_END_PROCEDURE);
+  status = ble_command (&message);
+
+  if (status > 0)
+  {
+    ble_response_end_procedure_t *end_procedure_rsp = (ble_response_end_procedure_t *)(&message);
+    if (end_procedure_rsp->result != 0)
+    {
+      printf ("BLE End procedure response received with failure %d\n", end_procedure_rsp->result);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("BLE End procedure response failed with %d\n", status);
   }
 
   return status;
@@ -863,6 +897,8 @@ int ble_start_scan (void)
   ble_message_t message;
   ble_command_scan_params_t *scan_params;
 
+  ble_wakeup_time = clock_current_time ();
+
   printf ("BLE Start scan request\n");
 
   scan_params = (ble_command_scan_params_t *)(&message);
@@ -941,31 +977,11 @@ int ble_start_scan (void)
   return status;
 }
 
-int ble_end_procedure (void)
+int ble_stop_scan (void)
 {
   int status;
-  ble_message_t message;
-  ble_command_end_procedure_t *end_procedure;
 
-  printf ("BLE End procedure request\n");
-
-  end_procedure = (ble_command_end_procedure_t *)(&message);
-  BLE_CLASS_GAP_HEADER (end_procedure, BLE_COMMAND_END_PROCEDURE);
-  status = ble_command (&message);
-
-  if (status > 0)
-  {
-    ble_response_end_procedure_t *end_procedure_rsp = (ble_response_end_procedure_t *)(&message);
-    if (end_procedure_rsp->result != 0)
-    {
-      printf ("BLE End procedure response received with failure %d\n", end_procedure_rsp->result);
-      status = -1;
-    }
-  }
-  else
-  {
-    printf ("BLE End procedure response failed with %d\n", status);
-  }
+  status = ble_end_procedure ();
 
   return status;
 }
@@ -973,6 +989,8 @@ int ble_end_procedure (void)
 int ble_start_profile (void)
 {
   int status;
+
+  ble_wakeup_time = clock_current_time ();
 
   connection_params.device = ble_device_list;
   while ((connection_params.device != NULL) &&
@@ -1144,6 +1162,8 @@ int ble_start_data (void)
 {
   int status;
 
+  ble_wakeup_time = clock_current_time ();
+
   connection_params.device = ble_device_list;
   while (connection_params.device != NULL)
   {
@@ -1172,7 +1192,6 @@ int ble_start_data (void)
   }
   else
   {
-    connection_params.current_time = clock_current_time ();
     ble_callback_data ();
     status = 0;
   }
@@ -1212,7 +1231,6 @@ int ble_next_data (void)
   }
   else
   {
-    connection_params.current_time = clock_current_time ();
     ble_callback_data ();
     status = 0;
   }
@@ -1330,8 +1348,9 @@ int ble_wait_data (void)
 
 int ble_update_sleep (void)
 {
-  int sleep_interval = 0x7fffffff;
   ble_device_list_entry_t *device_list;
+
+  ble_sleep_interval = 0x7fffffff;
 
   /* Loop through update list to find the minimum sleep interval */
   device_list = ble_device_list;
@@ -1344,8 +1363,9 @@ int ble_update_sleep (void)
 
       while (update_list != NULL)
       {
-        sleep_interval = (sleep_interval > update_list->update.timer) ? update_list->update.timer
-                                                                      : sleep_interval;
+        ble_sleep_interval = (ble_sleep_interval > update_list->update.timer)
+                              ? update_list->update.timer : ble_sleep_interval;
+        
         update_list = update_list->next;
       }
     }
@@ -1355,7 +1375,7 @@ int ble_update_sleep (void)
 
   /* Subtract the sleep interval from timer. All characteristics
      with timer value 0 will be updated on wake-up */
-  if (sleep_interval != 0x7fffffff)
+  if (ble_sleep_interval != 0x7fffffff)
   {
     device_list = ble_device_list;
     while (device_list != NULL)
@@ -1367,20 +1387,28 @@ int ble_update_sleep (void)
         
         while (update_list != NULL)
         {
-          update_list->update.timer -= sleep_interval;
+          update_list->update.timer -= ble_sleep_interval;
           update_list = update_list->next;
         }
       }
       
       device_list = device_list->next;
     }
+
+    ble_sleep_interval -= ((clock_current_time ()) - ble_wakeup_time);
+    if (ble_sleep_interval <= 0)
+    {
+      ble_sleep_interval = 10;
+    }
   }
   else
   {
-    sleep_interval = 10;
+    ble_sleep_interval = 10;
   }
 
-  return sleep_interval;
+  printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
+
+  return ble_sleep_interval;
 }
 
 void ble_event_scan_response (ble_event_scan_response_t *scan_response)

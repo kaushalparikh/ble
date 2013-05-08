@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "util.h"
 #include "ble.h"
 
 typedef enum
@@ -30,10 +29,6 @@ static ble_state_handler_t ble_state_handler[BLE_STATE_MAX] =
   ble_data
 };
 
-static int ble_state_processing = 0;
-
-static int ble_sleep_interval = 0;
-
 
 static ble_state_e ble_scan (ble_message_t *message)
 {
@@ -53,8 +48,6 @@ static ble_state_e ble_scan (ble_message_t *message)
       {
         if (message->data[0] == BLE_TIMER_SCAN)
         {
-          ble_state_processing = clock_current_time ();
-            
           printf ("BLE Scan state\n");
 
           if ((ble_start_scan ()) <= 0)
@@ -64,24 +57,16 @@ static ble_state_e ble_scan (ble_message_t *message)
           
           /* Flush rest of message, both from serial & timer */
           ble_flush_timer ();
-          ble_flush_serial ();    
+          ble_flush_serial ();
         }
         else if (message->data[0] == BLE_TIMER_SCAN_STOP)
         {
-          if ((ble_end_procedure ()) <= 0)
+          if ((ble_stop_scan ()) <= 0)
           {
             /* TODO: Scan stop failed, set timer to stop sometime later */
           }
           else
           {
-            ble_state_processing = (clock_current_time ()) - ble_state_processing;
-            
-            ble_sleep_interval -= ble_state_processing;
-            if (ble_sleep_interval <= 0)
-            {
-              ble_sleep_interval = 10;
-            }
-            
             /* Check if some devices need service discovery/update */
             if ((ble_check_profile_list ()) > 0)
             {
@@ -90,10 +75,8 @@ static ble_state_e ble_scan (ble_message_t *message)
             }
             else
             {
-              printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
               new_state = BLE_STATE_DATA;
-              (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
-              ble_sleep_interval = 0;
+              (void)ble_set_timer ((ble_update_sleep ()), BLE_TIMER_DATA);
             }
           }
         }
@@ -147,18 +130,8 @@ static ble_state_e ble_profile (ble_message_t *message)
         
         if ((ble_next_profile ()) <= 0)
         {
-          ble_state_processing = (clock_current_time ()) - ble_state_processing;
-          
-          ble_sleep_interval -= ble_state_processing;
-          if (ble_sleep_interval <= 0)
-          {
-            ble_sleep_interval = 10;
-          }
-           
-          printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
           new_state = BLE_STATE_DATA;
-          (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
-          ble_sleep_interval = 0;
+          (void)ble_set_timer ((ble_update_sleep ()), BLE_TIMER_DATA);
         }        
         break;
       }
@@ -184,8 +157,6 @@ static ble_state_e ble_profile (ble_message_t *message)
       {
         if (message->data[0] == BLE_TIMER_PROFILE)
         {
-          ble_state_processing = clock_current_time ();
-          
           printf ("BLE Profile state\n");
           
           /* Flush rest of message, both from serial & timer */
@@ -194,18 +165,8 @@ static ble_state_e ble_profile (ble_message_t *message)
 
           if ((ble_start_profile ()) <= 0)
           {
-            ble_state_processing = (clock_current_time ()) - ble_state_processing;
-            
-            ble_sleep_interval -= ble_state_processing;
-            if (ble_sleep_interval <= 0)
-            {
-              ble_sleep_interval = 10;
-            }            
-
-            printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
             new_state = BLE_STATE_DATA;
-            (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
-            ble_sleep_interval = 0;
+            (void)ble_set_timer ((ble_update_sleep ()), BLE_TIMER_DATA);
           }
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
@@ -262,8 +223,6 @@ static ble_state_e ble_data (ble_message_t *message)
         
         if ((ble_next_data ()) <= 0)
         {
-          ble_sleep_interval = ble_update_sleep ();
-          
           /* Exit data state */
           if ((ble_check_scan_list ()) > 0)
           {
@@ -272,9 +231,7 @@ static ble_state_e ble_data (ble_message_t *message)
           }
           else
           {
-            printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
-            (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
-            ble_sleep_interval = 0;
+            (void)ble_set_timer ((ble_update_sleep ()), BLE_TIMER_DATA);
           }
         }
         break;
@@ -307,8 +264,6 @@ static ble_state_e ble_data (ble_message_t *message)
 
           if ((ble_start_data ()) <= 0)
           {
-            ble_sleep_interval = ble_update_sleep ();
-            
             /* Exit data state */
             if ((ble_check_scan_list ()) > 0)
             {
@@ -317,9 +272,7 @@ static ble_state_e ble_data (ble_message_t *message)
             }
             else
             {
-              printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
-              (void)ble_set_timer (ble_sleep_interval, BLE_TIMER_DATA);
-              ble_sleep_interval = 0;
+              (void)ble_set_timer ((ble_update_sleep ()), BLE_TIMER_DATA);
             }
           }
         }

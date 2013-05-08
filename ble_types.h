@@ -11,11 +11,11 @@
 #endif
 
 typedef unsigned char      uint8;
-typedef signed char        int8;
+typedef char               int8;
 typedef unsigned short int uint16;
-typedef signed short int   int16;
-typedef unsigned long int  uint32;
-typedef long int           int32;
+typedef short int          int16;
+typedef unsigned int       uint32;
+typedef int                int32;
 
 typedef int *timer_handle_t;
 

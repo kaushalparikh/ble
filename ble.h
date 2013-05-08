@@ -737,7 +737,7 @@ extern void ble_flush_serial (void);
 
 extern int ble_start_scan (void);
 
-extern int ble_end_procedure (void);
+extern int ble_stop_scan (void);
 
 extern int ble_start_profile (void);
 
