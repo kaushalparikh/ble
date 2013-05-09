@@ -41,8 +41,8 @@ typedef struct PACKED
   uint8           type;
 } ble_char_temperature_t;
 
-static void ble_update_temperature (void *data);
-static void ble_update_temperature_interval (void *data);
+static void ble_update_temperature (int32 device_id, void *data);
+static void ble_update_temperature_interval (int32 device_id, void *data);
 
 static ble_char_value_t temperature = 
 {
@@ -82,25 +82,31 @@ static ble_char_value_t temperature_interval =
   },
 };
 
+static FILE *temperature_file[256];
 
-static void ble_update_temperature (void *data)
+
+static void ble_update_temperature (int32 device_id, void *data)
 {
   ble_char_list_entry_t *characteristics = (ble_char_list_entry_t *)data;
   ble_attr_list_entry_t *attribute = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(characteristics->desc_list)));
+
+  printf ("Device ID: %02d\n", device_id);
   
   if (attribute->value_length != 0)
   {
     ble_char_temperature_t *temperature = (ble_char_temperature_t *)(attribute->value);
+
+    fprintf (temperature_file[device_id-1], "%.1f\n", temperature->meas_value);
     
-    printf ("Temperature flags: 0x%02x\n", temperature->flags);
-    printf ("            value: %.1f\n", temperature->meas_value);
-    printf ("             date: %02d/%02d/%04d\n", temperature->meas_time.day,
-                                                  temperature->meas_time.month,
-                                                  temperature->meas_time.year);
-    printf ("             time: %02d:%02d:%02d\n", temperature->meas_time.hour,
-                                                  temperature->meas_time.minute,
-                                                  temperature->meas_time.second);
-    printf ("             type: 0x%02x\n", temperature->type);
+    printf ("  Temperature flags: 0x%02x\n", temperature->flags);
+    printf ("              value: %.1f\n", temperature->meas_value);
+    printf ("               date: %02d/%02d/%04d\n", temperature->meas_time.day,
+                                                     temperature->meas_time.month,
+                                                     temperature->meas_time.year);
+    printf ("               time: %02d:%02d:%02d\n", temperature->meas_time.hour,
+                                                     temperature->meas_time.minute,
+                                                     temperature->meas_time.second);
+    printf ("               type: 0x%02x\n", temperature->type);
 
     free (attribute->value);
     attribute->value        = NULL;
@@ -108,13 +114,16 @@ static void ble_update_temperature (void *data)
   }
   else
   {
+    fprintf (temperature_file[device_id-1], "NaN\n");
+    
     printf ("Temperature value not read\n");
   }
-    
+
+  fflush (temperature_file[device_id-1]);
   characteristics->update.timer = BLE_TEMPERATURE_MEAS_INTERVAL;
 }
 
-static void ble_update_temperature_interval (void *data)
+static void ble_update_temperature_interval (int32 device_id, void *data)
 {
   ble_char_list_entry_t *characteristics = (ble_char_list_entry_t *)data;
   ble_attr_list_entry_t *attribute = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(characteristics->desc_list)));
@@ -129,9 +138,9 @@ static void ble_update_temperature_interval (void *data)
   characteristics->update.timer = BLE_INVALID_MEAS_INTERVAL;
 }
 
-int ble_lookup_uuid (ble_char_list_entry_t *characteristics)
+int32 ble_lookup_uuid (ble_char_list_entry_t *characteristics)
 {
-  int found = 0;
+  int32 found = 0;
   ble_attr_list_entry_t *desc_list = characteristics->desc_list;
   ble_char_decl_t *char_decl = (ble_char_decl_t *)(desc_list->value);
   uint8 value_uuid_length = desc_list->value_length - 3;
@@ -168,7 +177,6 @@ int ble_lookup_uuid (ble_char_list_entry_t *characteristics)
     characteristics->update = temperature_interval.update;
     found = 1;
   }
-
 
   if (found == 1)
   {
@@ -229,14 +237,22 @@ int ble_lookup_uuid (ble_char_list_entry_t *characteristics)
   return found;
 }
 
-uint32 ble_identify_device (ble_char_list_entry_t *update_list)
+uint32 ble_identify_device (uint8 *address, ble_char_list_entry_t *update_list)
 {
-  uint32 id = 0;
+  int32 id = 0;
+  char *file_name;
   
   if (update_list != NULL)
   {
-    id = 1;
+    id = address[0];
+ 
+    file_name = malloc ((strlen ("temperature.000")) + 1);
+    sprintf (file_name, "temperature.%03d", id);
+    temperature_file[id-1] = fopen (file_name, "w");
+    printf ("Storing temperature in file %s, desc 0x%x\n", file_name, (unsigned int)(temperature_file[id-1]));
+    free (file_name);
   }
 
   return id;
 }
+

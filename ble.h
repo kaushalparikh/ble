@@ -55,7 +55,6 @@ typedef struct
   ble_service_list_entry_t *service_list;
   ble_char_list_entry_t    *update_list;
   int32                     setup_time;
-  int32                     data_time;
 } ble_device_t;
 
 /* Message header definitions */
@@ -523,7 +522,7 @@ typedef struct PACKED
 #define BLE_MAX_CONNECT_INTERVAL  MS_TO_1250US(20)
 
 #define BLE_CONNECT_SETUP_TIMEOUT  (5000)
-#define BLE_CONNECT_DATA_TIMEOUT   (30000)
+#define BLE_CONNECT_DATA_TIMEOUT   (10000)
 #define BLE_CONNECT_TIMEOUT        MS_TO_10MS(1000)
 
 #define BLE_CONNECT_LATENCY  (0)
@@ -754,6 +753,8 @@ extern int ble_update_data (void);
 extern int ble_wait_data (void);
 
 extern int ble_update_sleep (void);
+
+extern int ble_get_sleep (void);
 
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 

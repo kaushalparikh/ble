@@ -74,11 +74,9 @@ static void ble_callback_timer (timer_list_entry_t *timer_list_entry)
 
 static void ble_callback_data (void)
 {
-  int32 current_time;
   ble_device_list_entry_t *device_list;
 
   device_list = ble_device_list;
-  current_time = clock_current_time ();
 
   while (device_list != NULL)
   {
@@ -90,16 +88,19 @@ static void ble_callback_data (void)
       {
         if (update_list->update.timer <= 0)
         {
-          update_list->update.callback (update_list);
+          update_list->update.callback (device_list->info.id, update_list);
           
-          update_list->update.timer -= (current_time - device_list->info.data_time);
-          if (device_list->info.setup_time < 2000)
+          if (device_list->info.setup_time < 1000)
           {
             update_list->update.timer -= 1000;
           }
+          else if (device_list->info.setup_time > 2000)
+          {
+            update_list->update.timer += 1000;
+          }
         }
         
-        update_list = update_list->next;        
+        update_list = update_list->next;
       }
     }
 
@@ -1143,7 +1144,7 @@ int ble_read_profile (void)
 
     if (device->update_list != NULL)
     {
-      device->id     = ble_identify_device (device->update_list);
+      device->id     = ble_identify_device (device->address.byte, device->update_list);
       device->status = BLE_DEVICE_DATA;
     }
     else
@@ -1348,9 +1349,11 @@ int ble_wait_data (void)
 
 int ble_update_sleep (void)
 {
+  int32 wakeup_interval;
   ble_device_list_entry_t *device_list;
 
   ble_sleep_interval = 0x7fffffff;
+  wakeup_interval = (clock_current_time ()) - ble_wakeup_time;
 
   /* Loop through update list to find the minimum sleep interval */
   device_list = ble_device_list;
@@ -1363,15 +1366,30 @@ int ble_update_sleep (void)
 
       while (update_list != NULL)
       {
+        update_list->update.timer -= wakeup_interval;
+        if (update_list->update.timer < 0)
+        {
+          update_list->update.timer = 1;
+        }
+        
         ble_sleep_interval = (ble_sleep_interval > update_list->update.timer)
                               ? update_list->update.timer : ble_sleep_interval;
-        
+          
         update_list = update_list->next;
       }
     }
     
     device_list = device_list->next;
   }
+  
+  printf ("BLE Wakeup interval %d millisec\n", wakeup_interval);
+  
+  return ble_sleep_interval;
+}
+
+int ble_get_sleep (void)
+{
+  ble_device_list_entry_t *device_list;
 
   /* Subtract the sleep interval from timer. All characteristics
      with timer value 0 will be updated on wake-up */
@@ -1388,24 +1406,22 @@ int ble_update_sleep (void)
         while (update_list != NULL)
         {
           update_list->update.timer -= ble_sleep_interval;
+          if (update_list->update.timer < 0)
+          {
+            update_list->update.timer = 0;
+          }
           update_list = update_list->next;
         }
       }
       
       device_list = device_list->next;
     }
-
-    ble_sleep_interval -= ((clock_current_time ()) - ble_wakeup_time);
-    if (ble_sleep_interval <= 0)
-    {
-      ble_sleep_interval = 10;
-    }
   }
   else
   {
-    ble_sleep_interval = 10;
+    ble_sleep_interval = 1;
   }
-
+  
   printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
 
   return ble_sleep_interval;
@@ -1486,7 +1502,6 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
   {
     connection_params.device->info.setup_time
         = timer_status (&(((timer_list_entry_t *)connection_params.timer)->info));
-    connection_params.device->info.data_time = clock_current_time ();
 
     timer_stop (&(((timer_list_entry_t *)connection_params.timer)->info));
     free (connection_params.timer);
@@ -1497,10 +1512,8 @@ int ble_event_connection_status (ble_event_connection_status_t *connection_statu
   else if (connection_status->flags & BLE_CONNECT_SETUP_FAILED)
   {
     connection_params.device->info.setup_time = BLE_CONNECT_SETUP_TIMEOUT;
-    connection_params.device->info.data_time  = (clock_current_time ()) - BLE_CONNECT_SETUP_TIMEOUT;
 
     connection_params.timer = NULL;
-    /* connection_params.device->info.status = BLE_DEVICE_DISCOVER; */
     status = ble_end_procedure ();
   }
   else if (connection_status->flags & BLE_CONNECT_DATA_FAILED)

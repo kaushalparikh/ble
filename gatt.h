@@ -77,7 +77,7 @@ typedef struct
 {
   uint8   type;
   int32   timer;
-  void  (*callback)(void *data);
+  void  (*callback)(int32 ble_device_id, void *data);
 } ble_char_update_t;
 
 struct ble_attr_list_entry
@@ -113,9 +113,9 @@ struct ble_service_list_entry
 
 typedef struct ble_service_list_entry ble_service_list_entry_t;
 
-extern int ble_lookup_uuid (ble_char_list_entry_t *characteristics);
+extern int32 ble_lookup_uuid (ble_char_list_entry_t *characteristics);
 
-extern uint32 ble_identify_device (ble_char_list_entry_t *update_list);
+extern uint32 ble_identify_device (uint8 *address, ble_char_list_entry_t *update_list);
 
 #endif
 
