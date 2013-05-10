@@ -20,7 +20,7 @@ static ble_state_e ble_scan (ble_message_t *message);
 static ble_state_e ble_profile (ble_message_t *message);
 static ble_state_e ble_data (ble_message_t *message);
 
-static ble_state_e ble_state = BLE_STATE_DATA;
+static ble_state_e ble_state = BLE_STATE_SCAN;
 
 static ble_state_handler_t ble_state_handler[BLE_STATE_MAX] =
 {
@@ -67,10 +67,12 @@ static ble_state_e ble_scan (ble_message_t *message)
           }
           else
           {
-            (void)ble_update_sleep ();
-
             /* Check if some devices need service discovery/update */
-            if ((ble_check_profile_list ()) > 0)
+            if ((ble_check_scan_list ()) > 0)
+            {
+              (void)ble_set_timer (10, BLE_TIMER_SCAN);
+            }
+            else if ((ble_check_profile_list ()) > 0)
             {
               new_state = BLE_STATE_PROFILE;
               (void)ble_set_timer (10, BLE_TIMER_PROFILE);
@@ -133,7 +135,6 @@ static ble_state_e ble_profile (ble_message_t *message)
         if ((ble_next_profile ()) <= 0)
         {
           new_state = BLE_STATE_DATA;
-          (void)ble_update_sleep ();
           (void)ble_set_timer ((ble_get_sleep ()), BLE_TIMER_DATA);
         }        
         break;
@@ -168,9 +169,7 @@ static ble_state_e ble_profile (ble_message_t *message)
 
           if ((ble_start_profile ()) <= 0)
           {
-            new_state = BLE_STATE_DATA;
-            (void)ble_update_sleep ();
-            (void)ble_set_timer ((ble_get_sleep ()), BLE_TIMER_DATA);
+            /* TODO: Profile start failed, jump to data state instead? */
           }
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
@@ -227,18 +226,22 @@ static ble_state_e ble_data (ble_message_t *message)
         
         if ((ble_next_data ()) <= 0)
         {
-          int32 sleep_interval = ble_update_sleep ();
-            
+          int32 event;
+          int32 sleep_interval = ble_get_sleep ();
+          
           /* Exit data state */
-          if (sleep_interval < 20000)
+          if ((sleep_interval > 10) && (sleep_interval < 20000))
           {
-            (void)ble_set_timer ((ble_get_sleep ()), BLE_TIMER_DATA);
+            event = BLE_TIMER_DATA;
           }
           else
           {
+            sleep_interval = 10;
+            event          = BLE_TIMER_SCAN;
             new_state      = BLE_STATE_SCAN;
-            (void)ble_set_timer (10, BLE_TIMER_SCAN);
           }
+            
+          (void)ble_set_timer (sleep_interval, event);
         }
         break;
       }
@@ -270,18 +273,7 @@ static ble_state_e ble_data (ble_message_t *message)
 
           if ((ble_start_data ()) <= 0)
           {
-            int32 sleep_interval = ble_update_sleep ();
-            
-            /* Exit data state */
-            if (sleep_interval < 20000)
-            {
-              (void)ble_set_timer ((ble_get_sleep ()), BLE_TIMER_DATA);
-            }
-            else
-            {
-              new_state      = BLE_STATE_SCAN;
-              (void)ble_set_timer (10, BLE_TIMER_SCAN);
-            }
+            /* TODO: Data start failed, jump to scan state instead? */
           }
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
@@ -315,7 +307,7 @@ static ble_state_e ble_data (ble_message_t *message)
 
 void master_loop (void)
 {
-  (void)ble_set_timer (10, BLE_TIMER_DATA);
+  (void)ble_set_timer (10, BLE_TIMER_SCAN);
 
   while (1)
   {

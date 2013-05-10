@@ -710,7 +710,7 @@ typedef struct PACKED
 
 /* Function declarations */
 
-extern timer_handle_t ble_set_timer (int millisec, int event);
+extern timer_handle_t ble_set_timer (int32 millisec, int32 event);
 
 extern int ble_check_timer (void);
 
@@ -752,7 +752,7 @@ extern int ble_update_data (void);
 
 extern int ble_wait_data (void);
 
-extern int ble_update_sleep (void);
+extern void ble_update_timer (void);
 
 extern int ble_get_sleep (void);
 

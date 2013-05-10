@@ -116,7 +116,7 @@ static void ble_update_temperature (int32 device_id, void *data)
   {
     fprintf (temperature_file[device_id-1], "NaN\n");
     
-    printf ("Temperature value not read\n");
+    printf ("  Temperature not read\n");
   }
 
   fflush (temperature_file[device_id-1]);
