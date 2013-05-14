@@ -250,6 +250,7 @@ static ble_state_e ble_data (ble_message_t *message)
         if ((ble_update_data ()) <= 0)
         {
           /* TODO: */
+          ble_print_message (message);
         }
         break;        
       }

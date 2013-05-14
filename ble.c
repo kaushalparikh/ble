@@ -90,11 +90,11 @@ static void ble_callback_data (void)
         {
           update_list->update.callback (device_list->info.id, update_list);
           
-          if (device_list->info.setup_time < 1500)
+          if (device_list->info.setup_time < 1000)
           {
             update_list->update.timer -= 1000;
           }
-          else if (device_list->info.setup_time > 3000)
+          else if (device_list->info.setup_time > 2000)
           {
             update_list->update.timer += 1000;
           }
@@ -1151,7 +1151,7 @@ int ble_read_profile (void)
       int32 sleep_interval = ble_get_sleep ();
       ble_char_list_entry_t *update_list = device->update_list;
 
-      sleep_interval -= 5000;
+      sleep_interval -= 10000;
       if (sleep_interval <= 0)
       {
         sleep_interval = 20000;
@@ -1262,87 +1262,95 @@ int ble_next_data (void)
 int ble_update_data (void)
 {
   int status;
-  ble_device_t *device = &(connection_params.device->info);
 
-  if ((connection_params.characteristics != NULL) &&
-      ((connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_READ) ||
-       (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_WRITE)))
+  if (connection_params.handle != 0xff)
   {
-    connection_params.characteristics->update.timer = -1;
-  }
+    ble_device_t *device = &(connection_params.device->info);
 
-  if (connection_params.characteristics == NULL)
-  {
-    connection_params.characteristics = device->update_list;
-  }
-  else
-  {
-    connection_params.characteristics = connection_params.characteristics->next;
-  }
-
-  while ((connection_params.characteristics != NULL) &&
-         (connection_params.characteristics->update.timer > 0))
-  {
-    connection_params.characteristics = connection_params.characteristics->next;
-  }
-
-  if (connection_params.characteristics != NULL)
-  {
-    connection_params.attribute
-        = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(connection_params.characteristics->desc_list)));
-
-    if (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_READ)
+    if ((connection_params.characteristics != NULL) &&
+        ((connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_READ) ||
+         (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_WRITE)))
     {
-      status = ble_read_long_handle ();
+      connection_params.characteristics->update.timer = -1;
     }
-    else if ((connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_INDICATE) ||
-             (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_NOTIFY)   ||
-             (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_WRITE))
+  
+    if (connection_params.characteristics == NULL)
     {
-      if ((connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_INDICATE) ||
-          (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_NOTIFY))
-      {
-        connection_params.attribute = connection_params.characteristics->desc_list;
-        
-        while (connection_params.attribute != NULL)
-        {
-          uint16 uuid = ((connection_params.attribute->uuid[1]) << 8) | connection_params.attribute->uuid[0];
-          if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
-          {
-            break;
-          }
-          
-          connection_params.attribute = connection_params.attribute->next;
-        }
-      }
-
-      status = ble_write_handle ();
+      connection_params.characteristics = device->update_list;
     }
     else
     {
-      ble_message_list_entry_t *message_list_entry
-          = (ble_message_list_entry_t *)(malloc (sizeof (*message_list_entry)));
-
-      printf ("BLE Update data characteristics property %d not supported\n",
-                                                        connection_params.characteristics->update.type);
-
-      message_list_entry->message.header.type    = BLE_EVENT;
-      message_list_entry->message.header.length  = 5;
-      message_list_entry->message.header.class   = BLE_CLASS_ATTR_CLIENT;
-      message_list_entry->message.header.command = BLE_EVENT_PROCEDURE_COMPLETED;
-
-      list_add ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
-
+      connection_params.characteristics = connection_params.characteristics->next;
+    }
+  
+    while ((connection_params.characteristics != NULL) &&
+           (connection_params.characteristics->update.timer > 0))
+    {
+      connection_params.characteristics = connection_params.characteristics->next;
+    }
+  
+    if (connection_params.characteristics != NULL)
+    {
+      connection_params.attribute
+          = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(connection_params.characteristics->desc_list)));
+  
+      if (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_READ)
+      {
+        status = ble_read_long_handle ();
+      }
+      else if ((connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_INDICATE) ||
+               (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_NOTIFY)   ||
+               (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_WRITE))
+      {
+        if ((connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_INDICATE) ||
+            (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_NOTIFY))
+        {
+          connection_params.attribute = connection_params.characteristics->desc_list;
+          
+          while (connection_params.attribute != NULL)
+          {
+            uint16 uuid = ((connection_params.attribute->uuid[1]) << 8) | connection_params.attribute->uuid[0];
+            if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
+            {
+              break;
+            }
+            
+            connection_params.attribute = connection_params.attribute->next;
+          }
+        }
+  
+        status = ble_write_handle ();
+      }
+      else
+      {
+        ble_message_list_entry_t *message_list_entry
+            = (ble_message_list_entry_t *)(malloc (sizeof (*message_list_entry)));
+  
+        printf ("BLE Update data characteristics property %d not supported\n",
+                                                          connection_params.characteristics->update.type);
+  
+        message_list_entry->message.header.type    = BLE_EVENT;
+        message_list_entry->message.header.length  = 5;
+        message_list_entry->message.header.class   = BLE_CLASS_ATTR_CLIENT;
+        message_list_entry->message.header.command = BLE_EVENT_PROCEDURE_COMPLETED;
+  
+        list_add ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
+  
+        status = 1;
+      }
+    }
+    else if ((ble_wait_data ()) < 0)
+    {
+      status = ble_connect_disconnect ();
+    }
+    else
+    {
       status = 1;
     }
   }
-  else if ((ble_wait_data ()) < 0)
-  {
-    status = ble_connect_disconnect ();
-  }
   else
   {
-    status = 1;
+    status = 0;
   }
     
   return status;
