@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "list.h"
+#include "util.h"
 #include "gatt.h"
 #include "ble.h"
 
@@ -59,6 +60,7 @@ static ble_char_value_t temperature =
   {
     .type             = 0,
     .timer            = 0,
+    .previous_time    = 0,
     .callback         = ble_update_temperature,
   },
 };
@@ -78,6 +80,7 @@ static ble_char_value_t temperature_interval =
   {
     .type             = 0,
     .timer            = 0,
+    .previous_time    = 0,
     .callback         = ble_update_temperature_interval,
   },
 };
@@ -89,12 +92,23 @@ static void ble_update_temperature (int32 device_id, void *data)
 {
   ble_char_list_entry_t *characteristics = (ble_char_list_entry_t *)data;
   ble_attr_list_entry_t *attribute = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(characteristics->desc_list)));
+  int32 update_timer_correction = 0;
 
   printf ("Device ID: %02d\n", device_id);
+  characteristics->update.timer = BLE_TEMPERATURE_MEAS_INTERVAL;
   
   if (attribute->value_length != 0)
   {
+    int32 current_time;
     ble_char_temperature_t *temperature = (ble_char_temperature_t *)(attribute->value);
+
+    current_time = clock_current_time ();
+    update_timer_correction = (current_time - characteristics->update.previous_time) - BLE_TEMPERATURE_MEAS_INTERVAL;
+    characteristics->update.previous_time = current_time;
+    if ((update_timer_correction > -2000) && (update_timer_correction < 2000))
+    {
+      characteristics->update.timer -= update_timer_correction;
+    }
 
     fprintf (temperature_file[device_id-1], "%.1f\n", temperature->meas_value);
     
@@ -107,6 +121,7 @@ static void ble_update_temperature (int32 device_id, void *data)
                                                      temperature->meas_time.minute,
                                                      temperature->meas_time.second);
     printf ("               type: 0x%02x\n", temperature->type);
+    printf ("   Timer correction: %d\n", update_timer_correction);
 
     free (attribute->value);
     attribute->value        = NULL;
@@ -120,7 +135,6 @@ static void ble_update_temperature (int32 device_id, void *data)
   }
 
   fflush (temperature_file[device_id-1]);
-  characteristics->update.timer = BLE_TEMPERATURE_MEAS_INTERVAL;
 }
 
 static void ble_update_temperature_interval (int32 device_id, void *data)
@@ -249,7 +263,7 @@ uint32 ble_identify_device (uint8 *address, ble_char_list_entry_t *update_list)
     file_name = malloc ((strlen ("temperature.000")) + 1);
     sprintf (file_name, "temperature.%03d", id);
     temperature_file[id-1] = fopen (file_name, "w");
-    printf ("Storing temperature in file %s, desc 0x%x\n", file_name, (unsigned int)(temperature_file[id-1]));
+    printf ("Storing temperature in file %s\n", file_name);
     free (file_name);
   }
 

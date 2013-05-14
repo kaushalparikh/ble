@@ -77,6 +77,7 @@ typedef struct
 {
   uint8   type;
   int32   timer;
+  int32   previous_time;
   void  (*callback)(int32 ble_device_id, void *data);
 } ble_char_update_t;
 

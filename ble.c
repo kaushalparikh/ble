@@ -89,15 +89,6 @@ static void ble_callback_data (void)
         if (update_list->update.timer <= 0)
         {
           update_list->update.callback (device_list->info.id, update_list);
-          
-          if (device_list->info.setup_time < 1000)
-          {
-            update_list->update.timer -= 1000;
-          }
-          else if (device_list->info.setup_time > 2000)
-          {
-            update_list->update.timer += 1000;
-          }
         }
         
         update_list = update_list->next;
