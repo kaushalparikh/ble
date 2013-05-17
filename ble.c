@@ -63,9 +63,6 @@ static ble_connection_params_t connection_params =
   .timer           = NULL,
 };
 
-static int ble_sleep_interval = 0;
-static int ble_previous_time = 0;
-
 
 static void ble_callback_timer (timer_list_entry_t *timer_list_entry)
 {
@@ -89,6 +86,16 @@ static void ble_callback_data (void)
         if (update_list->update.timer <= 0)
         {
           update_list->update.callback (device_list->info.id, update_list);
+          /*
+          if (device_list->info.setup_time < 1000)
+          {
+            update_list->update.timer -= 1000;
+          }
+          else if (device_list->info.setup_time > 2000)
+          {
+            update_list->update.timer += 1000;
+          }
+          */
         }
         
         update_list = update_list->next;
@@ -361,6 +368,75 @@ static void ble_update_data_list (void)
     list_concat ((list_entry_t **)(&(device->update_list)), (list_entry_t *)notify_indicate_list);
     list_concat ((list_entry_t **)(&(device->update_list)), (list_entry_t *)read_write_list);
   }
+}
+
+static void ble_update_timer (void)
+{
+  int32 current_time;
+  ble_device_list_entry_t *device_list;
+
+  current_time = clock_current_time ();
+  device_list  = ble_device_list;
+
+  while (device_list != NULL)
+  {
+    if ((device_list->info.status == BLE_DEVICE_DATA)  ||
+        (device_list->info.status == BLE_DEVICE_DISCOVER))
+    {
+      ble_char_list_entry_t *update_list = device_list->info.update_list;
+
+      while (update_list != NULL)
+      {
+        update_list->update.timer = update_list->update.expected_time - current_time;
+        if (update_list->update.timer < 0)
+        {
+          update_list->update.timer = 0;
+        }
+          
+        update_list = update_list->next;
+      }
+    }
+    
+    device_list = device_list->next;
+  }
+}
+
+static int32 ble_get_wakeup (void)
+{
+  int32 wakeup_time;
+  ble_device_list_entry_t *device_list;
+  
+  wakeup_time = 0x7fffffff;
+  device_list = ble_device_list;
+
+  /* Loop through update list to find the minimum sleep interval */
+  while (device_list != NULL)
+  {
+    if ((device_list->info.status == BLE_DEVICE_DATA)  ||
+        (device_list->info.status == BLE_DEVICE_DISCOVER))
+    {
+      ble_char_list_entry_t *update_list = device_list->info.update_list;
+
+      while (update_list != NULL)
+      {
+        wakeup_time = (wakeup_time > update_list->update.expected_time)
+                       ? update_list->update.expected_time: wakeup_time;
+          
+        update_list = update_list->next;
+      }
+    }
+    
+    device_list = device_list->next;
+  }
+
+  /* Subtract the sleep interval from timer. All characteristics
+     with timer value 0 will be updated on wake-up */
+  if (wakeup_time == 0x7fffffff)
+  {
+    wakeup_time = clock_current_time ();
+  }
+
+  return wakeup_time;
 }
 
 static int ble_reset (void)
@@ -1139,18 +1215,24 @@ int ble_read_profile (void)
 
     if (device->update_list != NULL)
     {
-      int32 sleep_interval = ble_get_sleep ();
-      ble_char_list_entry_t *update_list = device->update_list;
+      int32 wakeup_time;
+      ble_char_list_entry_t *update_list;
 
-      sleep_interval -= 10000;
-      if (sleep_interval <= 0)
+      wakeup_time = ble_get_wakeup ();
+      update_list = device->update_list;
+
+      if (wakeup_time <= (clock_current_time ()))
       {
-        sleep_interval = 20000;
+        wakeup_time += 20000;
+      }
+      else
+      {
+        wakeup_time -= 10000;
       }
 
       while (update_list != NULL)
       {
-        update_list->update.timer = sleep_interval;
+        update_list->update.expected_time = wakeup_time;
         update_list = update_list->next;
       }
 
@@ -1263,6 +1345,18 @@ int ble_update_data (void)
          (connection_params.characteristics->update.type == BLE_CHAR_PROPERTY_WRITE)))
     {
       connection_params.characteristics->update.timer = -1;
+
+      if (connection_params.characteristics->update.init > 0)
+      {
+        connection_params.characteristics->update.init             = 0;
+        connection_params.characteristics->update.expected_time    = (clock_current_time ()) - 1000;
+        connection_params.characteristics->update.timer_correction = 0;
+      }
+      else
+      {
+        connection_params.characteristics->update.timer_correction
+          = (clock_current_time ()) - connection_params.characteristics->update.expected_time;
+      }
     }
   
     if (connection_params.characteristics == NULL)
@@ -1366,48 +1460,13 @@ int ble_wait_data (void)
   return status;
 }
 
-void ble_update_timer (void)
+int32 ble_get_sleep (void)
 {
-  int32 current_time;
-  int32 update_interval;
+  int32 min_sleep_interval;
   ble_device_list_entry_t *device_list;
-
-  current_time      = clock_current_time ();
-  update_interval   = current_time - ble_previous_time;
-  ble_previous_time = current_time;
-
-  /* Loop through update list to find the minimum sleep interval */
-  device_list = ble_device_list;
-  while (device_list != NULL)
-  {
-    if ((device_list->info.status == BLE_DEVICE_DATA)  ||
-        (device_list->info.status == BLE_DEVICE_DISCOVER))
-    {
-      ble_char_list_entry_t *update_list = device_list->info.update_list;
-
-      while (update_list != NULL)
-      {
-        update_list->update.timer -= update_interval;
-        if (update_list->update.timer <= 0)
-        {
-          update_list->update.timer = 0;
-        }
-          
-        update_list = update_list->next;
-      }
-    }
-    
-    device_list = device_list->next;
-  }
   
-  printf ("BLE Update interval %d millisec\n", update_interval);
-}
-
-int ble_get_sleep (void)
-{
-  ble_device_list_entry_t *device_list = ble_device_list;
-  
-  ble_sleep_interval = 0x7fffffff;
+  min_sleep_interval = 0x7fffffff;
+  device_list        = ble_device_list;
 
   /* Loop through update list to find the minimum sleep interval */
   while (device_list != NULL)
@@ -1419,8 +1478,8 @@ int ble_get_sleep (void)
 
       while (update_list != NULL)
       {
-        ble_sleep_interval = (ble_sleep_interval > update_list->update.timer)
-                              ? update_list->update.timer : ble_sleep_interval;
+        min_sleep_interval = (min_sleep_interval > update_list->update.timer)
+                              ? update_list->update.timer : min_sleep_interval;
           
         update_list = update_list->next;
       }
@@ -1431,14 +1490,14 @@ int ble_get_sleep (void)
 
   /* Subtract the sleep interval from timer. All characteristics
      with timer value 0 will be updated on wake-up */
-  if ((ble_sleep_interval == 0x7fffffff) || (ble_sleep_interval == 0))
+  if ((min_sleep_interval == 0x7fffffff) || (min_sleep_interval == 0))
   {
-    ble_sleep_interval = 10;
+    min_sleep_interval = 10;
   }
   
-  printf ("BLE Sleep interval %d millisec\n", ble_sleep_interval);
+  printf ("BLE Sleep interval %d millisec\n", min_sleep_interval);
 
-  return ble_sleep_interval;
+  return min_sleep_interval;
 }
 
 void ble_event_scan_response (ble_event_scan_response_t *scan_response)
@@ -1678,6 +1737,18 @@ int ble_event_attr_value (ble_event_attr_value_t *attr_value)
       if ((attribute->handle == attr_value->attr_handle) && (update_list->update.timer == 0))
       {
         update_list->update.timer = -1;
+
+        if (update_list->update.init > 0)
+        {
+          update_list->update.init             = 0;
+          update_list->update.expected_time    = (clock_current_time ()) - 1000;
+          update_list->update.timer_correction = 0;
+        }
+        else
+        {
+          update_list->update.timer_correction = (clock_current_time ()) - update_list->update.expected_time;
+        }
+
         break;
       }
       else

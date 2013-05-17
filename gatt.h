@@ -75,9 +75,11 @@ enum
 
 typedef struct
 {
+  uint8   init;
   uint8   type;
+  int32   expected_time;
   int32   timer;
-  int32   previous_time;
+  int32   timer_correction;
   void  (*callback)(int32 ble_device_id, void *data);
 } ble_char_update_t;
 

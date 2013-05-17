@@ -752,9 +752,7 @@ extern int ble_update_data (void);
 
 extern int ble_wait_data (void);
 
-extern void ble_update_timer (void);
-
-extern int ble_get_sleep (void);
+extern int32 ble_get_sleep (void);
 
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 

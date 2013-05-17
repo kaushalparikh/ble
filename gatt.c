@@ -58,9 +58,11 @@ static ble_char_value_t temperature =
   },
   .update =
   {
+    .init             = 1,
     .type             = 0,
+    .expected_time    = 0,
     .timer            = 0,
-    .previous_time    = 0,
+    .timer_correction = 0,
     .callback         = ble_update_temperature,
   },
 };
@@ -78,9 +80,11 @@ static ble_char_value_t temperature_interval =
   },
   .update =
   {
+    .init             = 1,
     .type             = 0,
+    .expected_time    = 0,
     .timer            = 0,
-    .previous_time    = 0,
+    .timer_correction = 0,
     .callback         = ble_update_temperature_interval,
   },
 };
@@ -92,23 +96,14 @@ static void ble_update_temperature (int32 device_id, void *data)
 {
   ble_char_list_entry_t *characteristics = (ble_char_list_entry_t *)data;
   ble_attr_list_entry_t *attribute = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(characteristics->desc_list)));
-  int32 update_timer_correction = 0;
 
   printf ("Device ID: %02d\n", device_id);
-  characteristics->update.timer = BLE_TEMPERATURE_MEAS_INTERVAL;
+    
+  characteristics->update.expected_time += BLE_TEMPERATURE_MEAS_INTERVAL;
   
   if (attribute->value_length != 0)
   {
-    int32 current_time;
     ble_char_temperature_t *temperature = (ble_char_temperature_t *)(attribute->value);
-
-    current_time = clock_current_time ();
-    update_timer_correction = (current_time - characteristics->update.previous_time) - BLE_TEMPERATURE_MEAS_INTERVAL;
-    characteristics->update.previous_time = current_time;
-    if ((update_timer_correction > -2000) && (update_timer_correction < 2000))
-    {
-      characteristics->update.timer -= update_timer_correction;
-    }
 
     fprintf (temperature_file[device_id-1], "%.1f\n", temperature->meas_value);
     
@@ -121,7 +116,7 @@ static void ble_update_temperature (int32 device_id, void *data)
                                                      temperature->meas_time.minute,
                                                      temperature->meas_time.second);
     printf ("               type: 0x%02x\n", temperature->type);
-    printf ("   Timer correction: %d\n", update_timer_correction);
+    printf ("   Timer correction: %d\n", characteristics->update.timer_correction);
 
     free (attribute->value);
     attribute->value        = NULL;
@@ -149,7 +144,7 @@ static void ble_update_temperature_interval (int32 device_id, void *data)
     attribute->value_length = 0;
   }
  
-  characteristics->update.timer = BLE_INVALID_MEAS_INTERVAL;
+  characteristics->update.expected_time += BLE_INVALID_MEAS_INTERVAL;
 }
 
 int32 ble_lookup_uuid (ble_char_list_entry_t *characteristics)
