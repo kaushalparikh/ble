@@ -86,16 +86,6 @@ static void ble_callback_data (void)
         if (update_list->update.timer <= 0)
         {
           update_list->update.callback (device_list->info.id, update_list);
-          /*
-          if (device_list->info.setup_time < 1000)
-          {
-            update_list->update.timer -= 1000;
-          }
-          else if (device_list->info.setup_time > 2000)
-          {
-            update_list->update.timer += 1000;
-          }
-          */
         }
         
         update_list = update_list->next;
@@ -409,7 +399,6 @@ static int32 ble_get_wakeup (void)
   wakeup_time = 0x7fffffff;
   device_list = ble_device_list;
 
-  /* Loop through update list to find the minimum sleep interval */
   while (device_list != NULL)
   {
     if ((device_list->info.status == BLE_DEVICE_DATA)  ||
@@ -420,7 +409,7 @@ static int32 ble_get_wakeup (void)
       while (update_list != NULL)
       {
         wakeup_time = (wakeup_time > update_list->update.expected_time)
-                       ? update_list->update.expected_time: wakeup_time;
+                       ? update_list->update.expected_time : wakeup_time;
           
         update_list = update_list->next;
       }
@@ -429,8 +418,6 @@ static int32 ble_get_wakeup (void)
     device_list = device_list->next;
   }
 
-  /* Subtract the sleep interval from timer. All characteristics
-     with timer value 0 will be updated on wake-up */
   if (wakeup_time == 0x7fffffff)
   {
     wakeup_time = clock_current_time ();

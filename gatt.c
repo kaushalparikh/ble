@@ -144,7 +144,7 @@ static void ble_update_temperature_interval (int32 device_id, void *data)
     attribute->value_length = 0;
   }
  
-  characteristics->update.expected_time += BLE_INVALID_MEAS_INTERVAL;
+  characteristics->update.expected_time = BLE_INVALID_MEAS_INTERVAL;
 }
 
 int32 ble_lookup_uuid (ble_char_list_entry_t *characteristics)
