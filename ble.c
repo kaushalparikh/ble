@@ -63,6 +63,8 @@ static ble_connection_params_t connection_params =
   .timer           = NULL,
 };
 
+static int32 ble_init_time = 0;
+
 
 static void ble_callback_timer (timer_list_entry_t *timer_list_entry)
 {
@@ -802,6 +804,8 @@ int ble_init (void)
 {
   int status = 0;
   int init_attempt = 0;
+
+  ble_init_time = clock_current_time ();
   
   /* Find BLE device and initialize */
   status = serial_init ();
@@ -851,6 +855,7 @@ int ble_init (void)
 
 void ble_deinit (void)
 {
+  serial_deinit ();
 }
 
 void ble_print_message (ble_message_t *message)
@@ -1313,6 +1318,22 @@ int ble_next_data (void)
   }
   else
   {
+    int32 current_time = clock_current_time ();
+
+    if ((current_time - ble_init_time) > (60*60*1000))
+    {
+      int init_attempt = 0;
+      
+      ble_deinit ();
+      do
+      {
+        init_attempt++;
+        printf ("BLE init attempt %d\n", init_attempt);
+        
+        status = ble_init ();
+      } while ((status <= 0) && (init_attempt < 2));
+    }
+    
     status = 0;
   }
   

@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "list.h"
-#include "util.h"
 #include "gatt.h"
 #include "ble.h"
 
