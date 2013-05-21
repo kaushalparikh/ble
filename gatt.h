@@ -1,7 +1,7 @@
 #ifndef __GATT_H__
 #define __GATT_H__
 
-#include "ble_types.h"
+#include "basic_types.h"
 
 #define BLE_MAX_UUID_LENGTH  (16)
 

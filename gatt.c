@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "basic_types.h"
 #include "list.h"
 #include "gatt.h"
 #include "ble.h"
@@ -248,7 +249,7 @@ int32 ble_lookup_uuid (ble_char_list_entry_t *characteristics)
 uint32 ble_identify_device (uint8 *address, ble_char_list_entry_t *update_list)
 {
   int32 id = 0;
-  char *file_name;
+  int8 *file_name;
   
   if (update_list != NULL)
   {

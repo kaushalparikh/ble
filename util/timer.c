@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <time.h>
 
+#include "basic_types.h"
 #include "util.h"
 
 
@@ -15,7 +16,7 @@ static void timer_event (int event_id, siginfo_t *event_info, void *unused)
   timer_delete ((timer_t)(timer_info->id));
 }
 
-int timer_start (timer_info_t *timer_info)
+int32 timer_start (timer_info_t *timer_info)
 {
   struct sigaction timer_action;
   struct sigevent signal_event;
@@ -66,7 +67,7 @@ int timer_start (timer_info_t *timer_info)
   return status;
 }
 
-int timer_status (timer_info_t *timer_info)
+int32 timer_status (timer_info_t *timer_info)
 {
   int current_count = -1;
 
@@ -82,12 +83,12 @@ int timer_status (timer_info_t *timer_info)
   return current_count;
 }
 
-int timer_stop (timer_info_t *timer_info)
+int32 timer_stop (timer_info_t *timer_info)
 {
   return timer_delete ((timer_t)(timer_info->id));
 }
 
-int clock_current_time (void)
+int32 clock_current_time (void)
 {
   int millisec = -1;
   struct timespec current_time;

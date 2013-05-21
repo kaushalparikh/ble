@@ -1,44 +1,37 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
-/* USB utilities */
-struct usb_info
-{
-  struct usb_info *next;
-  char            *dev_node;
-  char            *dev_sys_path;
-  char            *dev_subsystem_node;
-  unsigned char    bus_num;
-  unsigned char    dev_num;
-};
+#include "basic_types.h"
 
-typedef struct usb_info usb_info_t;
+/* Serial API */
+extern int32 serial_init (void);
 
-extern int usb_find (char *vendor_id, char *product_id,
-                     char *subsystem, usb_info_t **usb_info);
+extern void serial_deinit (void);
 
-extern int usb_disconnect (char *dev_node,
-                           int   interface);
+extern int32 serial_open (void);
 
-extern int usb_connect (char *dev_node,
-                        int   interface);
+extern void serial_close (void);
 
-/* Timer utilities */
+extern int32 serial_tx (uint32 bytes, uint8 *buffer);
+
+extern int32 serial_rx (uint32 bytes, uint8 *buffer);
+
+/* Timer API */
 typedef struct
 {
-  int    id;
-  int    millisec;
-  void (*callback)(void *);
-  void  *data;
+  int32    id;
+  int32    millisec;
+  void   (*callback)(void *);
+  void    *data;
 } timer_info_t;
 
-extern int timer_start (timer_info_t *timer_info);
+extern int32 timer_start (timer_info_t *timer_info);
 
-extern int timer_status (timer_info_t *timer_info);
+extern int32 timer_status (timer_info_t *timer_info);
 
-extern int timer_stop (timer_info_t *timer_info);
+extern int32 timer_stop (timer_info_t *timer_info);
 
-extern int clock_current_time (void);
+extern int32 clock_current_time (void);
 
 #endif
 

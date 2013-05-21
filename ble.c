@@ -4,10 +4,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "basic_types.h"
 #include "list.h"
 #include "util.h"
-#include "serial.h"
-#include "ble_types.h"
 #include "gatt.h"
 #include "ble.h"
 
@@ -15,7 +14,7 @@ struct timer_list_entry
 {
   struct timer_list_entry *next;
   timer_info_t             info;
-  int                      event;
+  int32                    event;
 };
 
 typedef struct timer_list_entry timer_list_entry_t;
@@ -98,12 +97,12 @@ static void ble_callback_data (void)
   }
 }
 
-static int ble_response (ble_message_t *response)
+static int32 ble_response (ble_message_t *response)
 {
   ble_message_t message;
-  int status;
+  int32 status;
 
-  while ((status = serial_rx (sizeof (message.header), (unsigned char *)(&(message.header)))) > 0)
+  while ((status = serial_rx (sizeof (message.header), (uint8 *)(&(message.header)))) > 0)
   {
     if (message.header.length > 0)
     {
@@ -132,12 +131,12 @@ static int ble_response (ble_message_t *response)
   return status;
 }
 
-static int ble_command (ble_message_t *message)
+static int32 ble_command (ble_message_t *message)
 {
-  int status;
+  int32 status;
 
   status = serial_tx (((sizeof (message->header)) + message->header.length),
-                      ((unsigned char *)message));
+                      ((uint8 *)message));
 
   if (status > 0)
   {
@@ -183,7 +182,7 @@ static ble_device_t * ble_find_device (ble_device_address_t *address)
 
 static void ble_print_device (ble_device_t *device)
 {
-  int i;
+  int32 i;
 
   printf ("     Name: %s\n", device->name);
   printf ("  Address: 0x");
@@ -196,7 +195,7 @@ static void ble_print_device (ble_device_t *device)
 
 static void ble_print_service_list (void)
 {
-  int i;
+  int32 i;
   ble_service_list_entry_t *service_list = connection_params.device->info.service_list;
 
   while (service_list != NULL)
@@ -428,9 +427,9 @@ static int32 ble_get_wakeup (void)
   return wakeup_time;
 }
 
-static int ble_reset (void)
+static int32 ble_reset (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_reset_t *reset;
 
@@ -438,7 +437,7 @@ static int ble_reset (void)
   BLE_CLASS_SYSTEM_HEADER (reset, BLE_COMMAND_RESET);
   reset->mode = BLE_RESET_NORMAL;
   status = serial_tx (((sizeof (reset->header)) + reset->header.length),
-                      (unsigned char *)reset);
+                      (uint8 *)reset);
   
   if (status <= 0)
   {
@@ -449,9 +448,9 @@ static int ble_reset (void)
   return status;
 }
 
-static int ble_hello (void)
+static int32 ble_hello (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_hello_t *hello;
 
@@ -470,9 +469,9 @@ static int ble_hello (void)
   return status;
 }
 
-static int ble_end_procedure (void)
+static int32 ble_end_procedure (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_end_procedure_t *end_procedure;
 
@@ -499,9 +498,9 @@ static int ble_end_procedure (void)
   return status;
 }
 
-static int ble_connect_direct (void)
+static int32 ble_connect_direct (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_connect_direct_t *connect_direct;
   ble_device_t *device = &(connection_params.device->info);
@@ -545,9 +544,9 @@ static int ble_connect_direct (void)
   return status;
 }
 
-static int ble_connect_disconnect (void)
+static int32 ble_connect_disconnect (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_disconnect_t *disconnect;
 
@@ -582,9 +581,9 @@ static int ble_connect_disconnect (void)
   return status;
 }
 
-static int ble_read_group (void)
+static int32 ble_read_group (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_read_group_t *read_group;
 
@@ -617,9 +616,9 @@ static int ble_read_group (void)
   return status;
 }
 
-static int ble_find_information (void)
+static int32 ble_find_information (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_find_information_t *find_information;
 
@@ -651,9 +650,9 @@ static int ble_find_information (void)
   return status;
 }
 
-static int ble_read_long_handle (void)
+static int32 ble_read_long_handle (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_read_handle_t *read_handle;
 
@@ -682,9 +681,9 @@ static int ble_read_long_handle (void)
   return status;
 }
 
-static int ble_read_handle (void)
+static int32 ble_read_handle (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_read_handle_t *read_handle;
 
@@ -713,9 +712,9 @@ static int ble_read_handle (void)
   return status;
 }
 
-static int ble_write_handle (void)
+static int32 ble_write_handle (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_write_handle_t *write_handle;
 
@@ -766,12 +765,12 @@ timer_handle_t ble_set_timer (int32 millisec, int32 event)
   return (timer_handle_t)timer_list_entry;
 }
 
-int ble_check_timer (void)
+int32 ble_check_timer (void)
 {
   return list_length ((list_entry_t **)(&timer_expiry_list));
 }
 
-int ble_receive_timer (ble_message_t *message)
+int32 ble_receive_timer (ble_message_t *message)
 {
   if (timer_expiry_list != NULL)
   {
@@ -800,55 +799,64 @@ void ble_flush_timer (void)
   }  
 }
 
-int ble_init (void)
+int32 ble_init (void)
 {
-  int status = 0;
-  int init_attempt = 0;
+  int32 status = -1;
+  int32 ble_init_attempt = 0;
 
   ble_init_time = clock_current_time ();
-  
-  /* Find BLE device and initialize */
-  status = serial_init ();
-  sleep (1);
 
-  if (status == 0)
+  do
   {
-    printf ("BLE Reset request\n");
+    ble_init_attempt++;
 
-      /* Reset BLE */
-    (void)ble_reset ();
+    printf ("BLE init attempt %d\n", ble_init_attempt);
+    
+    /* Find BLE device and initialize */
+    status = serial_init ();
     sleep (1);
-
-    /* Close & re-open UART after reset */
-    serial_deinit ();
-
-    do
+  
+    if (status > 0)
     {
-      init_attempt++;
-      sleep (1);
+      int32 serial_init_attempt = 0;
       
-      status = serial_init ();
-    } while ((status < 0) && (init_attempt < 2));
-
-    if (status == 0)
-    {
-      /* Ping BLE */
-      status = ble_hello ();
+      printf ("BLE Reset request\n");
+  
+        /* Reset BLE */
+      (void)ble_reset ();
+      sleep (1);
+  
+      /* Close & re-open UART after reset */
+      serial_deinit ();
+  
+      do
+      {
+        serial_init_attempt++;
+        sleep (1);
+        
+        status = serial_init ();
+      } while ((status < 0) && (serial_init_attempt < 2));
+  
+      if (status > 0)
+      {
+        /* Ping BLE */
+        status = ble_hello ();
+      }
+      else
+      {
+        printf ("BLE Reset request failed\n");
+      }
+  
+      if (status < 0)
+      {
+        serial_deinit ();
+      }
     }
     else
     {
-      printf ("BLE Reset request failed\n");
+      printf ("Can't find BLE device\n");
     }
-
-    if (status < 0)
-    {
-      serial_deinit ();
-    }
-  }
-  else
-  {
-    printf ("Can't find BLE device\n");
-  }
+  } while ((status < 0) && (ble_init_attempt < 2));
 
   return status;
 }
@@ -867,9 +875,9 @@ void ble_print_message (ble_message_t *message)
                                                                     message->header.command);
 }
 
-int ble_check_scan_list (void)
+int32 ble_check_scan_list (void)
 {
-  int found = 0;
+  int32 found = 0;
   ble_device_list_entry_t *device_list = ble_device_list;
 
   while (device_list != NULL)
@@ -885,9 +893,9 @@ int ble_check_scan_list (void)
   return ((ble_device_list != NULL) ? found : 1);
 }
 
-int ble_check_profile_list (void)
+int32 ble_check_profile_list (void)
 {
-  int found = 0;
+  int32 found = 0;
   ble_device_list_entry_t *device_list = ble_device_list;
 
   while (device_list != NULL)
@@ -902,12 +910,12 @@ int ble_check_profile_list (void)
   return found;  
 }
 
-int ble_check_serial (void)
+int32 ble_check_serial (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
 
-  while ((status = serial_rx (sizeof (message.header), (unsigned char *)(&(message.header)))) > 0)
+  while ((status = serial_rx (sizeof (message.header), (uint8 *)(&(message.header)))) > 0)
   {
     if (message.header.length > 0)
     {
@@ -926,7 +934,7 @@ int ble_check_serial (void)
   return list_length ((list_entry_t **)(&ble_message_list));
 }
 
-int ble_receive_serial (ble_message_t *message)
+int32 ble_receive_serial (ble_message_t *message)
 {
   if (ble_message_list != NULL)
   {
@@ -952,9 +960,9 @@ void ble_flush_serial (void)
   }  
 }
 
-int ble_start_scan (void)
+int32 ble_start_scan (void)
 {
-  int status;
+  int32 status;
   ble_message_t message;
   ble_command_scan_params_t *scan_params;
 
@@ -1038,9 +1046,9 @@ int ble_start_scan (void)
   return status;
 }
 
-int ble_stop_scan (void)
+int32 ble_stop_scan (void)
 {
-  int status;
+  int32 status;
 
   status = ble_end_procedure ();
   
@@ -1049,9 +1057,9 @@ int ble_stop_scan (void)
   return status;
 }
 
-int ble_start_profile (void)
+int32 ble_start_profile (void)
 {
-  int status;
+  int32 status;
 
   ble_update_timer ();
 
@@ -1074,9 +1082,9 @@ int ble_start_profile (void)
   return status;
 }
 
-int ble_next_profile (void)
+int32 ble_next_profile (void)
 {
-  int status;
+  int32 status;
   ble_device_list_entry_t *device_list_entry = connection_params.device;
 
   connection_params.device = connection_params.device->next;
@@ -1110,9 +1118,9 @@ int ble_next_profile (void)
   return status;
 }
 
-int ble_read_profile (void)
+int32 ble_read_profile (void)
 {
-  int status;
+  int32 status;
   ble_device_t *device = &(connection_params.device->info);
 
   if (device->status == BLE_DEVICE_DISCOVER_SERVICE)
@@ -1243,9 +1251,9 @@ int ble_read_profile (void)
   return status;
 }
 
-int ble_start_data (void)
+int32 ble_start_data (void)
 {
-  int status;
+  int32 status;
 
   ble_update_timer ();
 
@@ -1283,9 +1291,9 @@ int ble_start_data (void)
   return status;
 }
 
-int ble_next_data (void)
+int32 ble_next_data (void)
 {
-  int status;
+  int32 status;
 
   ble_callback_data ();
   ble_update_timer ();
@@ -1320,18 +1328,10 @@ int ble_next_data (void)
   {
     int32 current_time = clock_current_time ();
 
-    if ((current_time - ble_init_time) > (60*60*1000))
+    if ((current_time - ble_init_time) > (24*60*60*1000))
     {
-      int init_attempt = 0;
-      
       ble_deinit ();
-      do
-      {
-        init_attempt++;
-        printf ("BLE init attempt %d\n", init_attempt);
-        
-        status = ble_init ();
-      } while ((status <= 0) && (init_attempt < 2));
+      (void)ble_init ();
     }
     
     status = 0;
@@ -1340,9 +1340,9 @@ int ble_next_data (void)
   return status;
 }
 
-int ble_update_data (void)
+int32 ble_update_data (void)
 {
-  int status;
+  int32 status;
 
   if (connection_params.handle != 0xff)
   {
@@ -1449,9 +1449,9 @@ int ble_update_data (void)
   return status;
 }
 
-int ble_wait_data (void)
+int32 ble_wait_data (void)
 {
-  int status = -1;
+  int32 status = -1;
   ble_char_list_entry_t *update_list = connection_params.device->info.update_list;
 
   while (update_list != NULL)
@@ -1510,7 +1510,7 @@ int32 ble_get_sleep (void)
 
 void ble_event_scan_response (ble_event_scan_response_t *scan_response)
 {
-  int i;
+  int32 i;
   ble_device_t *device;
 
   printf ("BLE Scan response event\n");
@@ -1555,25 +1555,25 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
       {
         free (device->name);
       }
-      device->name = (char *)malloc (adv_data->length);
+      device->name = (int8 *)malloc (adv_data->length);
       device->name[adv_data->length-1] = '\0';
-      strncpy (device->name, (char *)(adv_data->value), (adv_data->length-1));
+      strncpy (device->name, (int8 *)(adv_data->value), (adv_data->length-1));
     }
     else if ((adv_data->type == BLE_ADV_LOCAL_NAME_SHORT) &&
              (device->name != NULL))
     {
-      device->name = (char *)malloc (adv_data->length);
+      device->name = (int8 *)malloc (adv_data->length);
       device->name[adv_data->length-1] = '\0';
-      strncpy (device->name, (char *)(adv_data->value), (adv_data->length-1));
+      strncpy (device->name, (int8 *)(adv_data->value), (adv_data->length-1));
     }
   }
 
   ble_print_device (device);
 }
 
-int ble_event_connection_status (ble_event_connection_status_t *connection_status)
+int32 ble_event_connection_status (ble_event_connection_status_t *connection_status)
 {
-  int status;
+  int32 status;
 
   printf ("BLE Connect event, status flags 0x%02x, interval %d, timeout %d, latency %d, bonding 0x%02x\n",
              connection_status->flags, connection_status->interval, connection_status->timeout,
@@ -1726,9 +1726,9 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
   }
 }
 
-int ble_event_attr_value (ble_event_attr_value_t *attr_value)
+int32 ble_event_attr_value (ble_event_attr_value_t *attr_value)
 {
-  int status = 1;
+  int32 status = 1;
   ble_attr_list_entry_t *attribute = NULL;
 
   printf ("BLE Attribute value event, type %d, handle 0x%04x\n", attr_value->type, attr_value->attr_handle);

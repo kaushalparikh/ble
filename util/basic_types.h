@@ -1,5 +1,5 @@
-#ifndef __BLE_TYPES_H__
-#define __BLE_TYPES_H__
+#ifndef __BASIC_TYPES_H__
+#define __BASIC_TYPES_H__
 
 /* Basic definitions */
 #ifdef __GNUC__

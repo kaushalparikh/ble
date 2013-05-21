@@ -11,8 +11,9 @@
 #include <errno.h>
 
 /* Local/project headers */
+#include "basic_types.h"
 #include "util.h"
-#include "serial.h"
+#include "usb.h"
 
 /* Local structures */
 typedef struct
@@ -57,7 +58,7 @@ void serial_free (void)
   serial_device.usb_info.dev_num = 255;
 }
 
-int serial_init (void)
+int32 serial_init (void)
 {
   usb_info_t *usb_list = NULL;
   int status = -1;
@@ -92,7 +93,7 @@ int serial_init (void)
         printf ("Trying to use %s\n", serial_device.usb_info.dev_subsystem_node);
         if ((serial_open ()) >  0)
         {
-          status = 0;
+          status = 1;
         }
         else
         {
@@ -109,7 +110,7 @@ int serial_init (void)
         printf ("Trying to use %s\n", serial_device.usb_info.dev_subsystem_node);
         if ((serial_open ()) >  0)
         {
-          status = 0;
+          status = 1;
 
           if (((asprintf (&(serial_device.usb_info.dev_node), "%s", usb_list_entry->dev_node)) > 0) &&
               ((asprintf (&(serial_device.usb_info.dev_sys_path), "%s", usb_list_entry->dev_sys_path)) > 0) &&
@@ -150,7 +151,7 @@ void serial_deinit (void)
   serial_free ();
 }
 
-int serial_open (void)
+int32 serial_open (void)
 {
   serial_device.file_desc = open (serial_device.usb_info.dev_subsystem_node,
                                   (O_RDWR | O_NOCTTY /*| O_NDELAY*/));
@@ -208,7 +209,7 @@ void serial_close (void)
   close (serial_device.file_desc);
 }
 
-int serial_tx (size_t bytes, unsigned char *buffer)
+int32 serial_tx (uint32 bytes, uint8 *buffer)
 {
   ssize_t bytes_written = 0;
   
@@ -244,7 +245,7 @@ int serial_tx (size_t bytes, unsigned char *buffer)
   return bytes_written;
 }
 
-int serial_rx (size_t bytes, unsigned char *buffer)
+int32 serial_rx (uint32 bytes, uint8 *buffer)
 {
   ssize_t bytes_read = 0;
 

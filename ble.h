@@ -2,7 +2,7 @@
 #define __BLE_H__
 
 /* GATT definitions */
-#include "ble_types.h"
+#include "basic_types.h"
 #include "gatt.h"
 
 /* Maximum message data size */
@@ -16,6 +16,12 @@
 
 /* Convert MS to intervals of 10ms */
 #define MS_TO_10MS(millisec)  ((millisec + 9)/10)
+
+/* Minimum timer duration in ms */
+#define BLE_MIN_TIMER_DURATION  (10)
+
+/* Minimum sleep interval in ms */
+#define BLE_MIN_SLEEP_INTERVAL  (20000)
 
 /* BLE device address */
 #define BLE_DEVICE_ADDRESS_LENGTH  (6)
@@ -50,7 +56,7 @@ typedef struct
 {
   uint32                    id;
   ble_device_address_t      address;
-  char                     *name;
+  int8                     *name;
   ble_device_status_e       status;
   ble_service_list_entry_t *service_list;
   ble_char_list_entry_t    *update_list;
@@ -712,51 +718,51 @@ typedef struct PACKED
 
 extern timer_handle_t ble_set_timer (int32 millisec, int32 event);
 
-extern int ble_check_timer (void);
+extern int32 ble_check_timer (void);
 
-extern int ble_receive_timer (ble_message_t *message);
+extern int32 ble_receive_timer (ble_message_t *message);
 
 extern void ble_flush_timer (void);
   
-extern int ble_init (void);
+extern int32 ble_init (void);
 
 extern void ble_deinit (void);
 
-extern int ble_check_scan_list (void);
+extern int32 ble_check_scan_list (void);
 
-extern int ble_check_profile_list (void);
+extern int32 ble_check_profile_list (void);
 
 extern void ble_print_message (ble_message_t *message);
 
-extern int ble_check_serial (void);
+extern int32 ble_check_serial (void);
 
-extern int ble_receive_serial (ble_message_t *message);
+extern int32 ble_receive_serial (ble_message_t *message);
 
 extern void ble_flush_serial (void);
 
-extern int ble_start_scan (void);
+extern int32 ble_start_scan (void);
 
-extern int ble_stop_scan (void);
+extern int32 ble_stop_scan (void);
 
-extern int ble_start_profile (void);
+extern int32 ble_start_profile (void);
 
-extern int ble_next_profile (void);
+extern int32 ble_next_profile (void);
 
-extern int ble_read_profile (void);
+extern int32 ble_read_profile (void);
 
-extern int ble_start_data (void);
+extern int32 ble_start_data (void);
 
-extern int ble_next_data (void);
+extern int32 ble_next_data (void);
 
-extern int ble_update_data (void);
+extern int32 ble_update_data (void);
 
-extern int ble_wait_data (void);
+extern int32 ble_wait_data (void);
 
 extern int32 ble_get_sleep (void);
 
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
-extern int ble_event_connection_status (ble_event_connection_status_t *connection_status);
+extern int32 ble_event_connection_status (ble_event_connection_status_t *connection_status);
 
 extern void ble_event_disconnect (ble_event_disconnect_t *disconnect);
 
@@ -764,7 +770,7 @@ extern void ble_event_read_group (ble_event_read_group_t *read_group);
 
 extern void ble_event_find_information (ble_event_find_information_t *find_information);
 
-extern int ble_event_attr_value (ble_event_attr_value_t *attr_value);
+extern int32 ble_event_attr_value (ble_event_attr_value_t *attr_value);
 
 #endif
 

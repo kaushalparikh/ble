@@ -11,7 +11,7 @@
 #include <linux/usbdevice_fs.h>
 #include <libudev.h>
 
-#include "util.h"
+#include "usb.h"
 
 
 static struct udev_device * usb_find_child (struct udev *udev,

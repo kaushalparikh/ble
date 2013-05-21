@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "basic_types.h"
 #include "ble.h"
 
 typedef enum
@@ -70,12 +71,12 @@ static ble_state_e ble_scan (ble_message_t *message)
             /* Check if some devices need service discovery/update */
             if ((ble_check_scan_list ()) > 0)
             {
-              (void)ble_set_timer (10, BLE_TIMER_SCAN);
+              (void)ble_set_timer (BLE_MIN_TIMER_DURATION, BLE_TIMER_SCAN);
             }
             else if ((ble_check_profile_list ()) > 0)
             {
               new_state = BLE_STATE_PROFILE;
-              (void)ble_set_timer (10, BLE_TIMER_PROFILE);
+              (void)ble_set_timer (BLE_MIN_TIMER_DURATION, BLE_TIMER_PROFILE);
             }
             else
             {
@@ -230,13 +231,13 @@ static ble_state_e ble_data (ble_message_t *message)
           int32 sleep_interval = ble_get_sleep ();
           
           /* Exit data state */
-          if ((sleep_interval > 10) && (sleep_interval < 20000))
+          if ((sleep_interval > BLE_MIN_TIMER_DURATION) && (sleep_interval < BLE_MIN_SLEEP_INTERVAL))
           {
             event = BLE_TIMER_DATA;
           }
           else
           {
-            sleep_interval = 10;
+            sleep_interval = BLE_MIN_TIMER_DURATION;
             event          = BLE_TIMER_SCAN;
             new_state      = BLE_STATE_SCAN;
           }
@@ -307,7 +308,7 @@ static ble_state_e ble_data (ble_message_t *message)
 
 void master_loop (void)
 {
-  (void)ble_set_timer (10, BLE_TIMER_SCAN);
+  (void)ble_set_timer (BLE_MIN_TIMER_DURATION, BLE_TIMER_SCAN);
 
   while (1)
   {
@@ -336,20 +337,9 @@ void master_loop (void)
 
 int main (int argc, char * argv[])
 {
-  int status = -1;
-  int init_attempt = 0;
-
   setlinebuf (stdout);
     
-  do
-  {
-    init_attempt++;
-    printf ("BLE init attempt %d\n", init_attempt);
-    
-    status = ble_init ();
-  } while ((status <= 0) && (init_attempt < 2));
-
-  if (status > 0)
+  if ((ble_init ()) > 0)
   {
     master_loop ();
   }
