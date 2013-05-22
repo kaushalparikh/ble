@@ -17,7 +17,5 @@ typedef short int          int16;
 typedef unsigned int       uint32;
 typedef int                int32;
 
-typedef int *timer_handle_t;
-
 #endif
 

@@ -12,16 +12,25 @@
 static void timer_event (int event_id, siginfo_t *event_info, void *unused)
 {
   timer_info_t *timer_info = event_info->si_value.sival_ptr;
-  timer_info->callback (timer_info->data);
+  timer_info->callback (timer_info);
   timer_delete ((timer_t)(timer_info->id));
+  free (timer_info);
 }
 
-int32 timer_start (timer_info_t *timer_info)
+int32 timer_start (int32 millisec, int32 event,
+                   void (*callback)(void *), timer_info_t **timer_info)
 {
   struct sigaction timer_action;
   struct sigevent signal_event;
   timer_t timer_id;
   int status;
+
+  *timer_info = (timer_info_t *)malloc (sizeof (**timer_info));
+
+  /* Fill timer info */
+  (*timer_info)->millisec = millisec;
+  (*timer_info)->event    = event;
+  (*timer_info)->callback = callback;
 
   /* Establish handler for timer signal */
   timer_action.sa_flags     = SA_SIGINFO;
@@ -33,15 +42,15 @@ int32 timer_start (timer_info_t *timer_info)
     /* Create the timer */
     signal_event.sigev_notify = SIGEV_SIGNAL;
     signal_event.sigev_signo  = SIGRTMIN;
-    signal_event.sigev_value.sival_ptr = timer_info;
+    signal_event.sigev_value.sival_ptr = *timer_info;
     status = timer_create (CLOCK_MONOTONIC, &signal_event, &timer_id);
     if (status == 0)
     {
       struct itimerspec timer_spec;
 
-      timer_info->id = (int)timer_id;
-      timer_spec.it_value.tv_sec  = timer_info->millisec / 1000;
-      timer_spec.it_value.tv_nsec = (timer_info->millisec % 1000) * 1000000;
+      (*timer_info)->id = (int)timer_id;
+      timer_spec.it_value.tv_sec  = millisec / 1000;
+      timer_spec.it_value.tv_nsec = (millisec % 1000) * 1000000;
       /* One-shot timer */
       timer_spec.it_interval.tv_sec  = 0;
       timer_spec.it_interval.tv_nsec = 0;
@@ -62,6 +71,11 @@ int32 timer_start (timer_info_t *timer_info)
   else
   {
     printf ("Unable to set timer expiry handler\n");
+  }
+
+  if (status != 0)
+  {
+    free (*timer_info);
   }
 
   return status;
@@ -85,7 +99,9 @@ int32 timer_status (timer_info_t *timer_info)
 
 int32 timer_stop (timer_info_t *timer_info)
 {
-  return timer_delete ((timer_t)(timer_info->id));
+  timer_t timer_id = (timer_t)(timer_info->id);
+  free (timer_info);
+  return timer_delete (timer_id);
 }
 
 int32 clock_current_time (void)
@@ -104,25 +120,21 @@ int32 clock_current_time (void)
 
 #ifdef UTIL_TIMER_TEST
 
-void callback (timer_info_t *timer_info)
+void callback (void *timer_info)
 {
-  printf ("Timer %d expired\n", timer_info->id);
+  printf ("Timer %d expired\n", ((timer_info_t *)timer_info)->id);
 }
 
 int main (void)
 {
-  timer_info_t timer_info;
+  timer_info_t *timer_info = NULL;
   int status;
 
-  timer_info.millisec = 3000;
-  timer_info.callback = (void (*)(void *))callback;
-  timer_info.data     = &timer_info;
-
-  status = timer_start (&timer_info);
+  status = timer_start (3000, 0, callback, &timer_info);
   sleep (4);
-  status = timer_start (&timer_info);
+  status = timer_start (3000, 0, callback, &timer_info);
   sleep (2);
-  status = timer_stop (&timer_info);
+  status = timer_stop (timer_info);
 
   return 0;
 }

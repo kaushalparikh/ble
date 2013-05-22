@@ -14,7 +14,6 @@ struct timer_list_entry
 {
   struct timer_list_entry *next;
   timer_info_t             info;
-  int32                    event;
 };
 
 typedef struct timer_list_entry timer_list_entry_t;
@@ -49,7 +48,7 @@ typedef struct
   ble_char_list_entry_t    *characteristics;
   ble_attr_list_entry_t    *attribute;
   uint8                     handle;
-  timer_handle_t            timer;
+  timer_info_t             *timer_info;
 } ble_connection_params_t;
 
 static ble_connection_params_t connection_params = 
@@ -59,16 +58,11 @@ static ble_connection_params_t connection_params =
   .characteristics = NULL,
   .attribute       = NULL,
   .handle          = 0xff,
-  .timer           = NULL,
+  .timer_info      = NULL,
 };
 
 static int32 ble_init_time = 0;
 
-
-static void ble_callback_timer (timer_list_entry_t *timer_list_entry)
-{
-  list_add ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
-}
 
 static void ble_callback_data (void)
 {
@@ -536,7 +530,8 @@ static int32 ble_connect_direct (void)
   }
 
   if ((status > 0) &&
-      ((connection_params.timer = ble_set_timer (BLE_CONNECT_SETUP_TIMEOUT, BLE_TIMER_CONNECT_SETUP)) == NULL))
+      ((timer_start (BLE_CONNECT_SETUP_TIMEOUT, BLE_TIMER_CONNECT_SETUP,
+                     ble_callback_timer, &(connection_params.timer_info))) != 0))
   {
     status = -1;
   }
@@ -571,11 +566,10 @@ static int32 ble_connect_disconnect (void)
     printf ("BLE Disconnect failed with %d\n", status);
   }
 
-  if (connection_params.timer != NULL)
+  if (connection_params.timer_info != NULL)
   {
-    timer_stop (&(((timer_list_entry_t *)connection_params.timer)->info));
-    free (connection_params.timer);
-    connection_params.timer = NULL;
+    timer_stop (connection_params.timer_info);
+    connection_params.timer_info = NULL;
   }
 
   return status;
@@ -747,56 +741,13 @@ static int32 ble_write_handle (void)
   return status;  
 }
 
-timer_handle_t ble_set_timer (int32 millisec, int32 event)
+void ble_callback_timer (void *timer_info)
 {
   timer_list_entry_t *timer_list_entry;
 
   timer_list_entry = (timer_list_entry_t *)malloc (sizeof (*timer_list_entry));
-  timer_list_entry->info.millisec = millisec;
-  timer_list_entry->info.callback = (void (*)(void *))ble_callback_timer;
-  timer_list_entry->info.data     = timer_list_entry;
-  timer_list_entry->event         = event;
-  if ((timer_start (&(timer_list_entry->info))) != 0)
-  {
-    free (timer_list_entry);
-    timer_list_entry = NULL;
-  }
-
-  return (timer_handle_t)timer_list_entry;
-}
-
-int32 ble_check_timer (void)
-{
-  return list_length ((list_entry_t **)(&timer_expiry_list));
-}
-
-int32 ble_receive_timer (ble_message_t *message)
-{
-  if (timer_expiry_list != NULL)
-  {
-    timer_list_entry_t *timer_list_entry = timer_expiry_list;
-
-    message->header.type    = BLE_EVENT;
-    message->header.length  = 1;
-    message->header.class   = BLE_CLASS_HW;
-    message->header.command = BLE_EVENT_SOFT_TIMER;
-    message->data[0]        = (uint8)(timer_list_entry->event);
-    
-    list_remove ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
-    free (timer_list_entry);
-  }
-
-  return list_length ((list_entry_t **)(&timer_expiry_list));
-}
-
-void ble_flush_timer (void)
-{
-  while (timer_expiry_list != NULL)
-  {
-    timer_list_entry_t *timer_list_entry = timer_expiry_list;
-    list_remove ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
-    free (timer_list_entry);
-  }  
+  timer_list_entry->info = *((timer_info_t *)timer_info);
+  list_add ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
 }
 
 int32 ble_init (void)
@@ -910,10 +861,13 @@ int32 ble_check_profile_list (void)
   return found;  
 }
 
-int32 ble_check_serial (void)
+int32 ble_check_message_list (void)
 {
   int32 status;
+  int32 pending;
   ble_message_t message;
+
+  pending = list_length ((list_entry_t **)(&timer_expiry_list));
 
   while ((status = serial_rx (sizeof (message.header), (uint8 *)(&(message.header)))) > 0)
   {
@@ -931,12 +885,29 @@ int32 ble_check_serial (void)
     }
   }
 
-  return list_length ((list_entry_t **)(&ble_message_list));
+  pending += (list_length ((list_entry_t **)(&ble_message_list)));
+
+  return pending;
 }
 
-int32 ble_receive_serial (ble_message_t *message)
+int32 ble_receive_message (ble_message_t *message)
 {
-  if (ble_message_list != NULL)
+  int32 pending;
+
+  if (timer_expiry_list != NULL)
+  {
+    timer_list_entry_t *timer_list_entry = timer_expiry_list;
+
+    message->header.type    = BLE_EVENT;
+    message->header.length  = 1;
+    message->header.class   = BLE_CLASS_HW;
+    message->header.command = BLE_EVENT_SOFT_TIMER;
+    message->data[0]        = (uint8)(timer_list_entry->info.event);
+    
+    list_remove ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
+    free (timer_list_entry);
+  }
+  else if (ble_message_list != NULL)
   {
     ble_message_list_entry_t *message_list_entry;
 
@@ -946,11 +917,21 @@ int32 ble_receive_serial (ble_message_t *message)
     free (message_list_entry);
   }
 
-  return list_length ((list_entry_t **)(&ble_message_list));
+  pending  = list_length ((list_entry_t **)(&timer_expiry_list));
+  pending += (list_length ((list_entry_t **)(&ble_message_list)));
+
+  return pending;
 }
 
-void ble_flush_serial (void)
+void ble_flush_message_list (void)
 {
+  while (timer_expiry_list != NULL)
+  {
+    timer_list_entry_t *timer_list_entry = timer_expiry_list;
+    list_remove ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
+    free (timer_list_entry);
+  }
+
   while (ble_message_list != NULL)
   {
     ble_message_list_entry_t *message_list_entry = ble_message_list;
@@ -1038,7 +1019,8 @@ int32 ble_start_scan (void)
   }
 
   if ((status > 0) &&
-      ((ble_set_timer (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP)) == NULL))
+      ((timer_start (BLE_SCAN_DURATION, BLE_TIMER_SCAN_STOP,
+                     ble_callback_timer, &(connection_params.timer_info))) != 0))
   {
     status = -1;
   }
@@ -1048,13 +1030,10 @@ int32 ble_start_scan (void)
 
 int32 ble_stop_scan (void)
 {
-  int32 status;
-
-  status = ble_end_procedure ();
-  
   ble_update_timer ();
-
-  return status;
+  connection_params.timer_info = NULL;
+  
+  return ble_end_procedure ();
 }
 
 int32 ble_start_profile (void)
@@ -1581,26 +1560,25 @@ int32 ble_event_connection_status (ble_event_connection_status_t *connection_sta
 
   if (connection_status->flags & BLE_CONNECT_ESTABLISHED)
   {
-    connection_params.device->info.setup_time
-        = timer_status (&(((timer_list_entry_t *)connection_params.timer)->info));
+    connection_params.device->info.setup_time = timer_status (connection_params.timer_info);
 
-    timer_stop (&(((timer_list_entry_t *)connection_params.timer)->info));
-    free (connection_params.timer);
-    connection_params.timer = NULL;
+    timer_stop (connection_params.timer_info);
+    connection_params.timer_info = NULL;
 
-    connection_params.timer = ble_set_timer (BLE_CONNECT_DATA_TIMEOUT, BLE_TIMER_CONNECT_DATA);
-    status = 1;
+    timer_start (BLE_CONNECT_DATA_TIMEOUT, BLE_TIMER_CONNECT_DATA,
+                 ble_callback_timer, &(connection_params.timer_info));
+    status = 1; 
   }
   else if (connection_status->flags & BLE_CONNECT_SETUP_FAILED)
   {
+    connection_params.timer_info = NULL;
     connection_params.device->info.setup_time = BLE_CONNECT_SETUP_TIMEOUT;
-
-    connection_params.timer = NULL;
+    
     status = ble_end_procedure ();
   }
   else if (connection_status->flags & BLE_CONNECT_DATA_FAILED)
   {
-    connection_params.timer = NULL;
+    connection_params.timer_info = NULL;
     
     if (connection_params.device->info.status != BLE_DEVICE_DATA)
     {
@@ -1627,11 +1605,10 @@ void ble_event_disconnect (ble_event_disconnect_t *disconnect)
   connection_params.attribute       = NULL;
   connection_params.handle          = 0xff;
     
-  if (connection_params.timer != NULL)
+  if (connection_params.timer_info != NULL)
   {
-    timer_stop (&(((timer_list_entry_t *)connection_params.timer)->info));
-    free (connection_params.timer);
-    connection_params.timer = NULL;
+    timer_stop (connection_params.timer_info);
+    connection_params.timer_info = NULL;
   }
 }
 

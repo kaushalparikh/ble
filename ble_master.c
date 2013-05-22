@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "basic_types.h"
+#include "util.h"
 #include "ble.h"
 
 typedef enum
@@ -57,8 +58,7 @@ static ble_state_e ble_scan (ble_message_t *message)
           }
           
           /* Flush rest of message, both from serial & timer */
-          ble_flush_timer ();
-          ble_flush_serial ();
+          ble_flush_message_list ();
         }
         else if (message->data[0] == BLE_TIMER_SCAN_STOP)
         {
@@ -71,17 +71,25 @@ static ble_state_e ble_scan (ble_message_t *message)
             /* Check if some devices need service discovery/update */
             if ((ble_check_scan_list ()) > 0)
             {
-              (void)ble_set_timer (BLE_MIN_TIMER_DURATION, BLE_TIMER_SCAN);
+              timer_info_t *timer_info = NULL;
+              (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_SCAN,
+                                 ble_callback_timer, &timer_info);
             }
             else if ((ble_check_profile_list ()) > 0)
             {
+              timer_info_t *timer_info = NULL;
+
               new_state = BLE_STATE_PROFILE;
-              (void)ble_set_timer (BLE_MIN_TIMER_DURATION, BLE_TIMER_PROFILE);
+              (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_PROFILE,
+                                 ble_callback_timer, &timer_info);
             }
             else
             {
+              timer_info_t *timer_info = NULL;
+
               new_state = BLE_STATE_DATA;
-              (void)ble_set_timer ((ble_get_sleep ()), BLE_TIMER_DATA);
+              (void)timer_start ((ble_get_sleep ()), BLE_TIMER_DATA,
+                                 ble_callback_timer, &timer_info);
             }
           }
         }
@@ -135,8 +143,11 @@ static ble_state_e ble_profile (ble_message_t *message)
         
         if ((ble_next_profile ()) <= 0)
         {
+          timer_info_t *timer_info = NULL;
+          
           new_state = BLE_STATE_DATA;
-          (void)ble_set_timer ((ble_get_sleep ()), BLE_TIMER_DATA);
+          (void)timer_start ((ble_get_sleep ()), BLE_TIMER_DATA,
+                             ble_callback_timer, &timer_info);          
         }        
         break;
       }
@@ -165,8 +176,7 @@ static ble_state_e ble_profile (ble_message_t *message)
           printf ("BLE Profile state\n");
           
           /* Flush rest of message, both from serial & timer */
-          ble_flush_timer ();
-          ble_flush_serial ();    
+          ble_flush_message_list ();
 
           if ((ble_start_profile ()) <= 0)
           {
@@ -227,6 +237,7 @@ static ble_state_e ble_data (ble_message_t *message)
         
         if ((ble_next_data ()) <= 0)
         {
+          timer_info_t *timer_info = NULL;
           int32 event;
           int32 sleep_interval = ble_get_sleep ();
           
@@ -241,8 +252,9 @@ static ble_state_e ble_data (ble_message_t *message)
             event          = BLE_TIMER_SCAN;
             new_state      = BLE_STATE_SCAN;
           }
-            
-          (void)ble_set_timer (sleep_interval, event);
+
+          (void)timer_start (sleep_interval, event,
+                             ble_callback_timer, &timer_info);              
         }
         break;
       }
@@ -269,8 +281,7 @@ static ble_state_e ble_data (ble_message_t *message)
           printf ("BLE Data state\n");
           
           /* Flush rest of message, both from serial & timer */
-          ble_flush_timer ();
-          ble_flush_serial ();
+          ble_flush_message_list ();
 
           if ((ble_start_data ()) <= 0)
           {
@@ -308,27 +319,21 @@ static ble_state_e ble_data (ble_message_t *message)
 
 void master_loop (void)
 {
-  (void)ble_set_timer (BLE_MIN_TIMER_DURATION, BLE_TIMER_SCAN);
+  timer_info_t *timer_info = NULL;
+  
+  (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_SCAN,
+                     ble_callback_timer, &timer_info);    
 
   while (1)
   {
     int pending;
     ble_message_t message;
 
-    if ((ble_check_timer ()) > 0)
+    if ((ble_check_message_list ()) > 0)
     {
       do
       {
-        pending = ble_receive_timer (&message);
-        ble_state = ble_state_handler[ble_state](&message);
-      } while (pending > 0);
-    }
-    
-    if ((ble_check_serial ()) > 0)
-    {
-      do
-      {
-        pending = ble_receive_serial (&message);
+        pending = ble_receive_message (&message);
         ble_state = ble_state_handler[ble_state](&message);
       } while (pending > 0);
     }

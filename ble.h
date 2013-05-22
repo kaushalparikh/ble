@@ -3,6 +3,7 @@
 
 /* GATT definitions */
 #include "basic_types.h"
+#include "util.h"
 #include "gatt.h"
 
 /* Maximum message data size */
@@ -716,14 +717,8 @@ typedef struct PACKED
 
 /* Function declarations */
 
-extern timer_handle_t ble_set_timer (int32 millisec, int32 event);
+extern void ble_callback_timer (void *timer_info);
 
-extern int32 ble_check_timer (void);
-
-extern int32 ble_receive_timer (ble_message_t *message);
-
-extern void ble_flush_timer (void);
-  
 extern int32 ble_init (void);
 
 extern void ble_deinit (void);
@@ -734,11 +729,11 @@ extern int32 ble_check_profile_list (void);
 
 extern void ble_print_message (ble_message_t *message);
 
-extern int32 ble_check_serial (void);
+extern int32 ble_check_message_list (void);
 
-extern int32 ble_receive_serial (ble_message_t *message);
+extern int32 ble_receive_message (ble_message_t *message);
 
-extern void ble_flush_serial (void);
+extern void ble_flush_message_list (void);
 
 extern int32 ble_start_scan (void);
 

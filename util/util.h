@@ -21,11 +21,12 @@ typedef struct
 {
   int32    id;
   int32    millisec;
+  int32    event;
   void   (*callback)(void *);
-  void    *data;
 } timer_info_t;
 
-extern int32 timer_start (timer_info_t *timer_info);
+extern int32 timer_start (int32 millisec, int32 event,
+                          void (*callback)(void *), timer_info_t **timer_info);
 
 extern int32 timer_status (timer_info_t *timer_info);
 
