@@ -110,7 +110,7 @@ static int32 ble_response (ble_message_t *response)
           (response->header.command != message.header.command))
       {
         ble_message_list_entry_t *message_list_entry 
-            = (ble_message_list_entry_t *)(malloc (sizeof (*message_list_entry)));
+            = (ble_message_list_entry_t *)malloc (sizeof (*message_list_entry));
         message_list_entry->message = message;
         list_add ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
       }
@@ -879,7 +879,7 @@ int32 ble_check_message_list (void)
     if (status > 0)
     {
       ble_message_list_entry_t *message_list_entry
-          = (ble_message_list_entry_t *)(malloc (sizeof (*message_list_entry)));
+          = (ble_message_list_entry_t *)malloc (sizeof (*message_list_entry));
       message_list_entry->message = message;
       list_add ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
     }
@@ -1396,7 +1396,7 @@ int32 ble_update_data (void)
       else
       {
         ble_message_list_entry_t *message_list_entry
-            = (ble_message_list_entry_t *)(malloc (sizeof (*message_list_entry)));
+            = (ble_message_list_entry_t *)malloc (sizeof (*message_list_entry));
   
         printf ("BLE Update data characteristics property %d not supported\n",
                                                           connection_params.characteristics->update.type);

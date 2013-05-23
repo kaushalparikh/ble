@@ -13,7 +13,7 @@ static void timer_event (int event_id, siginfo_t *event_info, void *unused)
 {
   timer_info_t *timer_info = event_info->si_value.sival_ptr;
   timer_info->callback (timer_info);
-  timer_delete ((timer_t)(timer_info->id));
+  timer_delete ((timer_t)(timer_info->handle));
   free (timer_info);
 }
 
@@ -48,7 +48,7 @@ int32 timer_start (int32 millisec, int32 event,
     {
       struct itimerspec timer_spec;
 
-      (*timer_info)->id = (int)timer_id;
+      (*timer_info)->handle = (int)timer_id;
       timer_spec.it_value.tv_sec  = millisec / 1000;
       timer_spec.it_value.tv_nsec = (millisec % 1000) * 1000000;
       /* One-shot timer */
@@ -87,7 +87,7 @@ int32 timer_status (timer_info_t *timer_info)
 
   struct itimerspec timer_spec;
   
-  if ((timer_gettime ((timer_t)(timer_info->id), &timer_spec)) == 0)
+  if ((timer_gettime ((timer_t)(timer_info->handle), &timer_spec)) == 0)
   {
     current_count = timer_info->millisec
                      - ((timer_spec.it_value.tv_sec * 1000)
@@ -99,7 +99,7 @@ int32 timer_status (timer_info_t *timer_info)
 
 int32 timer_stop (timer_info_t *timer_info)
 {
-  timer_t timer_id = (timer_t)(timer_info->id);
+  timer_t timer_id = (timer_t)(timer_info->handle);
   free (timer_info);
   return timer_delete (timer_id);
 }
@@ -122,7 +122,7 @@ int32 clock_current_time (void)
 
 void callback (void *timer_info)
 {
-  printf ("Timer %d expired\n", ((timer_info_t *)timer_info)->id);
+  printf ("Timer %d expired\n", ((timer_info_t *)timer_info)->handle);
 }
 
 int main (void)

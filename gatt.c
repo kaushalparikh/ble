@@ -254,12 +254,13 @@ uint32 ble_identify_device (uint8 *address, ble_char_list_entry_t *update_list)
   if (update_list != NULL)
   {
     id = address[0];
- 
-    file_name = malloc ((strlen ("temperature.000")) + 1);
-    sprintf (file_name, "temperature.%03d", id);
-    temperature_file[id-1] = fopen (file_name, "w");
-    printf ("Storing temperature in file %s\n", file_name);
-    free (file_name);
+
+    if ((asprintf (&file_name, "temperature.%03d", id)) > 0)
+    {
+      temperature_file[id-1] = fopen (file_name, "w");
+      printf ("Storing temperature in file %s\n", file_name);
+      free (file_name);
+    }
   }
 
   return id;
