@@ -48,7 +48,7 @@ int32 timer_start (int32 millisec, int32 event,
     {
       struct itimerspec timer_spec;
 
-      (*timer_info)->handle = (int)timer_id;
+      (*timer_info)->handle = (void *)timer_id;
       timer_spec.it_value.tv_sec  = millisec / 1000;
       timer_spec.it_value.tv_nsec = (millisec % 1000) * 1000000;
       /* One-shot timer */

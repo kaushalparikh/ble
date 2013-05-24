@@ -19,7 +19,7 @@ extern int32 serial_rx (uint32 bytes, uint8 *buffer);
 /* Timer API */
 typedef struct
 {
-  int32    handle;
+  void    *handle;
   int32    millisec;
   int32    event;
   void   (*callback)(void *);

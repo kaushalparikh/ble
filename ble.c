@@ -284,12 +284,12 @@ static void ble_free_service_list (void)
   
   while (service_list != NULL)
   {
-    ble_service_list_entry_t *service_list_entry;
+    ble_service_list_entry_t *service_list_entry = service_list;
     ble_char_list_entry_t *char_list = service_list->char_list;
 
     while (char_list != NULL)
     {
-      ble_char_list_entry_t *char_list_entry;
+      ble_char_list_entry_t *char_list_entry = char_list;
       ble_attr_list_entry_t *desc_list = char_list->desc_list;
 
       while (desc_list != NULL)
@@ -299,12 +299,10 @@ static void ble_free_service_list (void)
         free (desc_list_entry);
       }
 
-      char_list_entry = char_list;
       list_remove ((list_entry_t **)(&char_list), (list_entry_t *)char_list_entry);
       free (char_list_entry);      
     }
 
-    service_list_entry = service_list;
     list_remove ((list_entry_t **)(&service_list), (list_entry_t *)service_list_entry);
     free (service_list_entry);
   }
