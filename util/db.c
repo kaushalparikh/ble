@@ -7,17 +7,32 @@
 #include "basic_types.h"
 #include "list.h"
 
-#define STRING_CONCAT(dest, src)  {                                                                 \
-                                    dest = realloc (dest, ((strlen (dest)) + (strlen (src)) + 1));  \
-                                    dest = strcat (dest, src);                                      \
-                                  }
+#define STRING_CONCAT(dest, src)  \
+  {                                                                 \
+    dest = realloc (dest, ((strlen (dest)) + (strlen (src)) + 1));  \
+    dest = strcat (dest, src);                                      \
+  }
+
+#define STRING_REPLACE_CHAR(dest, search, replace)  \
+  {                                                                 \
+    int32 index = 0;              \
+    while (dest[index] != '\0')   \
+    {                             \
+      if (dest[index] == search)  \
+      {                           \
+        dest[index] = replace;    \
+      }                           \
+      index++;                    \
+    }                             \
+  }
 
 enum
 {
   DB_COLUMN_TYPE_TEXT  = 1,
   DB_COLUMN_TYPE_INT   = 2,
   DB_COLUMN_TYPE_FLOAT = 3,
-  DB_COLUMN_TYPE_BLOB  = 4 
+  DB_COLUMN_TYPE_BLOB  = 4 ,
+  DB_COLUMN_TYPE_NULL  = 5
 };
 
 enum
@@ -47,6 +62,7 @@ struct db_column_list_entry
   uint32                       index;
   uint8                        type;
   uint32                       flags;
+  int8                        *tag;
 };
 
 typedef struct db_column_list_entry db_column_list_entry_t;
@@ -69,103 +85,20 @@ typedef struct
 } db_info_t;
 
 
-int test_positional_params(sqlite3 *db)
-{
-    sqlite3_stmt *stmt;
-    const char* tail;
-
-    const char* sql = "insert into episodes (id, cid, name) "
-                      " values (?,?,'Mackinaw Peaches')";
-    int rc = sqlite3_prepare(db, sql, (int)strlen(sql), &stmt, &tail);
-
-    if(rc != SQLITE_OK) {
-        fprintf(stderr, "Error: %s\n", tail);
-    }
-
-    sqlite3_bind_int(stmt, 1, 10);
-    sqlite3_bind_int(stmt, 2, 10);
-    sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-
-    return SQLITE_OK;
-}
-
-int test_numbered_params(sqlite3 *db)
-{
-    sqlite3_stmt *stmt;
-    const char* tail;
-    char *name, *sql;
-    int rc;
-
-    name = "Mackinaw Peaches";
-    sql = "insert into episodes (id, cid, name) "
-          "values (?100,?100,?101)";
-
-    rc = sqlite3_prepare(db, sql, (int)strlen(sql), &stmt, &tail);
-
-    if(rc != SQLITE_OK) {
-        fprintf(stderr, "sqlite3_prepare() : Error: %s\n", tail);
-        return rc;
-    }
-
-    sqlite3_bind_int(stmt, 100, 10);
-    sqlite3_bind_text(stmt, 101, name, (int)strlen(name), SQLITE_TRANSIENT);
-    sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-
-    return SQLITE_OK;
-}
-
-int test_named_params(sqlite3 *db)
-{
-    sqlite3_stmt *stmt;
-    char *name, *sql;
-    int rc;
-    const char* tail;
-
-    name = "Mackinaw Peaches";
-    sql = "insert into episodes (id, cid, name) values (:cosmo,:cosmo,:newman)";
-
-    rc = sqlite3_prepare(db, sql, (int)strlen(sql), &stmt, &tail);
-
-    if(rc != SQLITE_OK) {
-        fprintf(stderr, "Error: %s\n", tail);
-        return rc;
-    }
-
-    sqlite3_bind_int( stmt, 
-                      sqlite3_bind_parameter_index(stmt, ":cosmo"), 10);
-    
-    sqlite3_bind_text( stmt, 
-                       sqlite3_bind_parameter_index(stmt, ":newman"), 
-                       name, 
-                       (int)strlen(name), NULL );
-
-    sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-
-    return SQLITE_OK;
-}
-
-
-
 static void db_add_column (char *title, uint32 index, uint8 type, uint8 flags,
                            db_column_list_entry_t **column_list)
 {
   db_column_list_entry_t *column_list_entry = (db_column_list_entry_t *)malloc (sizeof (*column_list_entry));
 
-  if ((asprintf (&(column_list_entry->title), "%s", title)) > 0)
-  {
-    column_list_entry->index = index;
-    column_list_entry->type  = type;
-    column_list_entry->flags = flags;
-    list_add ((list_entry_t **)column_list, (list_entry_t *)column_list_entry);
-  }
-  else
-  {
-    free (column_list_entry);
-    printf ("Can't allocate column title %s\n", title);
-  }
+  column_list_entry->title = strdup (title);
+  column_list_entry->index = index;
+  column_list_entry->type  = type;
+  column_list_entry->flags = flags;
+  column_list_entry->tag   = strdup (":");
+  STRING_CONCAT (column_list_entry->tag, title);
+  STRING_REPLACE_CHAR (column_list_entry->tag, ' ', '_');
+  STRING_REPLACE_CHAR (column_list_entry->tag, '.', '_');
+  list_add ((list_entry_t **)column_list, (list_entry_t *)column_list_entry);
 }
 
 static void db_free_column_list (db_column_list_entry_t *column_list)
@@ -174,6 +107,7 @@ static void db_free_column_list (db_column_list_entry_t *column_list)
   {
     db_column_list_entry_t *column_list_entry = column_list;
     free (column_list_entry->title);
+    free (column_list_entry->tag);
     list_remove ((list_entry_t **)(&column_list), (list_entry_t *)column_list_entry);
     free (column_list_entry);
   }
@@ -187,20 +121,93 @@ int32 db_fill_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
   db_column_list_entry_t *column_list = NULL;
   db_table_list_entry_t *table_list = db_info->table_list;
   
+  /* Find table */
   while (table_list != NULL)
   {
-    column_list = table_list->column_list;
-
-    while (column_list != NULL)
+    if ((strcmp (table_list->title, table_title)) == 0)
     {
-      if (((strcmp (table_list->title, table_title)) == 0) &&
-          ((strcmp (column_list->title, column_title)) == 0))
-      {
-        insert = (sqlite3_stmt *)(table_list->insert);
-        break;
-      }
+      column_list = table_list->column_list;
+      break;
+    }
 
-      column_list = column_list->next;
+    table_list = table_list->next;
+  }
+
+  while (column_list != NULL)
+  {
+    if ((strcmp (column_list->title, column_title)) == 0)
+    {
+      insert = (sqlite3_stmt *)(table_list->insert);
+      break;
+    }
+
+    column_list = column_list->next;
+  }
+
+  if (insert != NULL)
+  {
+    if (column_list->type == DB_COLUMN_TYPE_TEXT)
+    {
+      status = sqlite3_bind_text (insert,
+                                  (sqlite3_bind_parameter_index (insert, column_list->tag)),
+                                  column_value->text, -1, SQLITE_TRANSIENT);
+    }
+    else if (column_list->type == DB_COLUMN_TYPE_INT)
+    {
+      status = sqlite3_bind_int (insert,
+                                 (sqlite3_bind_parameter_index (insert, column_list->tag)),
+                                 column_value->integer);
+    }
+    else if (column_list->type == DB_COLUMN_TYPE_FLOAT)
+    {
+      status = sqlite3_bind_double (insert,
+                                    (sqlite3_bind_parameter_index (insert, column_list->tag)),
+                                    (double)(column_value->decimal));
+    }
+    else if (column_list->type == DB_COLUMN_TYPE_BLOB)
+    {
+      status = sqlite3_bind_blob (insert,
+                                  (sqlite3_bind_parameter_index (insert, column_list->tag)),
+                                  column_value->blob.data, column_value->blob.length, SQLITE_TRANSIENT);
+    }
+    else
+    {
+      status = sqlite3_bind_null (insert,
+                                  (sqlite3_bind_parameter_index (insert, column_list->tag)));
+    }
+
+    if (status == SQLITE_OK)
+    {
+      status = 1;
+    }
+    else
+    {
+      printf ("Can't fill database table '%s', column '%s'\n", table_title, column_title);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("Can't find database table '%s', column '%s'\n", table_title, column_title);
+    status = -1;
+  }
+
+  return status;
+}
+
+int32 db_write_table (db_info_t *db_info, int8 *title)
+{
+  int status;
+  sqlite3_stmt *insert = NULL;
+  db_table_list_entry_t *table_list = db_info->table_list;
+  
+  /* Find table */
+  while (table_list != NULL)
+  {
+    if ((strcmp (table_list->title, title)) == 0)
+    {
+      insert = (sqlite3_stmt *)(table_list->insert);
+      break;
     }
 
     table_list = table_list->next;
@@ -208,64 +215,29 @@ int32 db_fill_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
 
   if (insert != NULL)
   {
-    int8 *column_tag = NULL;
-    
-    column_tag = strdup ("\":");
-    STRING_CONCAT (column_tag, column_title);
-    STRING_CONCAT (column_tag, "\"");
-
-    printf ("Statement %s\n", (char *)insert);
-    printf ("Column tag %s\n", column_tag);
-
-    if (column_list->type == DB_COLUMN_TYPE_TEXT)
+    status = sqlite3_step (insert);
+    if (status == SQLITE_DONE)
     {
-      status = sqlite3_bind_text (insert,
-                                  (sqlite3_bind_parameter_index (insert, column_tag)),
-                                  column_value->text, -1, SQLITE_TRANSIENT);
-    }
-    else if (column_list->type == DB_COLUMN_TYPE_INT)
-    {
-      status = sqlite3_bind_int (insert,
-                                 (sqlite3_bind_parameter_index (insert, column_tag)),
-                                 column_value->integer);
-    }
-    else if (column_list->type == DB_COLUMN_TYPE_FLOAT)
-    {
-      status = sqlite3_bind_double (insert,
-                                    (sqlite3_bind_parameter_index (insert, column_tag)),
-                                    column_value->decimal);
-    }
-    else
-    {
-      status = sqlite3_bind_blob (insert,
-                                  (sqlite3_bind_parameter_index (insert, column_tag)),
-                                  column_value->blob.data, column_value->blob.length, SQLITE_TRANSIENT);
-    }
-
-    free (column_tag);
-
-    if (status == SQLITE_OK)
-    {
-      sqlite3_step (insert);
-      sqlite3_reset (insert);
       status = 1;
     }
     else
     {
-      printf ("Can't fill table %s, column %s\n", table_title, column_title);
+      printf ("Can't write database table '%s'\n", title);
       status = -1;
     }
+
+    sqlite3_reset (insert);
   }
   else
   {
-    printf ("Can't find table %s, column %s\n", table_title, column_title);
+    printf ("Can't find database table '%s'\n", title);
     status = -1;
   }
 
   return status;
 }
 
-int32 db_create_table (db_info_t *db_info, char *title, uint32 index,
+int32 db_create_table (db_info_t *db_info, int8 *title, uint32 index,
                        db_column_list_entry_t *column_list)
 {
   int status;
@@ -277,7 +249,7 @@ int32 db_create_table (db_info_t *db_info, char *title, uint32 index,
   table_list_entry->index       = index;
   
   /* Prepare create statement */
-  sql = strdup ("CREATE TABLE ");
+  sql = strdup ("CREATE TABLE IF NOT EXISTS");
   STRING_CONCAT (sql, "[");
   STRING_CONCAT (sql, title);
   STRING_CONCAT (sql, "] ( ");
@@ -344,10 +316,8 @@ int32 db_create_table (db_info_t *db_info, char *title, uint32 index,
     column_list = column_list->next;
   }
 
-  printf ("Execute sql %s\n", sql);
   status = sqlite3_exec ((sqlite3 *)(db_info->handle), sql, NULL, NULL, NULL);
   free (sql);
-  sql = NULL;
 
   if (status == SQLITE_OK)
   {
@@ -355,35 +325,58 @@ int32 db_create_table (db_info_t *db_info, char *title, uint32 index,
     sql = strdup ("INSERT INTO ");
     STRING_CONCAT (sql, "[");
     STRING_CONCAT (sql, title);
-    STRING_CONCAT (sql, "] VALUES ( ");
+    STRING_CONCAT (sql, "] ( ");
+
+    /* Column title */
+    column_list = table_list_entry->column_list;
+    while (column_list != NULL)
+    {
+      if (!(column_list->flags & (DB_COLUMN_FLAG_PRIMARY_KEY | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP)))
+      {
+        /* Column tag */
+        STRING_CONCAT (sql, "[");
+        STRING_CONCAT (sql, column_list->title);
+        STRING_CONCAT (sql, "]");
+
+        /* Comma, if there is column to add, else closing bracket */
+        if (column_list->next != NULL)
+        {
+          STRING_CONCAT (sql, ", ");
+        }
+        else
+        {
+          STRING_CONCAT (sql, " ) VALUES ( ");
+        }
+      }
+      
+      column_list = column_list->next;
+    }
 
     column_list = table_list_entry->column_list;
     while (column_list != NULL)
     {
-      /* Column title */
-      STRING_CONCAT (sql, ":\"");
-      STRING_CONCAT (sql, column_list->title);
-      STRING_CONCAT (sql, "\"");
+      if (!(column_list->flags & (DB_COLUMN_FLAG_PRIMARY_KEY | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP)))
+      {
+        /* Column tag */
+        STRING_CONCAT (sql, column_list->tag);
 
-      /* Comma, if there is column to add, else closing bracket */
-      if (column_list->next != NULL)
-      {
-        STRING_CONCAT (sql, ", ");
-      }
-      else
-      {
-        STRING_CONCAT (sql, " )");
+        /* Comma, if there is column to add, else closing bracket */
+        if (column_list->next != NULL)
+        {
+          STRING_CONCAT (sql, ", ");
+        }
+        else
+        {
+          STRING_CONCAT (sql, " )");
+        }
       }
       
       column_list = column_list->next;
     }
     
-    printf ("Prepare sql %s\n", sql);
     status = sqlite3_prepare_v2 ((sqlite3 *)(db_info->handle), sql, -1,
                                  (sqlite3_stmt **)(&(table_list_entry->insert)), NULL);
-    free (sql);
-    sql = NULL;
-
+    
     if (status == SQLITE_OK)
     {
       list_add ((list_entry_t **)(&(db_info->table_list)), (list_entry_t *)table_list_entry);
@@ -391,14 +384,16 @@ int32 db_create_table (db_info_t *db_info, char *title, uint32 index,
     }
     else
     {
-      printf ("Can't prepare insert statement\n");
+      printf ("Can't prepare database write statement '%s'\n", sql);
       status = -1;
     }
+    
+    free (sql);
   }
   else
   {
     status = -1;
-    printf ("Can't create table\n");
+    printf ("Can't create database table '%s'\n", title);
   }
 
   if (status < 0)
@@ -410,12 +405,12 @@ int32 db_create_table (db_info_t *db_info, char *title, uint32 index,
   return status;
 }
 
-int32 db_open (int8 *filename, db_info_t **db_info)
+int32 db_open (int8 *file_name, db_info_t **db_info)
 {
   int status;
   sqlite3 *db;
 
-  status = sqlite3_open_v2 (filename, &db,
+  status = sqlite3_open_v2 (file_name, &db,
                             (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE), NULL);
   if (status == SQLITE_OK)
   {
@@ -425,7 +420,7 @@ int32 db_open (int8 *filename, db_info_t **db_info)
   }
   else
   {
-    printf ("Can't open %s\n", sqlite3_errmsg (db));
+    printf ("Can't open database %s\n", file_name);
     sqlite3_close (db);
     status = -1;
   }
@@ -471,7 +466,10 @@ int main (int argc, char *argv[])
         table_index++;
         
         column_value.decimal = 98.4;
-        db_fill_column (db_info, "Group Title", "Temperature (F)", &column_value);
+        if ((db_fill_column (db_info, "Group Title", "Temperature (F)", &column_value)) > 0)
+        {
+          db_write_table (db_info, "Group Title");
+        }
       }
       else
       {
