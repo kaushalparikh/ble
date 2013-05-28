@@ -116,9 +116,9 @@ struct ble_service_list_entry
 
 typedef struct ble_service_list_entry ble_service_list_entry_t;
 
-extern int32 ble_lookup_uuid (ble_char_list_entry_t *characteristics);
+extern int32 ble_lookup_uuid (ble_char_list_entry_t *char_list_entry);
 
-extern uint32 ble_identify_device (uint8 *address, ble_char_list_entry_t *update_list);
+extern uint32 ble_identify_device (uint8 *address, ble_char_list_entry_t *update_list_entry);
 
 #endif
 

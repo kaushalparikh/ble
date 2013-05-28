@@ -8,23 +8,23 @@
 #include "list.h"
 #include "util.h"
 
-#define STRING_CONCAT(dest, src)  \
+#define STRING_CONCAT(dest, src)                                    \
   {                                                                 \
     dest = realloc (dest, ((strlen (dest)) + (strlen (src)) + 1));  \
     dest = strcat (dest, src);                                      \
   }
 
 #define STRING_REPLACE_CHAR(dest, search, replace)  \
-  {                                                                 \
-    int32 index = 0;              \
-    while (dest[index] != '\0')   \
-    {                             \
-      if (dest[index] == search)  \
-      {                           \
-        dest[index] = replace;    \
-      }                           \
-      index++;                    \
-    }                             \
+  {                                                 \
+    int32 index = 0;                                \
+    while (dest[index] != '\0')                     \
+    {                                               \
+      if (dest[index] == search)                    \
+      {                                             \
+        dest[index] = replace;                      \
+      }                                             \
+      index++;                                      \
+    }                                               \
   }
 
 
