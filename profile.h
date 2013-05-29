@@ -65,24 +65,6 @@ typedef struct PACKED
   uint16 description;
 } ble_char_format_t;
 
-enum
-{
-  BLE_CHAR_READ_DATA           = 0x01,
-  BLE_CHAR_NOTIFY_DATA         = 0x02,
-  BLE_CHAR_INDICATE_DATA       = 0x04,
-  BLE_CHAR_WRITE_DATA          = 0x08
-};
-
-typedef struct
-{
-  uint8   init;
-  uint8   type;
-  int32   expected_time;
-  int32   timer;
-  int32   timer_correction;
-  void  (*callback)(int32 ble_device_id, void *data);
-} ble_char_update_t;
-
 struct ble_attr_list_entry
 {
   struct ble_attr_list_entry *next;
@@ -99,26 +81,37 @@ struct ble_char_list_entry
 {
   struct ble_char_list_entry *next;
   ble_attr_list_entry_t      *desc_list;
-  ble_char_update_t           update;
 };
 
 typedef struct ble_char_list_entry ble_char_list_entry_t;
 
+typedef struct
+{
+  ble_char_list_entry_t  *char_list;
+  int32                   pending;
+  uint8                   init;
+  int32                   expected_time;
+  int32                   timer;
+  int32                   timer_correction;
+  void                  (*callback)(int32 ble_device_id, void *data);
+} ble_service_update_t;
+
 struct ble_service_list_entry
 {
   struct ble_service_list_entry *next;
-  struct ble_service_list_entry *include_list;
-  ble_char_list_entry_t         *char_list;
   ble_attr_list_entry_t          declaration;
   uint16                         start_handle;
   uint16                         end_handle;
+  struct ble_service_list_entry *include_list;
+  ble_char_list_entry_t         *char_list;
+  ble_service_update_t           update;
 };
 
 typedef struct ble_service_list_entry ble_service_list_entry_t;
 
-extern int32 ble_lookup_uuid (ble_char_list_entry_t *char_list_entry);
+extern int32 ble_lookup_service (ble_service_list_entry_t *service_list_entry);
 
-extern uint32 ble_identify_device (uint8 *address, ble_char_list_entry_t *update_list_entry);
+extern uint32 ble_identify_device (uint8 *address, ble_service_list_entry_t *service_list_entry);
 
 #endif
 

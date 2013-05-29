@@ -31,7 +31,7 @@ OBJ_DIR   := $(BUILD_DIR)/obj
 DEP_DIR   := $(BUILD_DIR)/depend
 
 # Input source files
-SRC_MASTER := main.c ble.c profile.c
+SRC_MASTER := profile.c ble.c main.c
 
 # Object & dependency files
 DEP_MASTER := $(patsubst %.c,$(DEP_DIR)/%.d, $(SRC_MASTER))
