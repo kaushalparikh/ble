@@ -1,7 +1,7 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
-#include "basic_types.h"
+#include "types.h"
 
 /* Serial API */
 extern int32 serial_init (void);

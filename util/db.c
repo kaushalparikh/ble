@@ -4,7 +4,7 @@
 #include <string.h>
 #include <sqlite3.h>
 
-#include "basic_types.h"
+#include "types.h"
 #include "list.h"
 #include "util.h"
 

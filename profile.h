@@ -1,7 +1,7 @@
-#ifndef __GATT_H__
-#define __GATT_H__
+#ifndef __PROFILE_H__
+#define __PROFILE_H__
 
-#include "basic_types.h"
+#include "types.h"
 
 #define BLE_MAX_UUID_LENGTH  (16)
 

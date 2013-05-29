@@ -31,15 +31,11 @@ OBJ_DIR   := $(BUILD_DIR)/obj
 DEP_DIR   := $(BUILD_DIR)/depend
 
 # Input source files
-SRC_MASTER := ble_master.c ble.c gatt.c
-SRC_SLAVE  := ble_master.c ble.c gatt.c
+SRC_MASTER := main.c ble.c profile.c
 
 # Object & dependency files
 DEP_MASTER := $(patsubst %.c,$(DEP_DIR)/%.d, $(SRC_MASTER))
 OBJ_MASTER := $(patsubst %.c,$(OBJ_DIR)/%.o, $(SRC_MASTER))
-
-DEP_SLAVE := $(patsubst %.c,$(DEP_DIR)/%.d, $(SRC_SLAVE))
-OBJ_SLAVE := $(patsubst %.c,$(OBJ_DIR)/%.o, $(SRC_SLAVE))
 
 # System packages
 SYSTEM_PACKAGES := libudev
@@ -65,7 +61,7 @@ ALL_INCLUDE_DIRS := $(SYSTEM_INCLUDE_DIRS) $(LOCAL_INCLUDE_DIRS)
 
 # Determine build targets
 ifeq ($(MAKECMDGOALS),)
-        TARGET_FILE := ble-master ble-slave
+        TARGET_FILE := ble
 else
         ifneq ($(MAKECMDGOALS),clean)
                 TARGET_FILE := $(MAKECMDGOALS)
@@ -80,13 +76,9 @@ endif
 $(TARGET_FILE) : $(TARGET_GOAL)
 	echo
 
-$(BUILD_DIR)/ble-master : $(LOCAL_LIBS) $(OBJ_MASTER)
+$(BUILD_DIR)/ble : $(LOCAL_LIBS) $(OBJ_MASTER)
 	echo "\nBuilding $(patsubst %/$(BUILD_DIR)/, %, $(notdir $@))"
 	$(CC) $(LD_FLAGS) $(DEFINES) $(OBJ_MASTER) $(LOCAL_LIBS) $(SYSTEM_LIBS) -o $@
-
-$(BUILD_DIR)/ble-slave : $(LOCAL_LIBS) $(OBJ_SLAVE)
-	echo "\nBuilding $(patsubst %/$(BUILD_DIR)/, %, $(notdir $@))"
-	$(CC) $(LD_FLAGS) $(DEFINES) $(OBJ_SLAVE) $(LOCAL_LIBS) $(SYSTEM_LIBS) -o $@
 
 %.a : .FORCE
 	echo
@@ -113,9 +105,6 @@ ifneq ($(MAKECMDGOALS),clean)
         $(shell mkdir -p $(DEP_DIR))
         ifneq ($(findstring ble-master, $(TARGET_FILE)),)
                 -include $(DEP_MASTER)
-        endif
-        ifneq ($(findstring ble-slave, $(TARGET_FILE)),)
-                -include $(DEP_SLAVE)
         endif
 endif
  

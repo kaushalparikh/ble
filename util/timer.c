@@ -5,7 +5,7 @@
 #include <signal.h>
 #include <time.h>
 
-#include "basic_types.h"
+#include "types.h"
 #include "util.h"
 
 

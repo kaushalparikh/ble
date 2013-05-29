@@ -11,7 +11,7 @@
 #include <errno.h>
 
 /* Local/project headers */
-#include "basic_types.h"
+#include "types.h"
 #include "util.h"
 #include "usb.h"
 

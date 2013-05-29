@@ -2,9 +2,8 @@
 #define __BLE_H__
 
 /* GATT definitions */
-#include "basic_types.h"
-#include "util.h"
-#include "gatt.h"
+#include "types.h"
+#include "profile.h"
 
 /* Maximum message data size */
 #define BLE_MAX_MESSAGE  (256)
@@ -750,8 +749,6 @@ extern int32 ble_start_data (void);
 extern int32 ble_next_data (void);
 
 extern int32 ble_update_data (void);
-
-extern int32 ble_wait_data (void);
 
 extern int32 ble_get_sleep (void);
 

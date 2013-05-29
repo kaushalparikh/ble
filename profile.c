@@ -3,10 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "basic_types.h"
+#include "types.h"
 #include "list.h"
-#include "gatt.h"
-#include "ble.h"
+#include "profile.h"
 
 typedef struct
 {
