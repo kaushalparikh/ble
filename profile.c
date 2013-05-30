@@ -106,7 +106,6 @@ static void ble_update_temperature (int32 device_id, void *data)
       }
 
       update_list_entry_tmp = update_list_entry;
-      list_remove ((list_entry_t **)(&(service_list_entry->update.char_list)), (list_entry_t *)update_list_entry);
     }
     else
     {
@@ -116,6 +115,7 @@ static void ble_update_temperature (int32 device_id, void *data)
     update_list_entry = update_list_entry->next;
     if (update_list_entry_tmp != NULL)
     {
+      list_remove ((list_entry_t **)(&(service_list_entry->update.char_list)), (list_entry_t *)update_list_entry_tmp);
       free (update_list_entry_tmp);
       update_list_entry_tmp = NULL;
     }
@@ -139,6 +139,12 @@ static void ble_update_temperature (int32 device_id, void *data)
         update_list_entry = (ble_char_list_entry_t *)malloc (sizeof (*update_list_entry));
         *update_list_entry = *char_list_entry;
         list_add ((list_entry_t **)(&(service_list_entry->update.char_list)), (list_entry_t *)update_list_entry);
+
+        desc_list_entry = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(char_list_entry->desc_list)));
+        desc_list_entry->value_length = BLE_MEAS_INTERVAL_LENGTH;
+        desc_list_entry->value = malloc (desc_list_entry->value_length);
+        desc_list_entry->value[0] = (BLE_TEMPERATURE_MEAS_INTERVAL/1000) & 0xff;
+        desc_list_entry->value[1] = ((BLE_TEMPERATURE_MEAS_INTERVAL/1000) >> 8) & 0xff;      
   
         service_list_entry->update.pending++;
         break;
@@ -154,7 +160,7 @@ static void ble_update_temperature (int32 device_id, void *data)
 int32 ble_lookup_service (ble_service_list_entry_t *service_list_entry)
 {
   int32 found = 0;
-  uint16 uuid = (service_list_entry->declaration.uuid[1] << 8) | service_list_entry->declaration.uuid[0];
+  uint16 uuid = (service_list_entry->declaration.value[1] << 8) | service_list_entry->declaration.value[0];
 
   service_list_entry->update.char_list        = NULL;
   service_list_entry->update.pending          = 0;
@@ -164,10 +170,12 @@ int32 ble_lookup_service (ble_service_list_entry_t *service_list_entry)
   service_list_entry->update.timer_correction = 0;
   service_list_entry->update.callback         = NULL;
 
-  if ((service_list_entry->declaration.uuid_length == BLE_GATT_UUID_LENGTH) &&
+  if ((service_list_entry->declaration.value_length == BLE_GATT_UUID_LENGTH) &&
       (uuid == BLE_TEMPERATURE_SERVICE_UUID))
   {
     ble_char_list_entry_t *char_list_entry = service_list_entry->char_list;
+
+    printf ("BLE Found temperature service\n");
     
     /* Temperature service; add temperature measurement, temperature type 
      * and measurement interval to update list */
@@ -184,12 +192,96 @@ int32 ble_lookup_service (ble_service_list_entry_t *service_list_entry)
            (uuid == BLE_MEAS_INTERVAL_UUID)))
       {
         ble_char_list_entry_t *update_list_entry = (ble_char_list_entry_t *)malloc (sizeof (*update_list_entry));
+
+        desc_list_entry = (ble_attr_list_entry_t *)malloc (sizeof (*desc_list_entry));
+        desc_list_entry->handle = char_decl->value_handle;
+        desc_list_entry->uuid_length = value_uuid_length;
+        memcpy (desc_list_entry->uuid, char_decl->value_uuid, value_uuid_length);
+        desc_list_entry->value_length = 0;
+        desc_list_entry->value = NULL;
+        list_add ((list_entry_t **)(&(char_list_entry->desc_list)), (list_entry_t *)desc_list_entry);
+
         *update_list_entry = *char_list_entry;
         list_add ((list_entry_t **)(&(service_list_entry->update.char_list)), (list_entry_t *)update_list_entry);
 
+        if (uuid == BLE_TEMPERATURE_MEAS_UUID)
+        {
+          printf ("BLE Found temperature measurement characteristics\n");
+
+          if (char_decl->properties & BLE_CHAR_PROPERTY_READ)
+          {
+            char_decl->properties = BLE_CHAR_PROPERTY_READ;
+          }
+          else if (char_decl->properties & BLE_CHAR_PROPERTY_INDICATE)
+          {
+            char_decl->properties = BLE_CHAR_PROPERTY_INDICATE;
+          }
+          else if (char_decl->properties & BLE_CHAR_PROPERTY_NOTIFY)
+          {
+            char_decl->properties = BLE_CHAR_PROPERTY_NOTIFY;
+          }
+          else
+          {
+            printf ("BLE temperature measurement property not handled\n");
+          }
+
+          desc_list_entry = char_list_entry->desc_list;
+          while (desc_list_entry != NULL)
+          {
+            if ((((desc_list_entry->uuid[1]) << 8) | desc_list_entry->uuid[0]) == BLE_GATT_CHAR_CLIENT_CONFIG)
+            {
+              ble_char_client_config_t *client_config = (ble_char_client_config_t *)malloc (sizeof (*client_config));
+    
+              client_config->bitfield = (char_decl->properties == BLE_CHAR_PROPERTY_INDICATE)
+                                        ? BLE_CHAR_CLIENT_INDICATE : BLE_CHAR_CLIENT_NOTIFY;
+              
+              desc_list_entry->value_length = sizeof (*client_config);
+              desc_list_entry->value = (uint8 *)client_config;
+              break;
+            }
+    
+            desc_list_entry = desc_list_entry->next;
+          }          
+        }
+        else if (uuid == BLE_TEMPERATURE_TYPE_UUID)
+        {
+          printf ("BLE Found temperature type characteristics\n");
+
+          if (char_decl->properties & BLE_CHAR_PROPERTY_READ)
+          {
+            char_decl->properties = BLE_CHAR_PROPERTY_READ;
+          }
+          else
+          {
+            printf ("BLE temperature type property not handled\n");
+          }          
+        }
+        else
+        {
+          printf ("BLE Found temperature measurement interval characteristics\n");
+
+          if (char_decl->properties & BLE_CHAR_PROPERTY_WRITE)
+          {
+            char_decl->properties = BLE_CHAR_PROPERTY_WRITE;
+          }
+          else if (char_decl->properties & BLE_CHAR_PROPERTY_WRITE_NO_RSP)
+          {
+            char_decl->properties = BLE_CHAR_PROPERTY_WRITE_NO_RSP;
+          }
+          else
+          {
+            printf ("BLE temperature interval property not handled\n");
+          }          
+          
+          desc_list_entry->value_length = BLE_MEAS_INTERVAL_LENGTH;
+          desc_list_entry->value = malloc (desc_list_entry->value_length);
+          desc_list_entry->value[0] = (BLE_TEMPERATURE_MEAS_INTERVAL/1000) & 0xff;
+          desc_list_entry->value[1] = ((BLE_TEMPERATURE_MEAS_INTERVAL/1000) >> 8) & 0xff;
+        }
+
         found++;
       }
-      
+
       char_list_entry = char_list_entry->next;
     }
 
