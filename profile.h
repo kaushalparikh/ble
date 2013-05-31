@@ -3,6 +3,9 @@
 
 #include "types.h"
 
+#define BLE_PACK_GATT_UUID(byte)  (((byte)[1] << 8) | (byte)[0])
+#define BLE_UNPACK_GATT_UUID(uuid, byte)  { (byte)[0] = ((uuid) & 0xff); (byte)[1] = (((uuid) & 0xff00) >> 8); } 
+
 #define BLE_MAX_UUID_LENGTH  (16)
 
 #define BLE_GATT_UUID_LENGTH  (2)
@@ -28,21 +31,21 @@ enum
 
 enum
 {
-  BLE_CHAR_PROPERTY_BROADCAST    = 0x01,
-  BLE_CHAR_PROPERTY_READ         = 0x02,
-  BLE_CHAR_PROPERTY_WRITE_NO_RSP = 0x04,
-  BLE_CHAR_PROPERTY_WRITE        = 0x08,
-  BLE_CHAR_PROPERTY_NOTIFY       = 0x10,
-  BLE_CHAR_PROPERTY_INDICATE     = 0x20,
-  BLE_CHAR_PROPERTY_WRITE_SIGNED = 0x40,
-  BLE_CHAR_PROPERTY_EXT          = 0x80
+  BLE_CHAR_TYPE_BROADCAST    = 0x01,
+  BLE_CHAR_TYPE_READ         = 0x02,
+  BLE_CHAR_TYPE_WRITE_NO_RSP = 0x04,
+  BLE_CHAR_TYPE_WRITE        = 0x08,
+  BLE_CHAR_TYPE_NOTIFY       = 0x10,
+  BLE_CHAR_TYPE_INDICATE     = 0x20,
+  BLE_CHAR_TYPE_WRITE_SIGNED = 0x40,
+  BLE_CHAR_TYPE_EXT          = 0x80
 };
 
 typedef struct PACKED
 {
-  uint8  properties;
-  uint16 value_handle;
-  uint8  value_uuid[BLE_MAX_UUID_LENGTH];
+  uint8  type;
+  uint16 handle;
+  uint8  uuid[BLE_MAX_UUID_LENGTH];
 } ble_char_decl_t;
 
 enum
@@ -71,8 +74,14 @@ struct ble_attr_list_entry
   uint16                      handle;
   uint8                       uuid_length;
   uint8                       uuid[BLE_MAX_UUID_LENGTH];
-  uint8                       value_length;
-  uint8                       *value;
+  uint8                       data_length;
+  uint8                      *data;
+  union
+  {
+    ble_char_decl_t           declaration;
+    ble_char_client_config_t  client_config;
+    ble_char_format_t         format;
+  };
 };
 
 typedef struct ble_attr_list_entry ble_attr_list_entry_t;
@@ -108,6 +117,9 @@ struct ble_service_list_entry
 };
 
 typedef struct ble_service_list_entry ble_service_list_entry_t;
+
+extern ble_attr_list_entry_t * ble_find_char_desc (ble_attr_list_entry_t *attr_list_entry,
+                                                   uint16 uuid);
 
 extern int32 ble_lookup_service (ble_service_list_entry_t *service_list_entry);
 

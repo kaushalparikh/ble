@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "types.h"
 #include "util.h"
@@ -342,8 +343,13 @@ void master_loop (void)
 
 int main (int argc, char * argv[])
 {
+  time_t current_time;
+
   setlinebuf (stdout);
-    
+  
+  current_time = time (0);
+  printf ("\nBLE Master start time %s\n", ctime (&current_time));
+
   if ((ble_init ()) > 0)
   {
     master_loop ();

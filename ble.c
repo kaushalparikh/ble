@@ -191,91 +191,74 @@ static void ble_print_device (ble_device_t *device)
 static void ble_print_service_list (void)
 {
   int32 i;
-  ble_service_list_entry_t *service_list = connection_params.device->info.service_list;
+  ble_service_list_entry_t *service_list_entry = connection_params.device->info.service_list;
 
-  while (service_list != NULL)
+  while (service_list_entry != NULL)
   {
-    uint16 uuid = ((service_list->declaration.uuid[1]) << 8) | service_list->declaration.uuid[0];
-    ble_char_list_entry_t *char_list = service_list->char_list;
+    uint16 uuid = BLE_PACK_GATT_UUID (service_list_entry->declaration.uuid);
+    ble_char_list_entry_t *char_list_entry = service_list_entry->char_list;
       
     printf ("Service -- %s\n", ((uuid == BLE_GATT_PRI_SERVICE) ? "primary" : "secondary"));
-    printf ("  handle range: 0x%04x to 0x%04x\n", service_list->start_handle, service_list->end_handle);
+    printf ("  handle range: 0x%04x to 0x%04x\n", service_list_entry->start_handle, service_list_entry->end_handle);
     printf ("          uuid: 0x");
-    for (i = (service_list->declaration.value_length - 1); i >= 0; i--)
+    for (i = (service_list_entry->declaration.data_length - 1); i >= 0; i--)
     {
-      printf ("%02x", service_list->declaration.value[i]);
+      printf ("%02x", service_list_entry->declaration.data[i]);
     }
     printf ("\n");
 
-    while (char_list != NULL)
+    while (char_list_entry != NULL)
     {
-      ble_attr_list_entry_t *desc_list = char_list->desc_list;
+      ble_attr_list_entry_t *desc_list_entry = char_list_entry->desc_list;
 
-      while (desc_list != NULL)
+      while (desc_list_entry != NULL)
       {
-        uuid = ((desc_list->uuid[1]) << 8) | desc_list->uuid[0];
+        uuid = BLE_PACK_GATT_UUID (desc_list_entry->uuid);
         if (uuid == BLE_GATT_CHAR_DECL)
         {
           printf ("    Characteristics -- declaration\n");
-          printf ("      handle: 0x%04x\n", desc_list->handle);
+          printf ("      handle: 0x%04x\n", desc_list_entry->handle);
           printf ("       value: ");
-        }
-        else
-        {
-          if (uuid == BLE_GATT_CHAR_USER_DESC)
+          printf ("0x%02x, 0x%04x, 0x", desc_list_entry->declaration.type, desc_list_entry->declaration.handle);
+          for (i = (desc_list_entry->data_length - 4); i >= 0; i--)
           {
-            printf ("        Descriptor -- description\n");
-          }
-          else if (uuid == BLE_GATT_CHAR_FORMAT)
-          {
-            printf ("        Descriptor -- format\n");
-          }
-          else if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
-          {
-            printf ("        Descriptor -- client configuration\n");
-          }
-
-          printf ("          handle: 0x%04x\n", desc_list->handle);
-          printf ("           value: ");
-        }
-
-        if (uuid == BLE_GATT_CHAR_DECL)
-        {
-          ble_char_decl_t *char_decl = (ble_char_decl_t *)(desc_list->value);
-          uint8 value_uuid_length = desc_list->value_length - 3;
-          printf ("0x%02x, 0x%04x, 0x", char_decl->properties, char_decl->value_handle);
-          for (i = (value_uuid_length - 1); i >= 0; i--)
-          {
-            printf ("%02x", char_decl->value_uuid[i]);
+            printf ("%02x", desc_list_entry->declaration.uuid[i]);
           }
           printf ("\n");
         }
         else if (uuid == BLE_GATT_CHAR_USER_DESC)
         {
-          for (i = 0; i < desc_list->value_length; i++)
+          printf ("        Descriptor -- description\n");
+          printf ("          handle: 0x%04x\n", desc_list_entry->handle);
+          printf ("           value: ");
+          for (i = 0; i < desc_list_entry->data_length; i++)
           {
-            printf ("%c", (int8)(desc_list->value[i]));
+            printf ("%c", (int8)(desc_list_entry->data[i]));
           }
           printf ("\n");
         }
         else if (uuid == BLE_GATT_CHAR_FORMAT)
         {
-          ble_char_format_t *char_format = (ble_char_format_t *)(desc_list->value);
-          printf ("0x%02x, %d\n", char_format->bitfield, char_format->exponent);
+          printf ("        Descriptor -- format\n");
+          printf ("          handle: 0x%04x\n", desc_list_entry->handle);
+          printf ("           value: ");
+          printf ("0x%02x, %d\n", desc_list_entry->format.bitfield, desc_list_entry->format.exponent);
         }
         else if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
         {
-          ble_char_client_config_t *char_client_config = (ble_char_client_config_t *)(desc_list->value);
-          printf ("0x%04x\n", char_client_config->bitfield);
+          printf ("        Descriptor -- client configuration\n");
+          printf ("          handle: 0x%04x\n", desc_list_entry->handle);
+          printf ("           value: ");
+          printf ("0x%04x\n", desc_list_entry->client_config.bitfield);
         }
         
-        desc_list = desc_list->next;
+        desc_list_entry = desc_list_entry->next;
       }
       
-      char_list = char_list->next;
+      char_list_entry = char_list_entry->next;
     }
     
-    service_list = service_list->next;
+    service_list_entry = service_list_entry->next;
   }
 }
 
@@ -579,8 +562,7 @@ static int32 ble_read_group (void)
   read_group->start_handle = BLE_MIN_GATT_HANDLE;
   read_group->end_handle   = BLE_MAX_GATT_HANDLE;
   read_group->length       = BLE_GATT_UUID_LENGTH;
-  read_group->data[0]      = (BLE_GATT_PRI_SERVICE & 0xff);
-  read_group->data[1]      = ((BLE_GATT_PRI_SERVICE & 0xff00) >> 8);
+  BLE_UNPACK_GATT_UUID (BLE_GATT_PRI_SERVICE, read_group->data);
   status = ble_command (&message);
 
   if (status > 0)
@@ -706,12 +688,12 @@ static int32 ble_write_handle (void)
   
   write_handle = (ble_command_write_handle_t *)(&message);
   BLE_CLASS_ATTR_CLIENT_HEADER (write_handle, BLE_COMMAND_WRITE_ATTR_CLIENT);
-  write_handle->header.length += connection_params.attribute->value_length;
+  write_handle->header.length += connection_params.attribute->data_length;
 
   write_handle->conn_handle = connection_params.handle;
   write_handle->attr_handle = connection_params.attribute->handle;
-  write_handle->length      = connection_params.attribute->value_length;
-  memcpy (write_handle->data, connection_params.attribute->value, write_handle->length);
+  write_handle->length      = connection_params.attribute->data_length;
+  memcpy (write_handle->data, connection_params.attribute->data, write_handle->length);
   status = ble_command (&message);
 
   if (status > 0)
@@ -881,11 +863,10 @@ void ble_event_read_group (ble_event_read_group_t *read_group)
   service_list_entry->declaration.next         = NULL;
   service_list_entry->declaration.handle       = read_group->start_handle;
   service_list_entry->declaration.uuid_length  = BLE_GATT_UUID_LENGTH;
-  service_list_entry->declaration.uuid[0]      = (BLE_GATT_PRI_SERVICE & 0xff);
-  service_list_entry->declaration.uuid[1]      = ((BLE_GATT_PRI_SERVICE & 0xff00) >> 8);
-  service_list_entry->declaration.value_length = read_group->length;
-  service_list_entry->declaration.value        = malloc (read_group->length);
-  memcpy (service_list_entry->declaration.value, read_group->data, read_group->length);
+  BLE_UNPACK_GATT_UUID (BLE_GATT_PRI_SERVICE, service_list_entry->declaration.uuid);
+  service_list_entry->declaration.data_length  = read_group->length;
+  service_list_entry->declaration.data         = malloc (read_group->length);
+  memcpy (service_list_entry->declaration.data, read_group->data, read_group->length);
 
   list_add ((list_entry_t **)(&(device->service_list)), (list_entry_t *)service_list_entry);
 }
@@ -898,7 +879,7 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
 
   if (find_information->length == BLE_GATT_UUID_LENGTH)
   {
-    uint16 uuid = ((find_information->data[1]) << 8) | (find_information->data[0]);
+    uint16 uuid = BLE_PACK_GATT_UUID (find_information->data);
     
     if (uuid == BLE_GATT_INCLUDE)
     {
@@ -907,8 +888,7 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
       
       include_list_entry->declaration.handle      = find_information->char_handle;
       include_list_entry->declaration.uuid_length = BLE_GATT_UUID_LENGTH;
-      include_list_entry->declaration.uuid[0]     = (BLE_GATT_INCLUDE & 0xff);
-      include_list_entry->declaration.uuid[1]     = ((BLE_GATT_INCLUDE & 0xff00) >> 8);
+      BLE_UNPACK_GATT_UUID (BLE_GATT_INCLUDE, include_list_entry->declaration.uuid);
   
       list_add ((list_entry_t **)(&(service->include_list)), (list_entry_t *)include_list_entry);  
     }
@@ -934,8 +914,24 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
       desc_list_entry->handle       = find_information->char_handle;
       desc_list_entry->uuid_length  = find_information->length;
       memcpy (desc_list_entry->uuid, find_information->data, find_information->length);
-      desc_list_entry->value_length = 0;
-      desc_list_entry->value        = NULL;
+      desc_list_entry->data_length  = 0;
+      if (uuid == BLE_GATT_CHAR_DECL)
+      {
+        desc_list_entry->data = (uint8 *)(&(desc_list_entry->declaration));
+      }
+      else if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
+      {
+        desc_list_entry->data = (uint8 *)(&(desc_list_entry->client_config));
+      }
+      else if (uuid == BLE_GATT_CHAR_FORMAT)
+      {
+        desc_list_entry->data = (uint8 *)(&(desc_list_entry->format));
+      }
+      else
+      {
+        desc_list_entry->data = NULL;
+      }
+
       list_add ((list_entry_t **)(&(char_list_entry->desc_list)), (list_entry_t *)desc_list_entry);
     }
     else if ((uuid == BLE_GATT_CHAR_EXT)           ||
@@ -1008,20 +1004,20 @@ int32 ble_event_attr_value (ble_event_attr_value_t *attr_value)
         (attr_value->type == BLE_ATTR_VALUE_NOTIFY)    ||
         (attr_value->type == BLE_ATTR_VALUE_INDICATE)  ||
         (attr_value->type == BLE_ATTR_VALUE_READ_TYPE) ||
-        ((attr_value->type == BLE_ATTR_VALUE_READ_BLOB) && (attribute->value_length == 0)))
+        ((attr_value->type == BLE_ATTR_VALUE_READ_BLOB) && (attribute->data_length == 0)))
     {
-      if (attribute->value == NULL)
+      if (attribute->data == NULL)
       {
-        attribute->value = malloc (attr_value->length);
+        attribute->data = malloc (attr_value->length);
       }
-      memcpy (attribute->value, attr_value->data, attr_value->length);
-      attribute->value_length = attr_value->length;
+      memcpy (attribute->data, attr_value->data, attr_value->length);
+      attribute->data_length = attr_value->length;
     }
     else
     {
-      attribute->value = realloc (attribute->value, (attribute->value_length + attr_value->length));
-      memcpy ((attribute->value + attribute->value_length), attr_value->data, attr_value->length);
-      attribute->value_length += attr_value->length;
+      attribute->data = realloc (attribute->data, (attribute->data_length + attr_value->length));
+      memcpy ((attribute->data + attribute->data_length), attr_value->data, attr_value->length);
+      attribute->data_length += attr_value->length;
     }
 
     if (((attr_value->type == BLE_ATTR_VALUE_NOTIFY)    ||
@@ -1603,10 +1599,11 @@ int32 ble_update_data (void)
   {
     if (connection_params.characteristics != NULL)
     {
-      ble_char_decl_t *char_decl = (ble_char_decl_t *)(connection_params.characteristics->desc_list->value);
+      ble_attr_list_entry_t *desc_list_entry = ble_find_char_desc (connection_params.characteristics->desc_list,
+                                                                   BLE_GATT_CHAR_DECL);
       
-      if ((char_decl->properties == BLE_CHAR_PROPERTY_READ) ||
-          (char_decl->properties == BLE_CHAR_PROPERTY_WRITE))
+      if ((desc_list_entry->declaration.type == BLE_CHAR_TYPE_READ) ||
+          (desc_list_entry->declaration.type == BLE_CHAR_TYPE_WRITE))
       {
         connection_params.service->update.pending--;
       }
@@ -1642,34 +1639,25 @@ int32 ble_update_data (void)
   
     if (connection_params.service != NULL)
     {
-      ble_char_decl_t *char_decl = (ble_char_decl_t *)(connection_params.characteristics->desc_list->value);
+      ble_attr_list_entry_t *desc_list_entry = ble_find_char_desc (connection_params.characteristics->desc_list,
+                                                                   BLE_GATT_CHAR_DECL);
       
       connection_params.attribute
           = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(connection_params.characteristics->desc_list)));
   
-      if (char_decl->properties == BLE_CHAR_PROPERTY_READ)
+      if (desc_list_entry->declaration.type == BLE_CHAR_TYPE_READ)
       {
         status = ble_read_long_handle ();
       }
-      else if ((char_decl->properties == BLE_CHAR_PROPERTY_INDICATE) ||
-               (char_decl->properties == BLE_CHAR_PROPERTY_NOTIFY)   ||
-               (char_decl->properties == BLE_CHAR_PROPERTY_WRITE))
+      else if ((desc_list_entry->declaration.type == BLE_CHAR_TYPE_INDICATE) ||
+               (desc_list_entry->declaration.type == BLE_CHAR_TYPE_NOTIFY)   ||
+               (desc_list_entry->declaration.type == BLE_CHAR_TYPE_WRITE))
       {
-        if ((char_decl->properties == BLE_CHAR_PROPERTY_INDICATE) ||
-            (char_decl->properties == BLE_CHAR_PROPERTY_NOTIFY))
+        if ((desc_list_entry->declaration.type == BLE_CHAR_TYPE_INDICATE) ||
+            (desc_list_entry->declaration.type == BLE_CHAR_TYPE_NOTIFY))
         {
-          connection_params.attribute = connection_params.characteristics->desc_list;
-          
-          while (connection_params.attribute != NULL)
-          {
-            uint16 uuid = ((connection_params.attribute->uuid[1]) << 8) | connection_params.attribute->uuid[0];
-            if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
-            {
-              break;
-            }
-            
-            connection_params.attribute = connection_params.attribute->next;
-          }
+          connection_params.attribute = ble_find_char_desc (connection_params.characteristics->desc_list,
+                                                            BLE_GATT_CHAR_CLIENT_CONFIG);
         }
   
         status = ble_write_handle ();
@@ -1680,7 +1668,7 @@ int32 ble_update_data (void)
             = (ble_message_list_entry_t *)malloc (sizeof (*message_list_entry));
   
         printf ("BLE Update data characteristics property %d not supported\n",
-                                                          char_decl->properties);
+                                                          desc_list_entry->declaration.type);
   
         message_list_entry->message.header.type    = BLE_EVENT;
         message_list_entry->message.header.length  = 5;
