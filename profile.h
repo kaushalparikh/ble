@@ -3,6 +3,46 @@
 
 #include "types.h"
 
+/* BLE device address */
+#define BLE_DEVICE_ADDRESS_LENGTH  (6)
+
+/* BLE device address type */
+enum
+{
+  BLE_ADDR_PUBLIC = 0,
+  BLE_ADDR_RANDOM = 1
+};
+
+typedef struct PACKED
+{
+  uint8 byte[BLE_DEVICE_ADDRESS_LENGTH];
+  uint8 type;  
+} ble_device_address_t;
+
+/* BLE device status */
+typedef enum
+{
+  BLE_DEVICE_DISCOVER           = 0,
+  BLE_DEVICE_DISCOVER_SERVICE   = 1,
+  BLE_DEVICE_DISCOVER_CHAR_DESC = 2,
+  BLE_DEVICE_DISCOVER_CHAR      = 3,
+  BLE_DEVICE_CONFIGURE_CHAR     = 4,
+  BLE_DEVICE_DATA               = 5,
+  BLE_DEVICE_IGNORE             = 6
+} ble_device_status_e;
+
+/* BLE device */
+typedef struct
+{
+  uint32                    id;
+  ble_device_address_t      address;
+  int8                     *name;
+  ble_device_status_e       status;
+  ble_service_list_entry_t *service_list;
+  ble_char_list_entry_t    *update_list;
+  int32                     setup_time;
+} ble_device_t;
+
 #define BLE_PACK_GATT_UUID(byte)  (((byte)[1] << 8) | (byte)[0])
 #define BLE_UNPACK_GATT_UUID(uuid, byte)  { (byte)[0] = ((uuid) & 0xff); (byte)[1] = (((uuid) & 0xff00) >> 8); } 
 

@@ -87,8 +87,64 @@ static db_column_list_entry_t * db_find_column (db_column_list_entry_t *column_l
   return column_list_entry;
 }
 
-int32 db_fill_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
+int32 db_read_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
                       db_column_value_t *column_value)
+{
+  int status;
+  db_table_list_entry_t *table_list_entry = db_find_table (db_info->table_list, table_title);
+  
+  if (table_list_entry != NULL)
+  {
+    db_column_list_entry_t *column_list_entry
+      = db_find_column (table_list_entry->column_list, column_title);
+    
+    if (column_list_entry != NULL)
+    {
+      sqlite3_stmt *select = (sqlite3_stmt *)(table_list_entry->select);
+
+      if (column_list_entry->type == DB_COLUMN_TYPE_TEXT)
+      {
+        column_value->text = (int8 *)sqlite3_column_text (select,
+                                                          column_list_entry->index);
+      }
+      else if (column_list_entry->type == DB_COLUMN_TYPE_INT)
+      {
+        column_value->integer = sqlite3_column_int (select,
+                                                    column_list_entry->index);
+      }
+      else if (column_list_entry->type == DB_COLUMN_TYPE_FLOAT)
+      {
+        column_value->decimal = sqlite3_column_double (select,
+                                                       column_list_entry->index);
+
+      }
+      else
+      {
+        column_value->blob.data = (uint8 *)sqlite3_column_blob (select,
+                                                                column_list_entry->index);
+        column_value->blob.length = sqlite3_column_bytes (select,
+                                                          column_list_entry->index);
+      }
+
+      status = 1;
+    }
+    else
+    {
+      printf ("Can't find database table '%s', column '%s'\n", table_title, column_title);
+      status = -1;
+    }
+  }
+  else
+  {
+    printf ("Can't find database table '%s'\n", table_title);
+    status = -1;
+  }
+
+  return status;
+}
+
+int32 db_write_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
+                       db_column_value_t *column_value)
 {
   int status;
   db_table_list_entry_t *table_list_entry = db_find_table (db_info->table_list, table_title);
@@ -138,7 +194,7 @@ int32 db_fill_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
       }
       else
       {
-        printf ("Can't fill database table '%s', column '%s'\n", table_title, column_title);
+        printf ("Can't write database table '%s', column '%s'\n", table_title, column_title);
         status = -1;
       }
     }
@@ -151,6 +207,41 @@ int32 db_fill_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
   else
   {
     printf ("Can't find database table '%s'\n", table_title);
+    status = -1;
+  }
+
+  return status;
+}
+
+int32 db_read_table (db_info_t *db_info, int8 *title)
+{
+  int status;
+  db_table_list_entry_t *table_list_entry = db_find_table (db_info->table_list, title);
+
+  if (table_list_entry != NULL)
+  {
+    sqlite3_stmt *select = (sqlite3_stmt *)(table_list_entry->select);
+    
+    status = sqlite3_step (select);
+    
+    if (status == SQLITE_ROW)
+    {
+      status = 1;
+    }
+    else if (status == SQLITE_DONE)
+    {
+      status = 0;
+      sqlite3_reset (select);
+    }
+    else
+    {
+      printf ("Can't read database table '%s'\n", title);
+      status = -1;
+    }
+  }  
+  else
+  {
+    printf ("Can't find database table '%s'\n", title);
     status = -1;
   }
 
@@ -235,6 +326,8 @@ int32 db_create_table (db_info_t *db_info, int8 *title, uint32 index,
   table_list_entry->title       = strdup (title);
   table_list_entry->column_list = column_list;
   table_list_entry->index       = index;
+  table_list_entry->insert      = NULL;
+  table_list_entry->select      = NULL;
   
   /* Prepare create statement */
   sql = strdup ("CREATE TABLE IF NOT EXISTS");
@@ -365,29 +458,63 @@ int32 db_create_table (db_info_t *db_info, int8 *title, uint32 index,
     status = sqlite3_prepare_v2 ((sqlite3 *)(db_info->handle), sql, -1,
                                  (sqlite3_stmt **)(&(table_list_entry->insert)), NULL);
     
-    if (status == SQLITE_OK)
-    {
-      list_add ((list_entry_t **)(&(db_info->table_list)), (list_entry_t *)table_list_entry);
-      status = 1;
-    }
-    else
+    if (status != SQLITE_OK)
     {
       printf ("Can't prepare database write statement '%s'\n", sql);
-      status = -1;
     }
     
     free (sql);
   }
   else
   {
-    status = -1;
-    printf ("Can't create database table '%s'\n", title);
+    printf ("Can't create database table '%s'\n", title);    
   }
 
-  if (status < 0)
+  if (status == SQLITE_OK)
   {
+    /* Prepare select statement */
+    sql = strdup ("SELECT * FROM ");
+    STRING_CONCAT (sql, "[");
+    STRING_CONCAT (sql, title);
+    STRING_CONCAT (sql, "]");
+
+    status = sqlite3_prepare_v2 ((sqlite3 *)(db_info->handle), sql, -1,
+                                 (sqlite3_stmt **)(&(table_list_entry->select)), NULL);
+    
+    if (status == SQLITE_OK)
+    {
+      list_add ((list_entry_t **)(&(db_info->table_list)), (list_entry_t *)table_list_entry);
+    }
+    else
+    {
+      printf ("Can't prepare database read statement '%s'\n", sql);
+    }
+    
+    free (sql); 
+  }
+
+  if (status == SQLITE_OK)
+  {
+    status = 1;
+  }
+  else
+  {
+    if (table_list_entry->insert != NULL)
+    {
+      sqlite3_finalize (table_list_entry->insert);
+      table_list_entry->insert = NULL;
+    }
+
+    if (table_list_entry->select != NULL)
+    {
+      sqlite3_finalize (table_list_entry->select);
+      table_list_entry->select = NULL;
+    }
+    
     free (table_list_entry->title);
     free (table_list_entry);
+
+    status = -1;
   }
 
   return status;
@@ -433,8 +560,8 @@ int main (int argc, char *argv[])
   {
     if ((db_open (argv[1], &db_info)) > 0)
     {
-      uint32 column_index = 1;
-      uint32 table_index  = 1;
+      uint32 column_index = 0;
+      uint32 table_index  = 0;
       db_column_list_entry_t *column_list = NULL;
 
       db_add_column ("No.", column_index, DB_COLUMN_TYPE_INT,
@@ -455,14 +582,24 @@ int main (int argc, char *argv[])
         db_clear_table (db_info, "Group Title");
         
         column_value.decimal = 98.4;
-        if ((db_fill_column (db_info, "Group Title", "Temperature (F)", &column_value)) > 0)
+        if ((db_write_column (db_info, "Group Title", "Temperature (F)", &column_value)) > 0)
         {
           db_write_table (db_info, "Group Title");
         }
         column_value.decimal = 100.4;
-        if ((db_fill_column (db_info, "Group Title", "Temperature (F)", &column_value)) > 0)
+        if ((db_write_column (db_info, "Group Title", "Temperature (F)", &column_value)) > 0)
         {
           db_write_table (db_info, "Group Title");
+        }
+
+        while ((db_read_table (db_info, "Group Title")) > 0)
+        {
+          db_read_column (db_info, "Group Title", "No.", &column_value);
+          printf ("%3d", column_value.integer);
+          db_read_column (db_info, "Group Title", "Time", &column_value);
+          printf ("%22s", column_value.text);
+          db_read_column (db_info, "Group Title", "Temperature (F)", &column_value);
+          printf ("%9.2f\n", column_value.decimal);
         }
       }
       else

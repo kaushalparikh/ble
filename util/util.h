@@ -83,6 +83,7 @@ struct db_table_list_entry
   int8                       *title;
   uint32                      index;
   void                       *insert;
+  void                       *select;
 };
 
 typedef struct db_table_list_entry db_table_list_entry_t;
@@ -93,8 +94,8 @@ typedef struct
   db_table_list_entry_t *table_list;
 } db_info_t;
 
-extern int32 db_fill_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
-                             db_column_value_t *column_value);
+extern int32 db_write_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
+                              db_column_value_t *column_value);
 
 extern int32 db_write_table (db_info_t *db_info, int8 *title);
 
