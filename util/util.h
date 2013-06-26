@@ -101,8 +101,7 @@ extern int32 db_write_table (db_info_t *db_info, int8 *title);
 
 extern int32 db_clear_table (db_info_t *db_info, int8 *title);
 
-extern int32 db_create_table (db_info_t *db_info, int8 *title, uint32 index,
-                              db_column_list_entry_t *column_list);
+extern int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry);
 
 extern int32 db_open (int8 *file_name, db_info_t **db_info);
 
