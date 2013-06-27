@@ -24,7 +24,7 @@ static void db_prepare_table_columns (db_table_list_entry_t *table_list_entry)
     {
       column_list_entry[column].index = column;
       column_list_entry[column].tag   = strdup (":");
-      string_join (column_list_entry[column].tag, column_list_entry[column].title);
+      STRING_CONCAT (column_list_entry[column].tag, column_list_entry[column].title);
       string_replace_char (column_list_entry[column].tag, ' ', '_');
       string_replace_char (column_list_entry[column].tag, '.', '_');
       list_add ((list_entry_t **)&(table_list_entry->column_list), (list_entry_t *)&(column_list_entry[column]));
@@ -123,139 +123,93 @@ int32 db_read_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
   return status;
 }
 
-int32 db_write_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
-                       db_column_value_t *column_value)
+int32 db_write_column (void *statement,
+                       db_column_list_entry_t *column_list_entry, db_column_value_t *column_value)
 {
   int status;
-  db_table_list_entry_t *table_list_entry = db_find_table (db_info->table_list, table_title);
   
-  if (table_list_entry != NULL)
+  if (column_list_entry->type == DB_COLUMN_TYPE_TEXT)
   {
-    db_column_list_entry_t *column_list_entry
-      = db_find_column (table_list_entry->column_list, column_title);
-    
-    if (column_list_entry != NULL)
-    {
-      sqlite3_stmt *insert = (sqlite3_stmt *)(table_list_entry->insert);
-      
-      if (column_list_entry->type == DB_COLUMN_TYPE_TEXT)
-      {
-        status = sqlite3_bind_text (insert,
-                                    (sqlite3_bind_parameter_index (insert, column_list_entry->tag)),
-                                    column_value->text, -1, SQLITE_TRANSIENT);
-      }
-      else if (column_list_entry->type == DB_COLUMN_TYPE_INT)
-      {
-        status = sqlite3_bind_int (insert,
-                                   (sqlite3_bind_parameter_index (insert, column_list_entry->tag)),
-                                   column_value->integer);
-      }
-      else if (column_list_entry->type == DB_COLUMN_TYPE_FLOAT)
-      {
-        status = sqlite3_bind_double (insert,
-                                      (sqlite3_bind_parameter_index (insert, column_list_entry->tag)),
-                                      (double)(column_value->decimal));
-      }
-      else if (column_list_entry->type == DB_COLUMN_TYPE_BLOB)
-      {
-        status = sqlite3_bind_blob (insert,
-                                    (sqlite3_bind_parameter_index (insert, column_list_entry->tag)),
-                                    column_value->blob.data, column_value->blob.length, SQLITE_TRANSIENT);
-      }
-      else
-      {
-        status = sqlite3_bind_null (insert,
-                                    (sqlite3_bind_parameter_index (insert, column_list_entry->tag)));
-      }
-
-      if (status == SQLITE_OK)
-      {
-        status = 1;
-      }
-      else
-      {
-        printf ("Can't write database table '%s', column '%s'\n", table_title, column_title);
-        status = -1;
-      }
-    }
-    else
-    {
-      printf ("Can't find database table '%s', column '%s'\n", table_title, column_title);
-      status = -1;
-    }
+    status = sqlite3_bind_text ((sqlite3_stmt *)statement,
+                                (sqlite3_bind_parameter_index ((sqlite3_stmt *)statement, column_list_entry->tag)),
+                                column_value->text, -1, SQLITE_TRANSIENT);
+  }
+  else if (column_list_entry->type == DB_COLUMN_TYPE_INT)
+  {
+    status = sqlite3_bind_int ((sqlite3_stmt *)statement,
+                               (sqlite3_bind_parameter_index ((sqlite3_stmt *)statement, column_list_entry->tag)),
+                               column_value->integer);
+  }
+  else if (column_list_entry->type == DB_COLUMN_TYPE_FLOAT)
+  {
+    status = sqlite3_bind_double ((sqlite3_stmt *)statement,
+                                  (sqlite3_bind_parameter_index ((sqlite3_stmt *)statement, column_list_entry->tag)),
+                                  (double)(column_value->decimal));
+  }
+  else if (column_list_entry->type == DB_COLUMN_TYPE_BLOB)
+  {
+    status = sqlite3_bind_blob ((sqlite3_stmt *)statement,
+                                (sqlite3_bind_parameter_index ((sqlite3_stmt *)statement, column_list_entry->tag)),
+                                column_value->blob.data, column_value->blob.length, SQLITE_TRANSIENT);
   }
   else
   {
-    printf ("Can't find database table '%s'\n", table_title);
+    status = sqlite3_bind_null ((sqlite3_stmt *)statement,
+                                (sqlite3_bind_parameter_index ((sqlite3_stmt *)statement, column_list_entry->tag)));
+  }
+
+  if (status == SQLITE_OK)
+  {
+    status = 1;
+  }
+  else
+  {
+    printf ("Can't write database column '%s'\n", column_list_entry->title);
     status = -1;
   }
 
   return status;
 }
 
-int32 db_read_table (db_info_t *db_info, int8 *title)
+int32 db_read_table (void *statement)
 {
   int status;
-  db_table_list_entry_t *table_list_entry = db_find_table (db_info->table_list, title);
-
-  if (table_list_entry != NULL)
+    
+  status = sqlite3_step ((sqlite3_stmt *)statement);
+  if (status == SQLITE_ROW)
   {
-    sqlite3_stmt *select = (sqlite3_stmt *)(table_list_entry->select);
-    
-    status = sqlite3_step (select);
-    
-    if (status == SQLITE_ROW)
-    {
-      status = 1;
-    }
-    else if (status == SQLITE_DONE)
-    {
-      status = 0;
-      sqlite3_reset (select);
-    }
-    else
-    {
-      printf ("Can't read database table '%s'\n", title);
-      status = -1;
-    }
-  }  
+    status = 1;
+  }
+  else if (status == SQLITE_DONE)
+  {
+    status = 0;
+    sqlite3_reset ((sqlite3_stmt *)statement);
+  }
   else
   {
-    printf ("Can't find database table '%s'\n", title);
+    printf ("Can't read table\n");
     status = -1;
   }
 
   return status;
 }
 
-int32 db_write_table (db_info_t *db_info, int8 *title)
+int32 db_write_table (void *statement)
 {
   int status;
-  db_table_list_entry_t *table_list_entry = db_find_table (db_info->table_list, title);
- 
-  if (table_list_entry != NULL)
+    
+  status = sqlite3_step ((sqlite3_stmt *)statement);
+  if (status == SQLITE_DONE)
   {
-    sqlite3_stmt *insert = (sqlite3_stmt *)(table_list_entry->insert);
-    
-    status = sqlite3_step (insert);
-    
-    if (status == SQLITE_DONE)
-    {
-      status = 1;
-    }
-    else
-    {
-      printf ("Can't write database table '%s'\n", title);
-      status = -1;
-    }
-
-    sqlite3_reset (insert);
+    status = 1;
   }
   else
   {
-    printf ("Can't find database table '%s'\n", title);
+    printf ("Can't write table\n");
     status = -1;
   }
+
+  sqlite3_reset ((sqlite3_stmt *)statement);
 
   return status;
 }
@@ -270,9 +224,9 @@ int32 db_clear_table (db_info_t *db_info, int8 *title)
     char *sql = NULL;
   
     sql = strdup ("DELETE FROM ");
-    string_join (sql, "[");
-    string_join (sql, title);
-    string_join (sql, "]");
+    STRING_CONCAT (sql, "[");
+    STRING_CONCAT (sql, title);
+    STRING_CONCAT (sql, "]");
   
     status = sqlite3_exec ((sqlite3 *)(db_info->handle), sql, NULL, NULL, NULL);
     free (sql);
@@ -304,35 +258,35 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
 
   /* Prepare create statement */
   sql = strdup ("CREATE TABLE IF NOT EXISTS");
-  string_join (sql, "[");
-  string_join (sql, table_list_entry->title);
-  string_join (sql, "] ( ");
+  STRING_CONCAT (sql, "[");
+  STRING_CONCAT (sql, table_list_entry->title);
+  STRING_CONCAT (sql, "] ( ");
 
   while (column_list_entry != NULL)
   {
     /* Column title */
-    string_join (sql, "[");
-    string_join (sql, column_list_entry->title);
-    string_join (sql, "]");
+    STRING_CONCAT (sql, "[");
+    STRING_CONCAT (sql, column_list_entry->title);
+    STRING_CONCAT (sql, "]");
  
     /* Space, then column data type */
     if (column_list_entry->type != 0)
     {
       if (column_list_entry->type == DB_COLUMN_TYPE_TEXT)
       {
-        string_join (sql, " TEXT");
+        STRING_CONCAT (sql, " TEXT");
       }
       else if (column_list_entry->type == DB_COLUMN_TYPE_INT)
       {
-        string_join (sql, " INTEGER");
+        STRING_CONCAT (sql, " INTEGER");
       }
       else if (column_list_entry->type == DB_COLUMN_TYPE_FLOAT)
       {
-        string_join (sql, " REAL");
+        STRING_CONCAT (sql, " REAL");
       }
       else if (column_list_entry->type == DB_COLUMN_TYPE_BLOB)
       {
-        string_join (sql, " BLOB");
+        STRING_CONCAT (sql, " BLOB");
       }
     }
 
@@ -341,30 +295,30 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
     {
       if (column_list_entry->flags & DB_COLUMN_FLAG_PRIMARY_KEY)
       {
-        string_join (sql, " PRIMARY KEY");
+        STRING_CONCAT (sql, " PRIMARY KEY");
       }
       if (column_list_entry->flags & DB_COLUMN_FLAG_NOT_NULL)
       {
-        string_join (sql, " NOT NULL");
+        STRING_CONCAT (sql, " NOT NULL");
       }
       if (column_list_entry->flags & DB_COLUMN_FLAG_DEFAULT_TIMESTAMP)
       {
-        string_join (sql, " DEFAULT (DATETIME('NOW','LOCALTIME'))");
+        STRING_CONCAT (sql, " DEFAULT (DATETIME('NOW','LOCALTIME'))");
       }
       if (column_list_entry->flags & DB_COLUMN_FLAG_DEFAULT_NA)
       {
-        string_join (sql, " DEFAULT NA");
+        STRING_CONCAT (sql, " DEFAULT NA");
       }
     }
 
     /* Comma, if there is column to add, else closing bracket */
     if (column_list_entry->next != NULL)
     {
-      string_join (sql, ", ");
+      STRING_CONCAT (sql, ", ");
     }
     else
     {
-      string_join (sql, " )");
+      STRING_CONCAT (sql, " )");
     }
 
     column_list_entry = column_list_entry->next;
@@ -377,57 +331,69 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
   {
     /* Prepare insert statement */
     sql = strdup ("INSERT INTO ");
-    string_join (sql, "[");
-    string_join (sql, table_list_entry->title);
-    string_join (sql, "] ( ");
+    STRING_CONCAT (sql, "[");
+    STRING_CONCAT (sql, table_list_entry->title);
+    STRING_CONCAT (sql, "]");
 
-    /* Column title */
     column_list_entry = table_list_entry->column_list;
-    while (column_list_entry != NULL)
+    while ((column_list_entry != NULL) &&
+           (column_list_entry->flags & (DB_COLUMN_FLAG_PRIMARY_KEY | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP)))
     {
-      if (!(column_list_entry->flags & (DB_COLUMN_FLAG_PRIMARY_KEY | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP)))
-      {
-        /* Column tag */
-        string_join (sql, "[");
-        string_join (sql, column_list_entry->title);
-        string_join (sql, "]");
-
-        /* Comma, if there is column to add, else closing bracket */
-        if (column_list_entry->next != NULL)
-        {
-          string_join (sql, ", ");
-        }
-        else
-        {
-          string_join (sql, " ) VALUES ( ");
-        }
-      }
-      
       column_list_entry = column_list_entry->next;
     }
 
-    column_list_entry = table_list_entry->column_list;
-    while (column_list_entry != NULL)
+    if (column_list_entry != NULL)
     {
-      if (!(column_list_entry->flags & (DB_COLUMN_FLAG_PRIMARY_KEY | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP)))
-      {
-        /* Column tag */
-        string_join (sql, column_list_entry->tag);
+      STRING_CONCAT (sql, " ( ");
 
-        /* Comma, if there is column to add, else closing bracket */
-        if (column_list_entry->next != NULL)
+      STRING_CONCAT (sql, "[");
+      STRING_CONCAT (sql, column_list_entry->title);
+      STRING_CONCAT (sql, "]");
+
+      column_list_entry = column_list_entry->next;
+      while (column_list_entry != NULL)
+      {
+        if (!(column_list_entry->flags & (DB_COLUMN_FLAG_PRIMARY_KEY | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP)))
         {
-          string_join (sql, ", ");
+          STRING_CONCAT (sql, ", ");
+          
+          STRING_CONCAT (sql, "[");
+          STRING_CONCAT (sql, column_list_entry->title);
+          STRING_CONCAT (sql, "]");
         }
-        else
-        {
-          string_join (sql, " )");
-        }
+        
+        column_list_entry = column_list_entry->next;        
       }
-      
+
+      STRING_CONCAT (sql, " ) VALUES ( ");
+    }
+
+    column_list_entry = table_list_entry->column_list;
+    while ((column_list_entry != NULL) &&
+           (column_list_entry->flags & (DB_COLUMN_FLAG_PRIMARY_KEY | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP)))
+    {
       column_list_entry = column_list_entry->next;
     }
-    
+
+    if (column_list_entry != NULL)
+    {
+      STRING_CONCAT (sql, column_list_entry->tag);
+
+      column_list_entry = column_list_entry->next;
+      while (column_list_entry != NULL)
+      {
+        if (!(column_list_entry->flags & (DB_COLUMN_FLAG_PRIMARY_KEY | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP)))
+        {
+          STRING_CONCAT (sql, ", ");
+          STRING_CONCAT (sql, column_list_entry->tag);
+        }
+        
+        column_list_entry = column_list_entry->next;        
+      }
+
+      STRING_CONCAT (sql, " )");
+    } 
+
     status = sqlite3_prepare_v2 ((sqlite3 *)(db_info->handle), sql, -1,
                                  (sqlite3_stmt **)(&(table_list_entry->insert)), NULL);
     
@@ -445,11 +411,97 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
 
   if (status == SQLITE_OK)
   {
+    /* Prepare update statement */
+    column_list_entry = table_list_entry->column_list;
+    while ((column_list_entry != NULL) && 
+           (!(column_list_entry->flags & DB_COLUMN_FLAG_UPDATE_VALUE)))
+    {
+      column_list_entry = column_list_entry->next;
+    }
+
+    if (column_list_entry != NULL)
+    {
+      sql = strdup ("UPDATE ");
+      STRING_CONCAT (sql, "[");
+      STRING_CONCAT (sql, table_list_entry->title);
+      STRING_CONCAT (sql, "] SET ");
+
+      STRING_CONCAT (sql, "[");
+      STRING_CONCAT (sql, column_list_entry->title);
+      STRING_CONCAT (sql, "] = ");
+      STRING_CONCAT (sql, column_list_entry->tag);
+
+      column_list_entry = column_list_entry->next;
+      while (column_list_entry != NULL)
+      {
+        if (column_list_entry->flags & DB_COLUMN_FLAG_UPDATE_VALUE)
+        {
+          STRING_CONCAT (sql, ", ");
+          
+          STRING_CONCAT (sql, "[");
+          STRING_CONCAT (sql, column_list_entry->title);
+          STRING_CONCAT (sql, "] = ");
+          STRING_CONCAT (sql, column_list_entry->tag);
+        }        
+
+        column_list_entry = column_list_entry->next;
+      }
+    }
+   
+    column_list_entry = table_list_entry->column_list;
+    while ((column_list_entry != NULL) && 
+           (!(column_list_entry->flags & DB_COLUMN_FLAG_UPDATE_KEY)))
+    {
+      column_list_entry = column_list_entry->next;
+    }
+
+    if (column_list_entry != NULL)
+    {
+      STRING_CONCAT (sql, " WHERE ");
+      
+      STRING_CONCAT (sql, "[");
+      STRING_CONCAT (sql, column_list_entry->title);
+      STRING_CONCAT (sql, "] = ");
+      STRING_CONCAT (sql, column_list_entry->tag);
+
+      column_list_entry = column_list_entry->next;
+      while (column_list_entry != NULL)
+      {
+        if (column_list_entry->flags & DB_COLUMN_FLAG_UPDATE_KEY)
+        {
+          STRING_CONCAT (sql, " AND ");
+          
+          STRING_CONCAT (sql, "[");
+          STRING_CONCAT (sql, column_list_entry->title);
+          STRING_CONCAT (sql, "] = ");
+          STRING_CONCAT (sql, column_list_entry->tag);
+        }        
+
+        column_list_entry = column_list_entry->next;
+      }      
+    }
+
+    if (sql != NULL)
+    {
+      status = sqlite3_prepare_v2 ((sqlite3 *)(db_info->handle), sql, -1,
+                                   (sqlite3_stmt **)(&(table_list_entry->update)), NULL);
+    
+      if (status != SQLITE_OK)
+      {
+        printf ("Can't prepare database update statement '%s'\n", sql);
+      }
+    
+      free (sql);
+    }
+  }
+
+  if (status == SQLITE_OK)
+  {
     /* Prepare select statement */
     sql = strdup ("SELECT * FROM ");
-    string_join (sql, "[");
-    string_join (sql, table_list_entry->title);
-    string_join (sql, "]");
+    STRING_CONCAT (sql, "[");
+    STRING_CONCAT (sql, table_list_entry->title);
+    STRING_CONCAT (sql, "]");
 
     status = sqlite3_prepare_v2 ((sqlite3 *)(db_info->handle), sql, -1,
                                  (sqlite3_stmt **)(&(table_list_entry->select)), NULL);
@@ -482,6 +534,12 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
     {
       sqlite3_finalize (table_list_entry->select);
       table_list_entry->select = NULL;
+    }
+
+    if (table_list_entry->update != NULL)
+    {
+      sqlite3_finalize (table_list_entry->update);
+      table_list_entry->update = NULL;
     }
 
     status = -1;
@@ -527,19 +585,20 @@ int32 db_close (db_info_t *db_info)
 
 static db_column_list_entry_t device_table_column_entries[DEVICE_TABLE_NUM_COLUMNS+1] = 
 {
-  {NULL, "No.",      0,  DB_COLUMN_TYPE_INT,  DB_COLUMN_FLAG_PRIMARY_KEY,                            NULL},
-  {NULL, "Address",  0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA), NULL},
-  {NULL, "Name",     0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA), NULL},
-  {NULL, "Service",  0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA), NULL},
-  {NULL, "Interval", 0,  DB_COLUMN_TYPE_INT,  (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA), NULL},
-  {NULL, "Status",   0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA), NULL},
-  {NULL, NULL,       -1, DB_COLUMN_TYPE_NULL, 0,                                                     NULL},
+  {NULL, "No.",      0,  DB_COLUMN_TYPE_INT,  DB_COLUMN_FLAG_NOT_NULL,                                 NULL},
+  {NULL, "Address",  0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_UPDATE_KEY),   NULL},
+  {NULL, "Name",     0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),   NULL},
+  {NULL, "Service",  0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_UPDATE_KEY),   NULL},
+  {NULL, "Interval", 0,  DB_COLUMN_TYPE_INT,  (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),   NULL},
+  {NULL, "Status",   0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA 
+                                                                       | DB_COLUMN_FLAG_UPDATE_VALUE), NULL},
+  {NULL, NULL,       -1, DB_COLUMN_TYPE_NULL, 0,                                                       NULL},
 };
 
 static db_table_list_entry_t table_entries[NUM_TABLES+1] =
 {
-  {NULL, device_table_column_entries, "Device List", 0,  NULL, NULL},
-  {NULL, NULL,                        NULL,          -1, NULL, NULL},
+  {NULL, device_table_column_entries, "Device List", 0,  NULL, NULL, NULL},
+  {NULL, NULL,                        NULL,          -1, NULL, NULL, NULL},
 };
 
 
@@ -555,26 +614,78 @@ int main (int argc, char *argv[])
 
       if ((db_create_table (db_info, &(table_entries[0]))) > 0)
       {
+        db_column_list_entry_t *column_list_entry = table_entries[0].column_list;
         db_column_value_t column_value;
 
-        /*
         db_clear_table (db_info, "Device List");
         
-        column_value.decimal = 98.4;
-        if ((db_write_column (db_info, "Group Title", "Temperature (F)", &column_value)) > 0)
+        column_value.integer = 1;
+        db_write_column (table_entries[0].insert, &(column_list_entry[0]), &column_value);
+        column_value.text = "01:02:03:04:05:06";
+        db_write_column (table_entries[0].insert, &(column_list_entry[1]), &column_value);
+        column_value.text = "Temperature Sensor";
+        db_write_column (table_entries[0].insert, &(column_list_entry[2]), &column_value);
+        column_value.text = "1809";
+        db_write_column (table_entries[0].insert, &(column_list_entry[3]), &column_value);
+        column_value.integer = 15;
+        db_write_column (table_entries[0].insert, &(column_list_entry[4]), &column_value);
+        column_value.text = "NA";
+        db_write_column (table_entries[0].insert, &(column_list_entry[5]), &column_value);
+        db_write_table (table_entries[0].insert);
+        
+        column_value.integer = 1;
+        db_write_column (table_entries[0].insert, &(column_list_entry[0]), &column_value);
+        column_value.text = "01:02:03:04:05:06";
+        db_write_column (table_entries[0].insert, &(column_list_entry[1]), &column_value);
+        column_value.text = "Temperature Sensor";
+        db_write_column (table_entries[0].insert, &(column_list_entry[2]), &column_value);
+        column_value.text = "180f";
+        db_write_column (table_entries[0].insert, &(column_list_entry[3]), &column_value);
+        column_value.integer = 60;
+        db_write_column (table_entries[0].insert, &(column_list_entry[4]), &column_value);
+        column_value.text = "NA";
+        db_write_column (table_entries[0].insert, &(column_list_entry[5]), &column_value);
+        db_write_table (table_entries[0].insert);
+        
+        printf ("Write table\n");
+        while ((db_read_table (table_entries[0].select)) > 0)
         {
-          db_write_table (db_info, "Group Title");
-        }
-        column_value.decimal = 100.4;
-        if ((db_write_column (db_info, "Group Title", "Temperature (F)", &column_value)) > 0)
-        {
-          db_write_table (db_info, "Group Title");
-        }
-        */
+          column_list_entry = table_entries[0].column_list;
 
-        while ((db_read_table (db_info, table_entries[0].title)) > 0)
+          db_read_column (db_info, table_entries[0].title, column_list_entry[0].title, &column_value);
+          printf ("%3d", column_value.integer);
+          db_read_column (db_info, table_entries[0].title, column_list_entry[1].title, &column_value);
+          printf ("%20s", column_value.text);          
+          db_read_column (db_info, table_entries[0].title, column_list_entry[2].title, &column_value);
+          printf ("%20s", column_value.text);
+          db_read_column (db_info, table_entries[0].title, column_list_entry[3].title, &column_value);
+          printf ("%10s", column_value.text);          
+          db_read_column (db_info, table_entries[0].title, column_list_entry[4].title, &column_value);
+          printf ("%4d", column_value.integer);
+          db_read_column (db_info, table_entries[0].title, column_list_entry[5].title, &column_value);
+          printf ("%10s\n", column_value.text);
+        }
+
+        column_value.text = "01:02:03:04:05:06";
+        db_write_column (table_entries[0].update, &(column_list_entry[1]), &column_value);
+        column_value.text = "1809";
+        db_write_column (table_entries[0].update, &(column_list_entry[3]), &column_value);
+        column_value.text = "Active";
+        db_write_column (table_entries[0].update, &(column_list_entry[5]), &column_value);
+        db_write_table (table_entries[0].update);
+        
+        column_value.text = "01:02:03:04:05:06";
+        db_write_column (table_entries[0].update, &(column_list_entry[1]), &column_value);
+        column_value.text = "180f";
+        db_write_column (table_entries[0].update, &(column_list_entry[3]), &column_value);
+        column_value.text = "Inactive";
+        db_write_column (table_entries[0].update, &(column_list_entry[5]), &column_value);
+        db_write_table (table_entries[0].update);
+        
+        printf ("Update table\n");
+        while ((db_read_table (table_entries[0].select)) > 0)
         {
-          db_column_list_entry_t *column_list_entry = table_entries[0].column_list;
+          column_list_entry = table_entries[0].column_list;
 
           db_read_column (db_info, table_entries[0].title, column_list_entry[0].title, &column_value);
           printf ("%3d", column_value.integer);

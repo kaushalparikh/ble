@@ -50,7 +50,9 @@ enum
   DB_COLUMN_FLAG_PRIMARY_KEY       = 0x00000001,
   DB_COLUMN_FLAG_NOT_NULL          = 0x00000002,
   DB_COLUMN_FLAG_DEFAULT_TIMESTAMP = 0x00000004,
-  DB_COLUMN_FLAG_DEFAULT_NA        = 0x00000008
+  DB_COLUMN_FLAG_DEFAULT_NA        = 0x00000008,
+  DB_COLUMN_FLAG_UPDATE_KEY        = 0x00000010,
+  DB_COLUMN_FLAG_UPDATE_VALUE      = 0x00000020
 };
 
 typedef union
@@ -84,6 +86,7 @@ struct db_table_list_entry
   int8                       *title;
   uint32                      index;
   void                       *insert;
+  void                       *update;
   void                       *select;
 };
 
@@ -95,10 +98,12 @@ typedef struct
   db_table_list_entry_t *table_list;
 } db_info_t;
 
-extern int32 db_write_column (db_info_t *db_info, int8 *table_title, int8 *column_title,
-                              db_column_value_t *column_value);
+extern int32 db_write_column (void *statement,
+                              db_column_list_entry_t *column_list_entry, db_column_value_t *column_value);
 
-extern int32 db_write_table (db_info_t *db_info, int8 *title);
+extern int32 db_read_table (void *statement);
+
+extern int32 db_write_table (void *statement);
 
 extern int32 db_clear_table (db_info_t *db_info, int8 *title);
 
@@ -108,11 +113,13 @@ extern int32 db_open (int8 *file_name, db_info_t **db_info);
 
 extern int32 db_close (db_info_t *db_info);
 
-static inline void string_join (int8 *dest, int8 *src)
-{
-  dest = realloc (dest, ((strlen (dest)) + (strlen (src)) + 1));
-  dest = strcat (dest, src);   
-}
+/* String API */
+
+#define STRING_CONCAT(dest, src)                                    \
+  {                                                                 \
+    dest = realloc (dest, ((strlen (dest)) + (strlen (src)) + 1));  \
+    dest = strcat (dest, src);                                      \
+  } 
 
 static inline void string_replace_char (int8 *dest, int8 search, int8 replace)
 {
