@@ -1,6 +1,7 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
+#include <string.h>
 #include "types.h"
 
 /* Serial API */
@@ -106,6 +107,50 @@ extern int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_l
 extern int32 db_open (int8 *file_name, db_info_t **db_info);
 
 extern int32 db_close (db_info_t *db_info);
+
+static inline void string_join (int8 *dest, int8 *src)
+{
+  dest = realloc (dest, ((strlen (dest)) + (strlen (src)) + 1));
+  dest = strcat (dest, src);   
+}
+
+static inline void string_replace_char (int8 *dest, int8 search, int8 replace)
+{
+  int32 index = 0;
+  
+  while (dest[index] != '\0')
+  {
+    if (dest[index] == search)
+    {
+      dest[index] = replace;
+    }
+    
+    index++;
+  }
+}
+
+static inline void hex_to_string (uint8 *hex, uint32 length, int8 *dest, int8 delimit)
+{
+  uint32 byte;
+  char lut[] = "0123456789ABCDEF";
+
+  for (byte = 0; byte < length; byte++)
+  {
+    *dest = lut[((*hex) >> 4) & 0x0f];
+    dest++;
+    *dest = lut[(*hex) & 0x0f];
+    dest++;
+    hex++;
+
+    if (delimit != '\0')
+    {
+      *dest = delimit;
+      dest++;
+    }
+  }
+
+  *dest = '\0';
+}
 
 #endif
 
