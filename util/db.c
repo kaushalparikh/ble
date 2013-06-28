@@ -513,6 +513,18 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
   }
   else
   {
+    db_column_list_entry_t *first_column = table_list_entry->column_list;
+    db_column_list_entry_t *column_list = table_list_entry->column_list;
+    
+    while (column_list != NULL)
+    {
+      column_list_entry = column_list;
+      free (column_list_entry->tag);
+      list_remove ((list_entry_t **)(&column_list), (list_entry_t *)column_list_entry);  
+    }
+
+    table_list_entry->column_list = first_column;
+    
     if (table_list_entry->insert != NULL)
     {
       sqlite3_finalize (table_list_entry->insert);

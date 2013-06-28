@@ -43,7 +43,12 @@ typedef struct PACKED
 } ble_char_temperature_t;
 
 /* Database declaration/definition */
-#define DB_NUM_TABLES                (1)
+enum
+{
+  DB_DEVICE_LIST_TABLE = 0,
+  DB_NUM_TABLES        = 1
+};
+
 #define DB_DEVICE_TABLE_NUM_COLUMNS  (6)
 
 static db_info_t db_info = 
@@ -371,26 +376,35 @@ int32 ble_get_device_list (ble_device_list_entry_t **device_list)
     status = db_open (&db_info);
     if (status > 0)
     {
-      int32 table = 0;
-      
-      while (db_tables[table].index != -1)
-      {
-        status = db_create_table (&db_info, &(db_tables[table]));
-        table++;
-      }
+      status = db_create_table (&db_info, &(db_tables[DB_DEVICE_LIST_TABLE]));
+    }
+  }
 
-      if (status < 0)
-      {
-        table--;
-        while (table >= 0)
-        {
-          status = db_delete_table (&db_info, &(db_tables[table]));
-          table--;
-        }
-        
-        db_close (&db_info);
-        db_info.handle = NULL;
-      }
+  if (status > 0)
+  {
+    printf ("BLE device list -- \n");
+    
+    while ((status = db_read_table (&(db_tables[DB_DEVICE_LIST_TABLE]))) > 0)
+    {
+      db_column_value_t column_value;
+      db_column_list_entry_t *column_list_entry = db_tables[DB_DEVICE_LIST_TABLE].column_list;
+
+      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[0]), &column_value);
+      printf ("%4d", column_value.integer);
+      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[1]), &column_value);
+      printf ("%20s", column_value.text);          
+      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[2]), &column_value);
+      printf ("%20s", column_value.text);
+      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[3]), &column_value);
+      printf ("%10s", column_value.text);          
+      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[4]), &column_value);
+      printf ("%4d", column_value.integer);
+      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[5]), &column_value);
+      printf ("%10s\n", column_value.text);
+    }
+
+    if (status < 0)
+    {
     }
   }
 

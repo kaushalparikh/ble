@@ -67,24 +67,21 @@ typedef union
   } blob;
 } db_column_value_t;
 
-struct db_column_list_entry
+typedef struct
 {
-  struct db_column_list_entry *next;
   int8                        *title;
   uint32                       index;
   uint8                        type;
   uint32                       flags;
   int8                        *tag;
-};
-
-typedef struct db_column_list_entry db_column_list_entry_t;
+} db_column_entry_t;
 
 struct db_table_list_entry
 {
   struct db_table_list_entry *next;
-  db_column_list_entry_t     *column_list;
   int8                       *title;
-  uint32                      index;
+  uint32                      num_columns;
+  db_column_entry_t          *column;
   void                       *insert;
   void                       *update;
   void                       *select;
