@@ -39,7 +39,7 @@ OBJ := $(patsubst %.c,$(OBJ_DIR)/%.o, $(SRC))
 
 
 # System packages
-SYSTEM_PACKAGES := libudev
+SYSTEM_PACKAGES := libudev sqlite3
 
 # System headers/libraries
 ifneq ($(SYSTEM_PACKAGES),)

@@ -158,12 +158,22 @@ typedef struct
   int32                     setup_time;
 } ble_device_t;
 
+struct ble_device_list_entry
+{
+  struct ble_device_list_entry *next;
+  ble_device_t                  info;
+};
+
+typedef struct ble_device_list_entry ble_device_list_entry_t;
+
 extern ble_attr_list_entry_t * ble_find_char_desc (ble_attr_list_entry_t *attr_list_entry,
                                                    uint16 uuid);
 
-extern int32 ble_lookup_service (ble_service_list_entry_t *service_list_entry);
+extern int32 ble_find_service (ble_service_list_entry_t *service_list_entry);
 
 extern uint32 ble_identify_device (uint8 *address, ble_service_list_entry_t *service_list_entry);
+
+extern int32 ble_get_device_list (ble_device_list_entry_t **device_list);
 
 #endif
 

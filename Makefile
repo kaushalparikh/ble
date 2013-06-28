@@ -38,7 +38,7 @@ DEP_MASTER := $(patsubst %.c,$(DEP_DIR)/%.d, $(SRC_MASTER))
 OBJ_MASTER := $(patsubst %.c,$(OBJ_DIR)/%.o, $(SRC_MASTER))
 
 # System packages
-SYSTEM_PACKAGES := libudev
+SYSTEM_PACKAGES := libudev sqlite3
 
 # System headers/libraries
 ifneq ($(SYSTEM_PACKAGES),)

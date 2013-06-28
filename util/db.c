@@ -9,33 +9,6 @@
 #include "util.h"
 
 
-static void db_prepare_table_columns (db_table_list_entry_t *table_list_entry)
-{
-  int column = 0;
-  int table = 0;
-
-  do
-  {
-    db_column_list_entry_t *column_list_entry = table_list_entry[table].column_list;
-    table_list_entry[table].column_list       = NULL;
-    
-    column = 0;
-    do
-    {
-      column_list_entry[column].index = column;
-      column_list_entry[column].tag   = strdup (":");
-      STRING_CONCAT (column_list_entry[column].tag, column_list_entry[column].title);
-      string_replace_char (column_list_entry[column].tag, ' ', '_');
-      string_replace_char (column_list_entry[column].tag, '.', '_');
-      list_add ((list_entry_t **)&(table_list_entry->column_list), (list_entry_t *)&(column_list_entry[column]));
-      column++;
-    } while (column_list_entry[column].index != -1);
-
-    table_list_entry[table].index = table;
-    table++;
-  } while (table_list_entry[table].index != -1);
-}
-
 static db_table_list_entry_t * db_find_table (db_table_list_entry_t *table_list_entry, int8 *title)
 {
   while (table_list_entry != NULL)
@@ -227,6 +200,18 @@ int32 db_delete_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
 
   if (status == SQLITE_OK)
   {
+    db_column_list_entry_t *first_column = table_list_entry->column_list;
+    db_column_list_entry_t *column_list = table_list_entry->column_list;
+    
+    while (column_list != NULL)
+    {
+      db_column_list_entry_t *column_list_entry = column_list;
+      free (column_list_entry->tag);
+      list_remove ((list_entry_t **)(&column_list), (list_entry_t *)column_list_entry);  
+    }
+
+    table_list_entry->column_list = first_column;
+    list_remove ((list_entry_t **)(&(db_info->table_list)), (list_entry_t *)table_list_entry);
     status = 1;
   }
   else
@@ -241,8 +226,24 @@ int32 db_delete_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
 int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry)
 {
   int status;
-  char *sql = NULL;
-  db_column_list_entry_t *column_list_entry = table_list_entry->column_list;
+  int column;
+  char *sql;
+  db_column_list_entry_t *column_list_entry;
+
+  column                        = 0;
+  column_list_entry             = table_list_entry->column_list;
+  table_list_entry->column_list = NULL;
+  
+  do
+  {
+    column_list_entry[column].index = column;
+    column_list_entry[column].tag   = strdup (":");
+    STRING_CONCAT (column_list_entry[column].tag, column_list_entry[column].title);
+    string_replace_char (column_list_entry[column].tag, ' ', '_');
+    string_replace_char (column_list_entry[column].tag, '.', '_');
+    list_add ((list_entry_t **)&(table_list_entry->column_list), (list_entry_t *)&(column_list_entry[column]));
+    column++;
+  } while (column_list_entry[column].index != -1);
 
   /* Prepare create statement */
   sql = strdup ("CREATE TABLE IF NOT EXISTS");
@@ -536,22 +537,21 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
   return status;
 }
 
-int32 db_open (int8 *file_name, db_info_t **db_info)
+int32 db_open (db_info_t *db_info)
 {
   int status;
   sqlite3 *db;
 
-  status = sqlite3_open_v2 (file_name, &db,
+  status = sqlite3_open_v2 (db_info->file_name, &db,
                             (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE), NULL);
   if (status == SQLITE_OK)
   {
-    *db_info = (db_info_t *)malloc (sizeof (**db_info));
-    (*db_info)->handle = (int32)db;
+    db_info->handle = db;
     status = 1;
   }
   else
   {
-    printf ("Can't open database %s\n", file_name);
+    printf ("Can't open database %s\n", db_info->file_name);
     sqlite3_close (db);
     status = -1;
   }
@@ -562,7 +562,6 @@ int32 db_open (int8 *file_name, db_info_t **db_info)
 int32 db_close (db_info_t *db_info)
 {
   sqlite3 *db = (sqlite3 *)(db_info->handle);
-  free (db_info);
   return sqlite3_close (db);
 }
 
@@ -592,104 +591,112 @@ static db_table_list_entry_t table_entries[NUM_TABLES+1] =
 
 int main (int argc, char *argv[])
 {
-  db_info_t *db_info = NULL;
+  db_info_t db_info = {NULL, NULL, NULL};
 
   if (argc > 1)
   {
-    if ((db_open (argv[1], &db_info)) > 0)
+    db_info.file_name = argv[1];
+    
+    if ((db_open (&db_info)) > 0)
     {
-      db_delete_table (db_info, &(table_entries[0]));
-      db_prepare_table_columns (table_entries);
-        
-      if ((db_create_table (db_info, &(table_entries[0]))) > 0)
+      int repeat = 2;
+
+      while (repeat > 0)
       {
-        db_column_list_entry_t *column_list_entry = table_entries[0].column_list;
-        db_column_value_t column_value;
-
-        column_value.integer = 1;
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[0]), &column_value);
-        column_value.text = "01:02:03:04:05:06";
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[1]), &column_value);
-        column_value.text = "Temperature Sensor";
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[2]), &column_value);
-        column_value.text = "1809";
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[3]), &column_value);
-        column_value.integer = 15;
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[4]), &column_value);
-        column_value.text = "NA";
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[5]), &column_value);
-        db_write_table (&(table_entries[0]), 1);
-        
-        column_value.integer = 1;
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[0]), &column_value);
-        column_value.text = "01:02:03:04:05:06";
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[1]), &column_value);
-        column_value.text = "Temperature Sensor";
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[2]), &column_value);
-        column_value.text = "180f";
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[3]), &column_value);
-        column_value.integer = 60;
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[4]), &column_value);
-        column_value.text = "NA";
-        db_write_column (&(table_entries[0]), 1, &(column_list_entry[5]), &column_value);
-        db_write_table (&(table_entries[0]), 1);
-        
-        printf ("Write table\n");
-        while ((db_read_table (&(table_entries[0]))) > 0)
+        if ((db_create_table (&db_info, &(table_entries[0]))) > 0)
         {
-          column_list_entry = table_entries[0].column_list;
-
-          db_read_column (&(table_entries[0]), &(column_list_entry[0]), &column_value);
-          printf ("%3d", column_value.integer);
-          db_read_column (&(table_entries[0]), &(column_list_entry[1]), &column_value);
-          printf ("%20s", column_value.text);          
-          db_read_column (&(table_entries[0]), &(column_list_entry[2]), &column_value);
-          printf ("%20s", column_value.text);
-          db_read_column (&(table_entries[0]), &(column_list_entry[3]), &column_value);
-          printf ("%10s", column_value.text);          
-          db_read_column (&(table_entries[0]), &(column_list_entry[4]), &column_value);
-          printf ("%4d", column_value.integer);
-          db_read_column (&(table_entries[0]), &(column_list_entry[5]), &column_value);
-          printf ("%10s\n", column_value.text);
+          db_column_list_entry_t *column_list_entry = table_entries[0].column_list;
+          db_column_value_t column_value;
+  
+          column_value.integer = 1;
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[0]), &column_value);
+          column_value.text = "01:02:03:04:05:06";
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[1]), &column_value);
+          column_value.text = "Temperature Sensor";
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[2]), &column_value);
+          column_value.text = "1809";
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[3]), &column_value);
+          column_value.integer = 15;
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[4]), &column_value);
+          column_value.text = "NA";
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[5]), &column_value);
+          db_write_table (&(table_entries[0]), 1);
+          
+          column_value.integer = 1;
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[0]), &column_value);
+          column_value.text = "01:02:03:04:05:06";
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[1]), &column_value);
+          column_value.text = "Temperature Sensor";
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[2]), &column_value);
+          column_value.text = "180f";
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[3]), &column_value);
+          column_value.integer = 60;
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[4]), &column_value);
+          column_value.text = "NA";
+          db_write_column (&(table_entries[0]), 1, &(column_list_entry[5]), &column_value);
+          db_write_table (&(table_entries[0]), 1);
+          
+          printf ("Write table\n");
+          while ((db_read_table (&(table_entries[0]))) > 0)
+          {
+            column_list_entry = table_entries[0].column_list;
+  
+            db_read_column (&(table_entries[0]), &(column_list_entry[0]), &column_value);
+            printf ("%3d", column_value.integer);
+            db_read_column (&(table_entries[0]), &(column_list_entry[1]), &column_value);
+            printf ("%20s", column_value.text);          
+            db_read_column (&(table_entries[0]), &(column_list_entry[2]), &column_value);
+            printf ("%20s", column_value.text);
+            db_read_column (&(table_entries[0]), &(column_list_entry[3]), &column_value);
+            printf ("%10s", column_value.text);          
+            db_read_column (&(table_entries[0]), &(column_list_entry[4]), &column_value);
+            printf ("%4d", column_value.integer);
+            db_read_column (&(table_entries[0]), &(column_list_entry[5]), &column_value);
+            printf ("%10s\n", column_value.text);
+          }
+  
+          column_value.text = "01:02:03:04:05:06";
+          db_write_column (&(table_entries[0]), 0, &(column_list_entry[1]), &column_value);
+          column_value.text = "1809";
+          db_write_column (&(table_entries[0]), 0, &(column_list_entry[3]), &column_value);
+          column_value.text = "Active";
+          db_write_column (&(table_entries[0]), 0, &(column_list_entry[5]), &column_value);
+          db_write_table (&(table_entries[0]), 0);
+          
+          column_value.text = "01:02:03:04:05:06";
+          db_write_column (&(table_entries[0]), 0, &(column_list_entry[1]), &column_value);
+          column_value.text = "180f";
+          db_write_column (&(table_entries[0]), 0, &(column_list_entry[3]), &column_value);
+          column_value.text = "Inactive";
+          db_write_column (&(table_entries[0]), 0, &(column_list_entry[5]), &column_value);
+          db_write_table (&(table_entries[0]), 0);
+          
+          printf ("Update table\n");
+          while ((db_read_table (&(table_entries[0]))) > 0)
+          {
+            column_list_entry = table_entries[0].column_list;
+  
+            db_read_column (&(table_entries[0]), &(column_list_entry[0]), &column_value);
+            printf ("%3d", column_value.integer);
+            db_read_column (&(table_entries[0]), &(column_list_entry[1]), &column_value);
+            printf ("%20s", column_value.text);          
+            db_read_column (&(table_entries[0]), &(column_list_entry[2]), &column_value);
+            printf ("%20s", column_value.text);
+            db_read_column (&(table_entries[0]), &(column_list_entry[3]), &column_value);
+            printf ("%10s", column_value.text);          
+            db_read_column (&(table_entries[0]), &(column_list_entry[4]), &column_value);
+            printf ("%4d", column_value.integer);
+            db_read_column (&(table_entries[0]), &(column_list_entry[5]), &column_value);
+            printf ("%10s\n", column_value.text);
+          }
+  
+          db_delete_table (&db_info, &(table_entries[0]));
         }
 
-        column_value.text = "01:02:03:04:05:06";
-        db_write_column (&(table_entries[0]), 0, &(column_list_entry[1]), &column_value);
-        column_value.text = "1809";
-        db_write_column (&(table_entries[0]), 0, &(column_list_entry[3]), &column_value);
-        column_value.text = "Active";
-        db_write_column (&(table_entries[0]), 0, &(column_list_entry[5]), &column_value);
-        db_write_table (&(table_entries[0]), 0);
-        
-        column_value.text = "01:02:03:04:05:06";
-        db_write_column (&(table_entries[0]), 0, &(column_list_entry[1]), &column_value);
-        column_value.text = "180f";
-        db_write_column (&(table_entries[0]), 0, &(column_list_entry[3]), &column_value);
-        column_value.text = "Inactive";
-        db_write_column (&(table_entries[0]), 0, &(column_list_entry[5]), &column_value);
-        db_write_table (&(table_entries[0]), 0);
-        
-        printf ("Update table\n");
-        while ((db_read_table (&(table_entries[0]))) > 0)
-        {
-          column_list_entry = table_entries[0].column_list;
-
-          db_read_column (&(table_entries[0]), &(column_list_entry[0]), &column_value);
-          printf ("%3d", column_value.integer);
-          db_read_column (&(table_entries[0]), &(column_list_entry[1]), &column_value);
-          printf ("%20s", column_value.text);          
-          db_read_column (&(table_entries[0]), &(column_list_entry[2]), &column_value);
-          printf ("%20s", column_value.text);
-          db_read_column (&(table_entries[0]), &(column_list_entry[3]), &column_value);
-          printf ("%10s", column_value.text);          
-          db_read_column (&(table_entries[0]), &(column_list_entry[4]), &column_value);
-          printf ("%4d", column_value.integer);
-          db_read_column (&(table_entries[0]), &(column_list_entry[5]), &column_value);
-          printf ("%10s\n", column_value.text);
-        }
+        repeat--;
       }
       
-      db_close (db_info);
+      db_close (&db_info);
     }
   }
   else

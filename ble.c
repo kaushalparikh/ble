@@ -30,14 +30,6 @@ typedef struct ble_message_list_entry ble_message_list_entry_t;
 
 LIST_HEAD_INIT (ble_message_list_entry_t, ble_message_list);
 
-struct ble_device_list_entry
-{
-  struct ble_device_list_entry *next;
-  ble_device_t                  info;
-};
-
-typedef struct ble_device_list_entry ble_device_list_entry_t;
-
 LIST_HEAD_INIT (ble_device_list_entry_t, ble_device_list);
 LIST_HEAD_INIT (ble_device_list_entry_t, ble_ignore_list);
 
@@ -302,7 +294,7 @@ static int32 ble_update_data_list (void)
 
   while (service_list_entry != NULL)
   {
-    found += (ble_lookup_service (service_list_entry));
+    found += (ble_find_service (service_list_entry));
     service_list_entry = service_list_entry->next;
   }
 
