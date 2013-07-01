@@ -102,6 +102,7 @@ typedef struct
   int32                   expected_time;
   int32                   timer;
   int32                   timer_correction;
+  int32                   interval;
   void                  (*callback)(int32 ble_device_id, void *data);
 } ble_service_update_t;
 
@@ -167,7 +168,13 @@ typedef struct ble_device_list_entry ble_device_list_entry_t;
 extern ble_attr_list_entry_t * ble_find_char_desc (ble_attr_list_entry_t *attr_list_entry,
                                                    uint16 uuid);
 
-extern int32 ble_find_service (ble_service_list_entry_t *service_list_entry);
+extern int32 ble_init_service (ble_service_list_entry_t *service_list_entry);
+
+extern ble_service_list_entry_t * ble_find_service (ble_service_list_entry_t *service_list_entry,
+                                                    uint8 *uuid, uint8 uuid_length);
+
+extern ble_device_list_entry_t * ble_find_device (ble_device_list_entry_t *device_list_entry,
+                                                  ble_device_address_t *address);
 
 extern uint32 ble_identify_device (uint8 *address, ble_service_list_entry_t *service_list_entry);
 
