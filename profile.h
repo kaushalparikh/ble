@@ -149,19 +149,17 @@ typedef enum
 /* BLE device */
 typedef struct
 {
-  uint32                    id;
-  ble_device_address_t      address;
-  int8                     *name;
-  ble_device_status_e       status;
-  ble_service_list_entry_t *service_list;
-  ble_char_list_entry_t    *update_list;
-  int32                     setup_time;
 } ble_device_t;
 
 struct ble_device_list_entry
 {
   struct ble_device_list_entry *next;
-  ble_device_t                  info;
+  uint32                        id;
+  ble_device_address_t          address;
+  int8                         *name;
+  ble_service_list_entry_t     *service_list;
+  ble_device_status_e           status;
+  int32                         setup_time;
 };
 
 typedef struct ble_device_list_entry ble_device_list_entry_t;

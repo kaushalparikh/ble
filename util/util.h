@@ -97,10 +97,10 @@ typedef struct
 } db_info_t;
 
 extern int32 db_read_column (db_table_list_entry_t *table_list_entry,
-                             db_column_list_entry_t *column_list_entry, db_column_value_t *column_value);
+                             uint32 index, db_column_value_t *column_value);
 
 extern int32 db_write_column (db_table_list_entry_t *table_list_entry, uint8 insert,
-                              db_column_list_entry_t *column_list_entry, db_column_value_t *column_value);
+                              uint32 index, db_column_value_t *column_value);
 
 extern int32 db_read_table (db_table_list_entry_t *table_list_entry);
 
@@ -138,6 +138,29 @@ static inline void string_replace_char (int8 *dest, int8 search, int8 replace)
 }
 
 static inline void hex_to_string (uint8 *hex, uint32 length, int8 *dest, int8 delimit)
+{
+  uint32 byte;
+  char lut[] = "0123456789ABCDEF";
+
+  for (byte = 0; byte < length; byte++)
+  {
+    *dest = lut[((*hex) >> 4) & 0x0f];
+    dest++;
+    *dest = lut[(*hex) & 0x0f];
+    dest++;
+    hex++;
+
+    if (delimit != '\0')
+    {
+      *dest = delimit;
+      dest++;
+    }
+  }
+
+  *dest = '\0';
+}
+
+static inline void string_to_hex (uint8 *hex, uint32 length, int8 *dest, int8 delimit)
 {
   uint32 byte;
   char lut[] = "0123456789ABCDEF";

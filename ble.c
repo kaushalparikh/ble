@@ -732,7 +732,6 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
     device->name         = NULL;
     device->status       = BLE_DEVICE_DISCOVER_SERVICE;
     device->service_list = NULL;
-    device->update_list  = NULL;
     
     list_add ((list_entry_t **)(&ble_device_list), (list_entry_t *)device_list_entry);
     printf ("New device --\n");

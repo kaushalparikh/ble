@@ -46,7 +46,7 @@ typedef struct PACKED
 enum
 {
   DB_DEVICE_LIST_TABLE = 0,
-  DB_NUM_TABLES        = 1
+  DB_NUM_STATIC_TABLES = 1
 };
 
 #define DB_DEVICE_TABLE_NUM_COLUMNS  (6)
@@ -58,22 +58,20 @@ static db_info_t db_info =
   .table_list = NULL,
 };
 
-static db_column_list_entry_t db_device_table_columns[DB_DEVICE_TABLE_NUM_COLUMNS+1] = 
+static db_column_entry_t db_device_table_columns[DB_DEVICE_TABLE_NUM_COLUMNS] = 
 {
-  {NULL, "No.",      0,  DB_COLUMN_TYPE_INT,  DB_COLUMN_FLAG_NOT_NULL,                                 NULL},
-  {NULL, "Address",  0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_UPDATE_KEY),   NULL},
-  {NULL, "Name",     0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),   NULL},
-  {NULL, "Service",  0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_UPDATE_KEY),   NULL},
-  {NULL, "Interval", 0,  DB_COLUMN_TYPE_INT,  (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),   NULL},
-  {NULL, "Status",   0,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA 
-                                                                       | DB_COLUMN_FLAG_UPDATE_VALUE), NULL},
-  {NULL, NULL,       -1, DB_COLUMN_TYPE_NULL, 0,                                                       NULL},
+  {"No.",      0,  DB_COLUMN_TYPE_INT,  DB_COLUMN_FLAG_NOT_NULL,                                 NULL},
+  {"Address",  1,  DB_COLUMN_TYPE_BLOB, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_UPDATE_KEY),   NULL},
+  {"Name",     2,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),   NULL},
+  {"Service",  3,  DB_COLUMN_TYPE_BLOB, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_UPDATE_KEY),   NULL},
+  {"Interval", 4,  DB_COLUMN_TYPE_INT,  (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),   NULL},
+  {"Status",   5,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA 
+                                                                 | DB_COLUMN_FLAG_UPDATE_VALUE), NULL}
 };
 
-static db_table_list_entry_t db_tables[DB_NUM_TABLES+1] =
+static db_table_list_entry_t db_static_tables[DB_NUM_STATIC_TABLES] =
 {
-  {NULL, db_device_table_columns, "Device List", 0,  NULL, NULL, NULL},
-  {NULL, NULL,                    NULL,          -1, NULL, NULL, NULL},
+  {NULL, "Device List", DB_DEVICE_TABLE_NUM_COLUMNS, db_device_table_columns, NULL, NULL, NULL}
 };
 
 static FILE *temperature_file[256];
@@ -376,7 +374,7 @@ int32 ble_get_device_list (ble_device_list_entry_t **device_list)
     status = db_open (&db_info);
     if (status > 0)
     {
-      status = db_create_table (&db_info, &(db_tables[DB_DEVICE_LIST_TABLE]));
+      status = db_create_table (&db_info, &(db_static_tables[DB_DEVICE_LIST_TABLE]));
     }
   }
 
@@ -384,27 +382,41 @@ int32 ble_get_device_list (ble_device_list_entry_t **device_list)
   {
     printf ("BLE device list -- \n");
     
-    while ((status = db_read_table (&(db_tables[DB_DEVICE_LIST_TABLE]))) > 0)
+    while ((status = db_read_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]))) > 0)
     {
       db_column_value_t column_value;
-      db_column_list_entry_t *column_list_entry = db_tables[DB_DEVICE_LIST_TABLE].column_list;
+      ble_device_list_entry_t *device_list_entry;
+      ble_service_list_entry_t *service_list_entry;
 
-      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[0]), &column_value);
+      db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 1, &column_value);
+
+      device_list_entry = ble_find_device (*device_list, column_value.blob.data);
+      if (device_list_entry == NULL)
+      {
+        device_list_entry               = (ble_device_list_entry_t *)malloc (sizeof (*device_list_entry));
+        device_list_entry->status       = BLE_DEVICE_DISCOVER_SERVICE;
+        device_list_entry->service_list = NULL;
+        device_list_entry->address.type = BLE_ADDR_PUBLIC;
+        memcpy (device_list_entry->address.byte, column_value.blob.data, BLE_DEVICE_ADDRESS_LENGTH);
+
+        db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 2, &column_value);
+        device_list_entry->name = strdup (column_value.text);
+        
+        list_add ((list_entry_t **)(&device_list), (list_entry_t *)device_list_entry);
+      }
+
+      db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 3, &column_value);
+
+      service_list_entry = ble_find_service (device_list_entry->service_list, column_value.blob.data, column_value.blob.length);
+      if (service_list_entry == NULL)
+      {
+        service_list_entry = (ble_service_list_entry_t *)malloc (sizeof (*service_list_entry));
+      }
+
+      db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 4, &column_value);
       printf ("%4d", column_value.integer);
-      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[1]), &column_value);
-      printf ("%20s", column_value.text);          
-      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[2]), &column_value);
-      printf ("%20s", column_value.text);
-      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[3]), &column_value);
-      printf ("%10s", column_value.text);          
-      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[4]), &column_value);
-      printf ("%4d", column_value.integer);
-      db_read_column (&(db_tables[DB_DEVICE_LIST_TABLE]), &(column_list_entry[5]), &column_value);
+      db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 5, &column_value);
       printf ("%10s\n", column_value.text);
-    }
-
-    if (status < 0)
-    {
     }
   }
 
