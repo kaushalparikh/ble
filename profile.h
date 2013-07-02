@@ -170,6 +170,8 @@ extern ble_attr_list_entry_t * ble_find_char_desc (ble_attr_list_entry_t *attr_l
 
 extern int32 ble_init_service (ble_service_list_entry_t *service_list_entry);
 
+extern void ble_print_device (ble_device_list_entry_t *device_list_entry);
+
 extern ble_service_list_entry_t * ble_find_service (ble_service_list_entry_t *service_list_entry,
                                                     uint8 *uuid, uint8 uuid_length);
 

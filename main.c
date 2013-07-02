@@ -51,49 +51,51 @@ static ble_state_e ble_scan (ble_message_t *message)
       {
         if (message->data[0] == BLE_TIMER_SCAN)
         {
+          timer_info_t *timer_info = NULL;
+          
           printf ("BLE Scan state\n");
 
-          if ((ble_start_scan ()) <= 0)
+          if ((ble_check_scan_list ()) > 0)
           {
-            /* TODO: try again after sometime */
+            ble_start_scan ();
           }
-          
-          /* Flush rest of message, both from serial & timer */
-          ble_flush_message_list ();
-        }
-        else if (message->data[0] == BLE_TIMER_SCAN_STOP)
-        {
-          if ((ble_stop_scan ()) <= 0)
+          else if ((ble_check_data_list ()) > 0)
           {
-            /* TODO: Scan stop failed, set timer to stop sometime later */
+            new_state = BLE_STATE_DATA;
+            (void)timer_start ((ble_get_sleep ()), BLE_TIMER_DATA,
+                               ble_callback_timer, &timer_info);
           }
           else
           {
-            /* Check if some devices need service discovery/update */
-            if ((ble_check_scan_list ()) > 0)
-            {
-              timer_info_t *timer_info = NULL;
-              (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_SCAN,
-                                 ble_callback_timer, &timer_info);
-            }
-            else if ((ble_check_profile_list ()) > 0)
-            {
-              timer_info_t *timer_info = NULL;
-
-              new_state = BLE_STATE_PROFILE;
-              (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_PROFILE,
-                                 ble_callback_timer, &timer_info);
-            }
-            else
-            {
-              timer_info_t *timer_info = NULL;
-
-              new_state = BLE_STATE_DATA;
-              (void)timer_start ((ble_get_sleep ()), BLE_TIMER_DATA,
-                                 ble_callback_timer, &timer_info);
-            }
+            (void)timer_start (BLE_SCAN_DURATION, BLE_TIMER_SCAN,
+                               ble_callback_timer, &timer_info);            
           }
         }
+        else if (message->data[0] == BLE_TIMER_SCAN_STOP)
+        {
+          timer_info_t *timer_info = NULL;
+          
+          ble_stop_scan ();
+          
+          if ((ble_check_data_list ()) > 0)
+          {
+            new_state = BLE_STATE_DATA;
+            (void)timer_start ((ble_get_sleep ()), BLE_TIMER_DATA,
+                               ble_callback_timer, &timer_info);
+          }
+          else if ((ble_check_profile_list ()) > 0)
+          {
+            new_state = BLE_STATE_PROFILE;
+            (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_PROFILE,
+                               ble_callback_timer, &timer_info);
+          }
+          else
+          {
+            (void)timer_start (BLE_SCAN_DURATION, BLE_TIMER_SCAN,
+                               ble_callback_timer, &timer_info);             
+          }
+        }
+        
         break;
       }
       default:

@@ -351,6 +351,40 @@ ble_service_list_entry_t * ble_find_service (ble_service_list_entry_t *service_l
   return service_list_entry;  
 }
 
+void ble_print_device (ble_device_list_entry_t *device_list_entry)
+{
+  int32 i;
+  ble_service_list_entry_t *service_list_entry;
+
+  printf ("     Name: %s\n", device_list_entry->name);
+  printf ("  Address: 0x");
+  for (i = 0; i < BLE_DEVICE_ADDRESS_LENGTH; i++)
+  {
+    printf ("%02x", device_list_entry->address.byte[i]);
+  }
+  printf (" (%s)\n", ((device_list_entry->address.type > 0) ? "random" : "public"));
+
+  service_list_entry = device_list_entry->service_list;
+
+  printf ("  Service: ");
+  while (service_list_entry != NULL)
+  {
+    printf ("0x");
+    for (i = 0; i < service_list_entry->declaration.data_length; i++)
+    {
+      printf ("%02x", service_list_entry->declaration.data[i]);
+    }
+
+    if (service_list_entry->next != NULL)
+    {
+      printf (", ");
+    }
+    
+    service_list_entry = service_list_entry->next;
+  }
+  printf ("\n");
+}
+
 ble_device_list_entry_t * ble_find_device (ble_device_list_entry_t *device_list_entry,
                                            ble_device_address_t *address)
 {
@@ -402,12 +436,11 @@ int32 ble_get_device_list (ble_device_list_entry_t **device_list)
 
   if (status > 0)
   {
-    printf ("BLE device list -- \n");
+    ble_device_list_entry_t *device_list_entry;
     
     while ((status = db_read_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]))) > 0)
     {
       db_column_value_t column_value;
-      ble_device_list_entry_t *device_list_entry;
       ble_service_list_entry_t *service_list_entry;
       ble_device_address_t address;
 
@@ -423,7 +456,7 @@ int32 ble_get_device_list (ble_device_list_entry_t **device_list)
         device_list_entry->id           = 0;
         device_list_entry->address      = address;
         device_list_entry->service_list = NULL;
-        device_list_entry->status       = BLE_DEVICE_DISCOVER_SERVICE;
+        device_list_entry->status       = BLE_DEVICE_DISCOVER;
         device_list_entry->setup_time   = 0;
 
         db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 2, &column_value);
@@ -473,6 +506,21 @@ int32 ble_get_device_list (ble_device_list_entry_t **device_list)
         db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 5, &column_value);
         db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0);
       }
+    }
+
+    printf ("BLE device list -- \n");
+    device_list_entry = *device_list;
+    if (device_list_entry != NULL)
+    {
+      while (device_list_entry != NULL)
+      {
+        ble_print_device (device_list_entry);
+        device_list_entry = device_list_entry->next;
+      }
+    }
+    else
+    {
+      printf (" No devices\n");
     }
   }
 
