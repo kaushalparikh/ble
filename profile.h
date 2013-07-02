@@ -103,7 +103,7 @@ typedef struct
   int32                   timer;
   int32                   timer_correction;
   int32                   interval;
-  void                  (*callback)(int32 ble_device_id, void *data);
+  void                  (*callback)(void *data);
 } ble_service_update_t;
 
 struct ble_service_list_entry
@@ -155,7 +155,6 @@ typedef struct
 struct ble_device_list_entry
 {
   struct ble_device_list_entry *next;
-  uint32                        id;
   ble_device_address_t          address;
   int8                         *name;
   ble_service_list_entry_t     *service_list;

@@ -694,8 +694,6 @@ extern int32 ble_check_message_list (void);
 
 extern int32 ble_receive_message (ble_message_t *message);
 
-extern void ble_flush_message_list (void);
-
 extern void ble_start_scan (void);
 
 extern void ble_stop_scan (void);

@@ -178,9 +178,6 @@ static ble_state_e ble_profile (ble_message_t *message)
         {
           printf ("BLE Profile state\n");
           
-          /* Flush rest of message, both from serial & timer */
-          ble_flush_message_list ();
-
           if ((ble_start_profile ()) <= 0)
           {
             /* TODO: Profile start failed, jump to data state instead? */
@@ -283,9 +280,6 @@ static ble_state_e ble_data (ble_message_t *message)
         {
           printf ("BLE Data state\n");
           
-          /* Flush rest of message, both from serial & timer */
-          ble_flush_message_list ();
-
           if ((ble_start_data ()) <= 0)
           {
             /* TODO: Data start failed, jump to scan state instead? */

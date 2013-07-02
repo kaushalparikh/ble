@@ -76,7 +76,7 @@ static void ble_callback_data (void)
           = (clock_current_time ()) - service_list_entry->update.expected_time;        
       }
 
-      service_list_entry->update.callback (connection_params.device->id, service_list_entry);
+      service_list_entry->update.callback (service_list_entry);
     }
     
     service_list_entry = service_list_entry->next;
@@ -1116,24 +1116,6 @@ int32 ble_receive_message (ble_message_t *message)
   pending += (list_length ((list_entry_t **)(&ble_message_list)));
 
   return pending;
-}
-
-void ble_flush_message_list (void)
-{
-  while (timer_expiry_list != NULL)
-  {
-    timer_list_entry_t *timer_list_entry = timer_expiry_list;
-    list_remove ((list_entry_t **)(&timer_expiry_list), (list_entry_t *)timer_list_entry);
-    free (timer_list_entry);
-  }
-
-  while (ble_message_list != NULL)
-  {
-    ble_message_list_entry_t *message_list_entry = ble_message_list;
-    list_remove ((list_entry_t **)(&ble_message_list), (list_entry_t *)message_list_entry);
-    ble_print_message (&(message_list_entry->message));
-    free (message_list_entry);
-  }  
 }
 
 void ble_start_scan (void)
