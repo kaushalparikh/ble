@@ -289,15 +289,92 @@ ble_attr_list_entry_t * ble_find_char_desc (ble_attr_list_entry_t *attr_list_ent
   return attr_list_entry;
 }
 
-int32 ble_init_service (ble_device_list_entry_t *device_list_entry)
+void ble_print_service (ble_device_list_entry_t *device_list_entry)
 {
-  int32 found = 0;
-  uint8 uuid_length;
-  uint16 uuid;
   ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
   
   while (service_list_entry != NULL)
   {
+    int32 i;
+    uint16 uuid = BLE_PACK_GATT_UUID (service_list_entry->declaration.uuid);
+    ble_char_list_entry_t *char_list_entry = service_list_entry->char_list;
+      
+    printf ("Service -- %s\n", ((uuid == BLE_GATT_PRI_SERVICE) ? "primary" : "secondary"));
+    printf ("  handle range: 0x%04x to 0x%04x\n", service_list_entry->start_handle, service_list_entry->end_handle);
+    printf ("          uuid: 0x");
+    for (i = (service_list_entry->declaration.data_length - 1); i >= 0; i--)
+    {
+      printf ("%02x", service_list_entry->declaration.data[i]);
+    }
+    printf ("\n");
+
+    while (char_list_entry != NULL)
+    {
+      ble_attr_list_entry_t *desc_list_entry = char_list_entry->desc_list;
+
+      while (desc_list_entry != NULL)
+      {
+        uuid = BLE_PACK_GATT_UUID (desc_list_entry->uuid);
+        if (uuid == BLE_GATT_CHAR_DECL)
+        {
+          printf ("    Characteristics -- declaration\n");
+          printf ("      handle: 0x%04x\n", desc_list_entry->handle);
+          printf ("       value: ");
+          printf ("0x%02x, 0x%04x, 0x", desc_list_entry->declaration.type, desc_list_entry->declaration.handle);
+          for (i = (desc_list_entry->data_length - 4); i >= 0; i--)
+          {
+            printf ("%02x", desc_list_entry->declaration.uuid[i]);
+          }
+          printf ("\n");
+        }
+        else if (uuid == BLE_GATT_CHAR_USER_DESC)
+        {
+          printf ("        Descriptor -- description\n");
+          printf ("          handle: 0x%04x\n", desc_list_entry->handle);
+          printf ("           value: ");
+          for (i = 0; i < desc_list_entry->data_length; i++)
+          {
+            printf ("%c", (int8)(desc_list_entry->data[i]));
+          }
+          printf ("\n");
+        }
+        else if (uuid == BLE_GATT_CHAR_FORMAT)
+        {
+          printf ("        Descriptor -- format\n");
+          printf ("          handle: 0x%04x\n", desc_list_entry->handle);
+          printf ("           value: ");
+          printf ("0x%02x, %d\n", desc_list_entry->format.bitfield, desc_list_entry->format.exponent);
+        }
+        else if (uuid == BLE_GATT_CHAR_CLIENT_CONFIG)
+        {
+          printf ("        Descriptor -- client configuration\n");
+          printf ("          handle: 0x%04x\n", desc_list_entry->handle);
+          printf ("           value: ");
+          printf ("0x%04x\n", desc_list_entry->client_config.bitfield);
+        }
+        
+        desc_list_entry = desc_list_entry->next;
+      }
+      
+      char_list_entry = char_list_entry->next;
+    }
+    
+    service_list_entry = service_list_entry->next;
+  }
+}
+
+int32 ble_init_service (ble_device_list_entry_t *device_list_entry)
+{
+  int32 status = 0;
+  ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
+  
+  while (service_list_entry != NULL)
+  {
+    int32 found;
+    uint8 uuid_length;
+    uint16 uuid;
+
+    found       = 0;
     uuid_length = service_list_entry->declaration.data_length;
     uuid        = BLE_PACK_GATT_UUID (service_list_entry->declaration.data);
 
@@ -365,27 +442,31 @@ int32 ble_init_service (ble_device_list_entry_t *device_list_entry)
 
       if (found > 0)
       {
-        db_column_value_t column_value;
-
-        service_list_entry->update.pending  = 3;
+        service_list_entry->update.pending  = found;
         service_list_entry->update.callback = ble_update_temperature;
-          
-        column_value.blob.data   = device_list_entry->address.byte;
-        column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
-        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 1, &column_value);
-        column_value.blob.data   = service_list_entry->declaration.data;
-        column_value.blob.length = service_list_entry->declaration.data_length;
-        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 3, &column_value);
-        column_value.text = "Active";
-        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 5, &column_value);
-        db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0);
       }
     }
 
-    service_list_entry = service_list_entry->next;
+    if (found > 0)
+    {
+      db_column_value_t column_value;
+ 
+      column_value.blob.data   = device_list_entry->address.byte;
+      column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
+      db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 1, &column_value);
+      column_value.blob.data   = service_list_entry->declaration.data;
+      column_value.blob.length = service_list_entry->declaration.data_length;
+      db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 3, &column_value);
+      column_value.text = "Active";
+      db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 5, &column_value);
+      db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0);
+    }    
+
+    status             += found;
+    service_list_entry  = service_list_entry->next;
   }
 
-  return found;  
+  return status;  
 }
 
 ble_service_list_entry_t * ble_find_service (ble_device_list_entry_t *device_list_entry,
@@ -406,10 +487,35 @@ ble_service_list_entry_t * ble_find_service (ble_device_list_entry_t *device_lis
   return service_list_entry;  
 }
 
+void ble_clear_service (ble_device_list_entry_t *device_list_entry)
+{
+  ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
+
+  while (service_list_entry != NULL)
+  {
+    while (service_list_entry->char_list != NULL)
+    {
+      ble_char_list_entry_t *char_list_entry = service_list_entry->char_list;
+  
+      while (char_list_entry->desc_list != NULL)
+      {
+        ble_attr_list_entry_t *desc_list_entry = char_list_entry->desc_list;
+        list_remove ((list_entry_t **)(&(char_list_entry->desc_list)), (list_entry_t *)desc_list_entry);
+        free (desc_list_entry);
+      }
+  
+      list_remove ((list_entry_t **)(&(service_list_entry->char_list)), (list_entry_t *)char_list_entry);
+      free (char_list_entry);      
+    }
+
+    service_list_entry = service_list_entry->next;
+  }
+}
+
 void ble_print_device (ble_device_list_entry_t *device_list_entry)
 {
   int32 i;
-  ble_service_list_entry_t *service_list_entry;
+  ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
 
   printf ("     Name: %s\n", device_list_entry->name);
   printf ("  Address: 0x");
@@ -418,8 +524,6 @@ void ble_print_device (ble_device_list_entry_t *device_list_entry)
     printf ("%02x", device_list_entry->address.byte[i]);
   }
   printf (" (%s)\n", ((device_list_entry->address.type > 0) ? "random" : "public"));
-
-  service_list_entry = device_list_entry->service_list;
 
   printf ("  Service: ");
   while (service_list_entry != NULL)
@@ -456,7 +560,7 @@ ble_device_list_entry_t * ble_find_device (ble_device_list_entry_t *device_list_
   return device_list_entry;
 }
 
-int32 ble_get_device_list (ble_device_list_entry_t **device_list)
+void ble_get_device_list (ble_device_list_entry_t **device_list)
 {
   int32 status = 1;
   
@@ -556,7 +660,5 @@ int32 ble_get_device_list (ble_device_list_entry_t **device_list)
       printf (" No devices\n");
     }
   }
-
-  return status;
 }
 

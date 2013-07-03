@@ -249,9 +249,10 @@ enum
   BLE_TIMER_PROFILE       = 2,
   BLE_TIMER_PROFILE_STOP  = 3,
   BLE_TIMER_DATA          = 4,
-  BLE_TIMER_CONNECT_SETUP = 5,
-  BLE_TIMER_CONNECT_DATA  = 6,
-  BLE_TIMER_INVALID       = 7
+  BLE_TIMER_DATA_STOP     = 5,
+  BLE_TIMER_CONNECT_SETUP = 6,
+  BLE_TIMER_CONNECT_DATA  = 7,
+  BLE_TIMER_INVALID       = 8
 };
 
 /* Message header */
@@ -698,19 +699,21 @@ extern void ble_start_scan (void);
 
 extern void ble_stop_scan (void);
 
-extern int32 ble_start_profile (void);
+extern void ble_start_profile (void);
 
-extern int32 ble_next_profile (void);
+extern void ble_next_profile (void);
 
-extern int32 ble_read_profile (void);
+extern void ble_read_profile (void);
 
-extern int32 ble_start_data (void);
+extern void ble_start_data (void);
 
-extern int32 ble_next_data (void);
+extern void ble_next_data (void);
 
-extern int32 ble_update_data (void);
+extern void ble_update_data (void);
 
 extern int32 ble_get_sleep (void);
+
+extern void ble_update_sleep (void);
 
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
@@ -722,7 +725,7 @@ extern void ble_event_read_group (ble_event_read_group_t *read_group);
 
 extern void ble_event_find_information (ble_event_find_information_t *find_information);
 
-extern int32 ble_event_attr_value (ble_event_attr_value_t *attr_value);
+extern void ble_event_attr_value (ble_event_attr_value_t *attr_value);
 
 #endif
 

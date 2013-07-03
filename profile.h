@@ -167,17 +167,21 @@ typedef struct ble_device_list_entry ble_device_list_entry_t;
 extern ble_attr_list_entry_t * ble_find_char_desc (ble_attr_list_entry_t *attr_list_entry,
                                                    uint16 uuid);
 
-extern int32 ble_init_service (ble_device_list_entry_t *device_list_entry);
+extern void ble_print_service (ble_device_list_entry_t *device_list_entry);
 
-extern void ble_print_device (ble_device_list_entry_t *device_list_entry);
+extern int32 ble_init_service (ble_device_list_entry_t *device_list_entry);
 
 extern ble_service_list_entry_t * ble_find_service (ble_device_list_entry_t *device_list_entry,
                                                     uint8 *uuid, uint8 uuid_length);
 
+extern void ble_clear_service (ble_device_list_entry_t *device_list_entry);
+
+extern void ble_print_device (ble_device_list_entry_t *device_list_entry);
+
 extern ble_device_list_entry_t * ble_find_device (ble_device_list_entry_t *device_list_entry,
                                                   ble_device_address_t *address);
 
-extern int32 ble_get_device_list (ble_device_list_entry_t **device_list);
+extern void ble_get_device_list (ble_device_list_entry_t **device_list);
 
 #endif
 
