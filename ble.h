@@ -713,8 +713,6 @@ extern void ble_update_data (void);
 
 extern int32 ble_get_sleep (void);
 
-extern void ble_update_sleep (void);
-
 extern void ble_event_scan_response (ble_event_scan_response_t *scan_response);
 
 extern int32 ble_event_connection_status (ble_event_connection_status_t *connection_status);

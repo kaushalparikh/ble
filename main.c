@@ -53,7 +53,6 @@ static ble_state_e ble_scan (ble_message_t *message)
         {
           printf ("BLE Scan state\n");
 
-          ble_update_sleep ();
           ble_start_scan ();
         }
         else if (message->data[0] == BLE_TIMER_SCAN_STOP)
@@ -184,7 +183,6 @@ static ble_state_e ble_profile (ble_message_t *message)
         {
           printf ("BLE Profile state\n");
 
-          ble_update_sleep ();
           ble_start_profile ();
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
@@ -308,7 +306,6 @@ static ble_state_e ble_data (ble_message_t *message)
         {
           printf ("BLE Data state\n");
 
-          ble_update_sleep ();
           ble_start_data ();
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||

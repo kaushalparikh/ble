@@ -83,6 +83,40 @@ static void ble_callback_data (void)
   }
 }
 
+static void ble_update_sleep (void)
+{
+  int32 current_time;
+  ble_device_list_entry_t *device_list_entry;
+  
+  current_time      = clock_current_time ();
+  device_list_entry = ble_device_list;
+
+  while (device_list_entry != NULL)
+  {
+    if ((device_list_entry->status == BLE_DEVICE_DATA)  ||
+        (device_list_entry->status == BLE_DEVICE_DISCOVER))
+    {
+      ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
+
+      while (service_list_entry != NULL)
+      {
+        if (service_list_entry->update.char_list != NULL)
+        {
+          service_list_entry->update.timer = service_list_entry->update.expected_time - current_time;
+          if (service_list_entry->update.timer < 0)
+          {
+            service_list_entry->update.timer = 0;
+          }
+        }
+          
+        service_list_entry = service_list_entry->next;
+      }
+    }
+    
+    device_list_entry = device_list_entry->next;
+  }
+}
+
 static int32 ble_response (ble_message_t *response)
 {
   ble_message_t message;
@@ -984,6 +1018,7 @@ void ble_start_scan (void)
   ble_message_t message;
   ble_command_scan_params_t *scan_params;
 
+  ble_update_sleep ();
   ble_get_device_list (&ble_device_list);
 
   printf ("BLE Start scan request\n");
@@ -1061,12 +1096,15 @@ void ble_start_scan (void)
 
 void ble_stop_scan (void)
 {
+  ble_update_sleep ();
   connection_params.timer_info = NULL;
   (void)ble_end_procedure ();
 }
 
 void ble_start_profile (void)
 {
+  ble_update_sleep ();
+  
   connection_params.device = ble_device_list;
   while ((connection_params.device != NULL) &&
          (connection_params.device->status != BLE_DEVICE_DISCOVER_SERVICE))
@@ -1080,6 +1118,8 @@ void ble_start_profile (void)
 
 void ble_next_profile (void)
 {
+  ble_update_sleep ();
+  
   connection_params.device = connection_params.device->next;
   while ((connection_params.device != NULL) &&
          (connection_params.device->status != BLE_DEVICE_DISCOVER_SERVICE))
@@ -1216,6 +1256,8 @@ void ble_read_profile (void)
 
 void ble_start_data (void)
 {
+  ble_update_sleep ();
+  
   connection_params.device  = ble_device_list;
   while (connection_params.device != NULL)
   {
@@ -1251,6 +1293,7 @@ void ble_start_data (void)
 void ble_next_data (void)
 {
   ble_callback_data ();
+  ble_update_sleep ();
 
   connection_params.device = connection_params.device->next;
   while (connection_params.device != NULL)
@@ -1401,8 +1444,6 @@ int32 ble_get_sleep (void)
   int32 min_sleep_interval;
   ble_device_list_entry_t *device_list_entry;
 
-  ble_update_sleep ();
-
   min_sleep_interval = 0x7fffffff;
   device_list_entry  = ble_device_list;
 
@@ -1429,47 +1470,11 @@ int32 ble_get_sleep (void)
     device_list_entry = device_list_entry->next;
   }
 
-  /* Subtract the sleep interval from timer. All characteristics
-     with timer value 0 will be updated on wake-up */
   if ((min_sleep_interval == 0x7fffffff) || (min_sleep_interval == 0))
   {
     min_sleep_interval = 10;
   }
   
   return min_sleep_interval;
-}
-
-void ble_update_sleep (void)
-{
-  int32 current_time;
-  ble_device_list_entry_t *device_list_entry;
-  
-  current_time      = clock_current_time ();
-  device_list_entry = ble_device_list;
-
-  while (device_list_entry != NULL)
-  {
-    if ((device_list_entry->status == BLE_DEVICE_DATA)  ||
-        (device_list_entry->status == BLE_DEVICE_DISCOVER))
-    {
-      ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
-
-      while (service_list_entry != NULL)
-      {
-        if (service_list_entry->update.char_list != NULL)
-        {
-          service_list_entry->update.timer = service_list_entry->update.expected_time - current_time;
-          if (service_list_entry->update.timer < 0)
-          {
-            service_list_entry->update.timer = 0;
-          }
-        }
-          
-        service_list_entry = service_list_entry->next;
-      }
-    }
-    
-    device_list_entry = device_list_entry->next;
-  }
 }
 
