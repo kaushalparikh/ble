@@ -55,34 +55,6 @@ static ble_connection_params_t connection_params =
 static int32 ble_init_time = 0;
 
 
-static void ble_callback_data (void)
-{
-  ble_service_list_entry_t *service_list_entry = connection_params.device->service_list;
-
-  while (service_list_entry != NULL)
-  {
-    if ((service_list_entry->update.char_list != NULL) &&
-        (service_list_entry->update.timer <= 0))
-    {
-      if (service_list_entry->update.init)
-      {
-        service_list_entry->update.init             = 0;
-        service_list_entry->update.expected_time    = (clock_current_time () + 500);
-        service_list_entry->update.timer_correction = 0;
-      }
-      else
-      {
-        service_list_entry->update.timer_correction
-          = (clock_current_time ()) - service_list_entry->update.expected_time;        
-      }
-
-      service_list_entry->update.callback (service_list_entry);
-    }
-    
-    service_list_entry = service_list_entry->next;
-  }
-}
-
 static void ble_update_sleep (void)
 {
   int32 current_time;
@@ -102,10 +74,10 @@ static void ble_update_sleep (void)
       {
         if (service_list_entry->update.char_list != NULL)
         {
-          service_list_entry->update.timer = service_list_entry->update.expected_time - current_time;
-          if (service_list_entry->update.timer < 0)
+          service_list_entry->update.wait = service_list_entry->update.time - current_time;
+          if (service_list_entry->update.wait < 0)
           {
-            service_list_entry->update.timer = 0;
+            service_list_entry->update.wait = 0;
           }
         }
           
@@ -189,7 +161,7 @@ static void ble_init_timer (void)
   {
     if (service_list_entry->update.char_list != NULL)
     {
-      service_list_entry->update.expected_time = wakeup_time;
+      service_list_entry->update.time = wakeup_time;
     }
       
     service_list_entry = service_list_entry->next;
@@ -204,7 +176,7 @@ static int32 ble_wait_data (void)
   while (service_list_entry != NULL)
   {
     if ((service_list_entry->update.char_list != NULL) &&
-        (service_list_entry->update.timer <= 0)        &&
+        (service_list_entry->update.wait <= 0)         &&
         (service_list_entry->update.pending > 0))
     {
       status = 1;
@@ -575,8 +547,6 @@ int32 ble_event_connection_status (ble_event_connection_status_t *connection_sta
 
   if (connection_status->flags & BLE_CONNECT_ESTABLISHED)
   {
-    connection_params.device->setup_time = timer_status (connection_params.timer_info);
-
     timer_stop (connection_params.timer_info);
     connection_params.timer_info = NULL;
 
@@ -587,7 +557,6 @@ int32 ble_event_connection_status (ble_event_connection_status_t *connection_sta
   else if (connection_status->flags & BLE_CONNECT_SETUP_FAILED)
   {
     connection_params.timer_info = NULL;
-    connection_params.device->setup_time = BLE_CONNECT_SETUP_TIMEOUT;
     
     (void)ble_end_procedure ();
     status = -1;
@@ -1241,7 +1210,7 @@ void ble_read_profile (void)
       {
         if (service_list_entry->update.char_list != NULL)
         {
-          service_list_entry->update.expected_time = current_time;
+          service_list_entry->update.time = current_time;
         }
           
         service_list_entry = service_list_entry->next;
@@ -1267,7 +1236,7 @@ void ble_start_data (void)
       while (connection_params.service != NULL)
       {
         if ((connection_params.service->update.char_list != NULL) &&
-            (connection_params.service->update.timer <= 0))
+            (connection_params.service->update.wait <= 0))
         {
           break;
         }
@@ -1292,7 +1261,7 @@ void ble_start_data (void)
 
 void ble_next_data (void)
 {
-  ble_callback_data ();
+  connection_params.device->callback (connection_params.device);
   ble_update_sleep ();
 
   connection_params.device = connection_params.device->next;
@@ -1304,7 +1273,7 @@ void ble_next_data (void)
       while (connection_params.service != NULL)
       {
         if ((connection_params.service->update.char_list != NULL) &&
-            (connection_params.service->update.timer <= 0))
+            (connection_params.service->update.wait <= 0))
         {
           break;
         }
@@ -1328,16 +1297,15 @@ void ble_next_data (void)
   else
   {
     timer_info_t *timer_info = NULL;
-    int32 current_time = clock_current_time ();
-
-    if ((current_time - ble_init_time) > (24*60*60*1000))
+    
+    if (((clock_current_time ())- ble_init_time) > (24*60*60*1000))
     {
       ble_deinit ();
       (void)ble_init ();
     }
     
     (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_DATA_STOP,
-                       ble_callback_timer, &timer_info);    
+                       ble_callback_timer, &timer_info);
   }
 }
 
@@ -1372,7 +1340,7 @@ void ble_update_data (void)
         while (connection_params.service != NULL)
         {
           if ((connection_params.service->update.char_list != NULL) &&
-              (connection_params.service->update.timer <= 0))
+              (connection_params.service->update.wait <= 0))
           {
             connection_params.characteristics = connection_params.service->update.char_list;
             break;
@@ -1459,8 +1427,8 @@ int32 ble_get_sleep (void)
       {
         if (service_list_entry->update.char_list != NULL)
         {
-          min_sleep_interval = (min_sleep_interval > service_list_entry->update.timer)
-                                ? service_list_entry->update.timer : min_sleep_interval;
+          min_sleep_interval = (min_sleep_interval > service_list_entry->update.wait)
+                                ? service_list_entry->update.wait : min_sleep_interval;
         }
 
         service_list_entry = service_list_entry->next;

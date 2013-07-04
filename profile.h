@@ -99,11 +99,10 @@ typedef struct
   ble_char_list_entry_t  *char_list;
   int32                   pending;
   uint8                   init;
-  int32                   expected_time;
-  int32                   timer;
-  int32                   timer_correction;
+  int32                   time;
+  int32                   time_offset;
+  int32                   wait;
   int32                   interval;
-  void                  (*callback)(void *data);
 } ble_service_update_t;
 
 struct ble_service_list_entry
@@ -154,12 +153,13 @@ typedef struct
 
 struct ble_device_list_entry
 {
-  struct ble_device_list_entry *next;
-  ble_device_address_t          address;
-  int8                         *name;
-  ble_service_list_entry_t     *service_list;
-  ble_device_status_e           status;
-  int32                         setup_time;
+  struct ble_device_list_entry  *next;
+  ble_device_address_t           address;
+  int8                          *name;
+  ble_service_list_entry_t      *service_list;
+  ble_device_status_e            status;
+  void                          *data;
+  void                         (*callback)(void *device_list_entry);
 };
 
 typedef struct ble_device_list_entry ble_device_list_entry_t;

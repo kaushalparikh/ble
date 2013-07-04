@@ -9,21 +9,6 @@
 #include "util.h"
 
 
-static db_table_list_entry_t * db_find_table (db_table_list_entry_t *table_list_entry, int8 *title)
-{
-  while (table_list_entry != NULL)
-  {
-    if ((strcmp (table_list_entry->title, title)) == 0)
-    {
-      break;
-    }
-
-    table_list_entry = table_list_entry->next;
-  }
-
-  return table_list_entry;
-}
-
 int32 db_read_column (db_table_list_entry_t *table_list_entry,
                       uint32 index, db_column_value_t *column_value)
 {
@@ -67,34 +52,43 @@ int32 db_write_column (db_table_list_entry_t *table_list_entry, uint8 insert,
     statement = (sqlite3_stmt *)(table_list_entry->update);
   }
   
-  if (table_list_entry->column[index].type == DB_COLUMN_TYPE_TEXT)
+  if (column_value != NULL)
   {
-    status = sqlite3_bind_text (statement,
-                                (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
-                                column_value->text, -1, SQLITE_TRANSIENT);
-  }
-  else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_INT)
-  {
-    status = sqlite3_bind_int (statement,
-                               (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
-                               column_value->integer);
-  }
-  else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_FLOAT)
-  {
-    status = sqlite3_bind_double (statement,
+    if (table_list_entry->column[index].type == DB_COLUMN_TYPE_TEXT)
+    {
+      status = sqlite3_bind_text (statement,
                                   (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
-                                  (double)(column_value->decimal));
-  }
-  else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_BLOB)
-  {
-    status = sqlite3_bind_blob (statement,
-                                (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
-                                column_value->blob.data, column_value->blob.length, SQLITE_TRANSIENT);
+                                  column_value->text, -1, SQLITE_TRANSIENT);
+    }
+    else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_INT)
+    {
+      status = sqlite3_bind_int (statement,
+                                 (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
+                                 column_value->integer);
+    }
+    else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_FLOAT)
+    {
+      status = sqlite3_bind_double (statement,
+                                    (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
+                                    (double)(column_value->decimal));
+    }
+    else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_BLOB)
+    {
+      status = sqlite3_bind_blob (statement,
+                                  (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
+                                  column_value->blob.data, column_value->blob.length, SQLITE_TRANSIENT);
+    }
+    else
+    {
+      status = sqlite3_bind_null (statement,
+                                  (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)));
+    }
   }
   else
-  {
-    status = sqlite3_bind_null (statement,
-                                (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)));
+  {   
+    status = sqlite3_bind_text (statement,
+                                (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
+                                "NA", -1, SQLITE_TRANSIENT);
   }
 
   if (status == SQLITE_OK)
@@ -272,7 +266,8 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
   }
 
   status = sqlite3_exec ((sqlite3 *)(db_info->handle), sql, NULL, NULL, NULL);
-  free (sql);    
+  free (sql);
+  sql = NULL;
 
   if (status == SQLITE_OK)
   {
@@ -339,6 +334,7 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
     }
     
     free (sql);
+    sql = NULL;
   }
   else
   {
@@ -441,7 +437,8 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
       printf ("Can't prepare database read statement '%s'\n", sql);
     }
     
-    free (sql); 
+    free (sql);
+    sql = NULL;
   }
 
   if (status == SQLITE_OK)
@@ -504,8 +501,9 @@ int32 db_close (db_info_t *db_info)
 
 #ifdef UTIL_DB_TEST
 
-#define NUM_STATIC_TABLES         (1)
-#define DEVICE_TABLE_NUM_COLUMNS  (6)
+#define NUM_STATIC_TABLES              (1)
+#define DEVICE_TABLE_NUM_COLUMNS       (6)
+#define TEMPERATURE_TABLE_NUM_COLUMNS  (4)
 
 static db_column_entry_t device_table_columns[DEVICE_TABLE_NUM_COLUMNS] = 
 {
@@ -516,6 +514,14 @@ static db_column_entry_t device_table_columns[DEVICE_TABLE_NUM_COLUMNS] =
   {"Interval", 4,  DB_COLUMN_TYPE_INT,  (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),   NULL},
   {"Status",   5,  DB_COLUMN_TYPE_TEXT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA 
                                                                  | DB_COLUMN_FLAG_UPDATE_VALUE), NULL}
+};
+
+static db_column_entry_t temperature_table_columns[TEMPERATURE_TABLE_NUM_COLUMNS] =
+{
+  {"No.",               0, DB_COLUMN_TYPE_INT,   DB_COLUMN_FLAG_PRIMARY_KEY,                                   NULL},
+  {"Time",              1, DB_COLUMN_TYPE_TEXT,  (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP), NULL},
+  {"Temperature (C)",   2, DB_COLUMN_TYPE_FLOAT, (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),        NULL},
+  {"Battery Level (%)", 3, DB_COLUMN_TYPE_INT,   (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),        NULL},
 };
 
 static db_table_list_entry_t static_tables[NUM_STATIC_TABLES] =
@@ -538,9 +544,11 @@ int main (int argc, char *argv[])
 
       while (repeat > 0)
       {
+        db_table_list_entry_t *table_list_entry;
+        db_column_value_t column_value;
+
         if ((db_create_table (&db_info, &(static_tables[0]))) > 0)
         {
-          db_column_value_t column_value;
           uint8 address[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
           uint8 temperature_service[] = {0x18, 0x09};
           uint8 battery_service[] = {0x18, 0x0f};
@@ -657,6 +665,41 @@ int main (int argc, char *argv[])
   
           db_delete_table (&db_info, &(static_tables[0]));
         }
+
+        table_list_entry = (db_table_list_entry_t *)malloc (sizeof (*table_list_entry));
+        
+        table_list_entry->title       = strdup ("Temperature Sensor");
+        table_list_entry->num_columns = TEMPERATURE_TABLE_NUM_COLUMNS;
+        table_list_entry->column      = temperature_table_columns;
+        table_list_entry->insert      = NULL;
+        table_list_entry->update      = NULL;
+        table_list_entry->select      = NULL;
+
+        if ((db_create_table (&db_info, table_list_entry)) > 0)
+        {
+          db_write_column (table_list_entry, 1, 2, NULL);
+          db_write_column (table_list_entry, 1, 3, NULL);
+          column_value.decimal = 98.4;
+          db_write_column (table_list_entry, 1, 2, &column_value);
+          db_write_table (table_list_entry, 1);
+
+          printf ("Write table\n");
+          while ((db_read_table (table_list_entry)) > 0)
+          {
+            db_read_column (table_list_entry, 0, &column_value);
+            printf ("%3d", column_value.integer);
+            db_read_column (table_list_entry, 1, &column_value);
+            printf ("%22s", column_value.text);
+            db_read_column (table_list_entry, 2, &column_value);
+            printf ("%8.1f", column_value.decimal);
+            db_read_column (table_list_entry, 3, &column_value);
+            printf ("%7d\n", column_value.integer);
+          }
+
+          db_delete_table (&db_info, table_list_entry);
+        }
+
+        free (table_list_entry);
 
         repeat--;
       }

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "types.h"
 #include "list.h"
@@ -96,13 +97,13 @@ enum
 static db_column_entry_t db_temperature_table_columns[DB_TEMPERATURE_TABLE_NUM_COLUMNS] =
 {
   {"No.",               DB_TEMPERATURE_TABLE_COLUMN_NO,          DB_COLUMN_TYPE_INT,
-    DB_COLUMN_FLAG_PRIMARY_KEY,                                                          NULL},
+    DB_COLUMN_FLAG_PRIMARY_KEY,                                   NULL},
   {"Time",              DB_TEMPERATURE_TABLE_COLUMN_TIME,        DB_COLUMN_TYPE_TEXT,
-    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),                               NULL},
+    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP), NULL},
   {"Temperature (C)",   DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, DB_COLUMN_TYPE_FLOAT,
-    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),                               NULL},
+    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),        NULL},
   {"Battery Level (%)", DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL,   DB_COLUMN_TYPE_INT,
-    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),                               NULL},
+    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),        NULL},
 };
 
 static db_info_t db_info = 
@@ -170,106 +171,143 @@ static void ble_update_char_type (ble_attr_list_entry_t * desc_list_entry, uint8
   }
 }
 
-static void ble_update_temperature (void *data)
+static void ble_update_temperature (void *device_list_entry)
 {
-  int32 update_failed = 0;
-  ble_service_list_entry_t *service_list_entry = (ble_service_list_entry_t *)data;
-  ble_char_list_entry_t *update_list_entry = service_list_entry->update.char_list;
+  int32 current_time;
+  ble_service_list_entry_t *service_list_entry;
+  db_table_list_entry_t *table_list_entry;
 
-  service_list_entry->update.expected_time += service_list_entry->update.interval;
-  service_list_entry->update.pending        = 1;
+  current_time       = clock_current_time ();
+  service_list_entry = ((ble_device_list_entry_t *)device_list_entry)->service_list;
+  table_list_entry   = (db_table_list_entry_t *)(((ble_device_list_entry_t *)device_list_entry)->data);
 
-  while (update_list_entry != NULL)
+  db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, NULL);
+  db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL, NULL);
+
+  while (service_list_entry != NULL)
   {
-    ble_char_list_entry_t *update_list_entry_tmp = NULL;
-    ble_attr_list_entry_t *char_value
-      = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(update_list_entry->desc_list)));
-    uint16 uuid = BLE_PACK_GATT_UUID (char_value->uuid);
-
-    if (uuid == BLE_TEMPERATURE_MEAS_UUID)
+    if ((service_list_entry->update.char_list != NULL) &&
+        (service_list_entry->update.wait <= 0))
     {
-      if (char_value->data_length != 0)
-      {
-        ble_char_temperature_t *temperature = (ble_char_temperature_t *)(char_value->data);
+      int32 update_failed = 0;
+      ble_char_list_entry_t *update_list_entry;
       
-        printf ("  Temperature flags: 0x%02x\n", temperature->flags);
-        printf ("              value: %.1f\n", temperature->meas_value);
-        printf ("               date: %02d/%02d/%04d\n", temperature->meas_time.day,
-                                                         temperature->meas_time.month,
-                                                         temperature->meas_time.year);
-        printf ("               time: %02d:%02d:%02d\n", temperature->meas_time.hour,
-                                                         temperature->meas_time.minute,
-                                                         temperature->meas_time.second);
-        printf ("               type: 0x%02x\n", temperature->type);
-        printf ("   Timer correction: %d\n", service_list_entry->update.timer_correction);
+      if (service_list_entry->update.init)
+      {
+        service_list_entry->update.init        = 0;
+        service_list_entry->update.time        = current_time;
+        service_list_entry->update.time_offset = 0;
       }
       else
       {
-        update_failed = 1;
-
-        printf ("  Temperature not read\n");
+        service_list_entry->update.time_offset = current_time - service_list_entry->update.time;        
+      }
+      
+      update_list_entry                   = service_list_entry->update.char_list;
+      service_list_entry->update.time    += service_list_entry->update.interval;
+      service_list_entry->update.pending  = 1;
+      
+      while (update_list_entry != NULL)
+      {
+        db_column_value_t column_value;
+        ble_char_list_entry_t *update_list_entry_tmp = NULL;
+        ble_attr_list_entry_t *char_value
+          = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(update_list_entry->desc_list)));
+        uint16 uuid = BLE_PACK_GATT_UUID (char_value->uuid);
+      
+        if (uuid == BLE_TEMPERATURE_MEAS_UUID)
+        {
+          if (char_value->data_length != 0)
+          {
+            ble_char_temperature_t *temperature = (ble_char_temperature_t *)(char_value->data);
+          
+            printf ("  Temperature flags: 0x%02x\n", temperature->flags);
+            printf ("              value: %.1f (C)\n", temperature->meas_value);
+            printf ("               type: 0x%02x\n", temperature->type);
+            printf ("               date: %02d/%02d/%04d\n", temperature->meas_time.day,
+                                                             temperature->meas_time.month,
+                                                             temperature->meas_time.year);
+            printf ("               time: %02d:%02d:%02d\n", temperature->meas_time.hour,
+                                                             temperature->meas_time.minute,
+                                                             temperature->meas_time.second);
+            printf ("             offset: %d (ms)\n", service_list_entry->update.time_offset);
+      
+            column_value.decimal = temperature->meas_value;
+            (void)db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, &column_value);
+          }
+          else
+          {
+            update_failed = 1;
+      
+            printf ("  Temperature not read\n");
+          }
+        }
+        else if ((uuid == BLE_TEMPERATURE_TYPE_UUID) ||
+                 (uuid == BLE_MEAS_INTERVAL_UUID))
+        {
+          update_list_entry_tmp = update_list_entry;
+        }
+        else
+        {
+          printf ("BLE unexpected uuid 0x%04x in temperature update list\n", uuid);
+        }
+      
+        if (char_value->data_length != 0)
+        {
+          free (char_value->data);
+          char_value->data        = NULL;
+          char_value->data_length = 0;
+        }
+      
+        update_list_entry = update_list_entry->next;
+        if (update_list_entry_tmp != NULL)
+        {
+          list_remove ((list_entry_t **)(&(service_list_entry->update.char_list)), (list_entry_t *)update_list_entry_tmp);
+          free (update_list_entry_tmp);
+          update_list_entry_tmp = NULL;
+        }
+      }
+      
+      if (update_failed > 0)
+      {
+        ble_char_list_entry_t *char_list_entry = service_list_entry->char_list;
+        
+        /* Add measurement interval to update list */
+        while (char_list_entry != NULL)
+        {
+          uint8 uuid_length;
+          uint16 uuid;
+          ble_attr_list_entry_t *desc_list_entry
+            = ble_find_char_desc (char_list_entry->desc_list, BLE_GATT_CHAR_DECL);;
+          
+          uuid_length = desc_list_entry->data_length - 3;
+          uuid        = BLE_PACK_GATT_UUID (desc_list_entry->declaration.uuid);
+      
+          if ((uuid_length == BLE_GATT_UUID_LENGTH) && (uuid == BLE_MEAS_INTERVAL_UUID))
+          {
+            update_list_entry = (ble_char_list_entry_t *)malloc (sizeof (*update_list_entry));
+            *update_list_entry = *char_list_entry;
+            list_add ((list_entry_t **)(&(service_list_entry->update.char_list)), (list_entry_t *)update_list_entry);
+      
+            desc_list_entry = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(char_list_entry->desc_list)));
+            desc_list_entry->data_length = BLE_MEAS_INTERVAL_LENGTH;
+            desc_list_entry->data        = malloc (desc_list_entry->data_length);
+            desc_list_entry->data[0]     = (service_list_entry->update.interval/1000) & 0xff;
+            desc_list_entry->data[1]     = ((service_list_entry->update.interval/1000) >> 8) & 0xff;      
+      
+            service_list_entry->update.pending++;
+            break;
+          }      
+          
+          char_list_entry = char_list_entry->next;
+        }
       }
     }
-    else if ((uuid == BLE_TEMPERATURE_TYPE_UUID) ||
-             (uuid == BLE_MEAS_INTERVAL_UUID))
-    {
-      update_list_entry_tmp = update_list_entry;
-    }
-    else
-    {
-      printf ("BLE unexpected uuid 0x%04x in temperature update list\n", uuid);
-    }
 
-    if (char_value->data_length != 0)
-    {
-      free (char_value->data);
-      char_value->data        = NULL;
-      char_value->data_length = 0;
-    }
-
-    update_list_entry = update_list_entry->next;
-    if (update_list_entry_tmp != NULL)
-    {
-      list_remove ((list_entry_t **)(&(service_list_entry->update.char_list)), (list_entry_t *)update_list_entry_tmp);
-      free (update_list_entry_tmp);
-      update_list_entry_tmp = NULL;
-    }
+    service_list_entry = service_list_entry->next;    
   }
 
-  if (update_failed > 0)
-  {
-    ble_char_list_entry_t *char_list_entry = service_list_entry->char_list;
-    
-    /* Add measurement interval to update list */
-    while (char_list_entry != NULL)
-    {
-      uint8 uuid_length;
-      uint16 uuid;
-      ble_attr_list_entry_t *desc_list_entry
-        = ble_find_char_desc (char_list_entry->desc_list, BLE_GATT_CHAR_DECL);;
-      
-      uuid_length = desc_list_entry->data_length - 3;
-      uuid        = BLE_PACK_GATT_UUID (desc_list_entry->declaration.uuid);
-
-      if ((uuid_length == BLE_GATT_UUID_LENGTH) && (uuid == BLE_MEAS_INTERVAL_UUID))
-      {
-        update_list_entry = (ble_char_list_entry_t *)malloc (sizeof (*update_list_entry));
-        *update_list_entry = *char_list_entry;
-        list_add ((list_entry_t **)(&(service_list_entry->update.char_list)), (list_entry_t *)update_list_entry);
-
-        desc_list_entry = (ble_attr_list_entry_t *)list_tail ((list_entry_t **)(&(char_list_entry->desc_list)));
-        desc_list_entry->data_length = BLE_MEAS_INTERVAL_LENGTH;
-        desc_list_entry->data        = malloc (desc_list_entry->data_length);
-        desc_list_entry->data[0]     = (service_list_entry->update.interval/1000) & 0xff;
-        desc_list_entry->data[1]     = ((service_list_entry->update.interval/1000) >> 8) & 0xff;      
-  
-        service_list_entry->update.pending++;
-        break;
-      }      
-      
-      char_list_entry = char_list_entry->next;
-    }
-  }
+  db_write_table (table_list_entry, 1);
 }
 
 ble_attr_list_entry_t * ble_find_char_desc (ble_attr_list_entry_t *attr_list_entry,
@@ -442,8 +480,24 @@ int32 ble_init_service (ble_device_list_entry_t *device_list_entry)
 
       if (found > 0)
       {
-        service_list_entry->update.pending  = found;
-        service_list_entry->update.callback = ble_update_temperature;
+        db_table_list_entry_t *table_list_entry;
+        
+        service_list_entry->update.pending = found;
+        
+        table_list_entry = (db_table_list_entry_t *)malloc (sizeof (*table_list_entry));
+        
+        table_list_entry->title       = strdup (device_list_entry->name);
+        table_list_entry->num_columns = DB_TEMPERATURE_TABLE_NUM_COLUMNS;
+        table_list_entry->column      = db_temperature_table_columns;
+        table_list_entry->insert      = NULL;
+        table_list_entry->update      = NULL;
+        table_list_entry->select      = NULL;
+
+        if ((db_create_table (&db_info, table_list_entry)) > 0)
+        {
+          device_list_entry->data     = table_list_entry;
+          device_list_entry->callback = ble_update_temperature;
+        }
       }
     }
 
@@ -453,12 +507,12 @@ int32 ble_init_service (ble_device_list_entry_t *device_list_entry)
  
       column_value.blob.data   = device_list_entry->address.byte;
       column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
-      db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 1, &column_value);
+      db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
       column_value.blob.data   = service_list_entry->declaration.data;
       column_value.blob.length = service_list_entry->declaration.data_length;
-      db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 3, &column_value);
+      db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
       column_value.text = "Active";
-      db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 5, &column_value);
+      db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_STATUS, &column_value);
       db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0);
     }    
 
@@ -583,7 +637,7 @@ void ble_get_device_list (ble_device_list_entry_t **device_list)
       ble_service_list_entry_t *service_list_entry;
       ble_device_address_t address;
 
-      db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 1, &column_value);
+      db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
       memcpy (address.byte, column_value.blob.data, BLE_DEVICE_ADDRESS_LENGTH);
       address.type = BLE_ADDR_PUBLIC;
       device_list_entry = ble_find_device (*device_list, &address);
@@ -595,15 +649,16 @@ void ble_get_device_list (ble_device_list_entry_t **device_list)
         device_list_entry->address      = address;
         device_list_entry->service_list = NULL;
         device_list_entry->status       = BLE_DEVICE_DISCOVER;
-        device_list_entry->setup_time   = 0;
+        device_list_entry->data         = NULL;
+        device_list_entry->callback     = NULL;
 
-        db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 2, &column_value);
+        db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_NAME, &column_value);
         device_list_entry->name = strdup (column_value.text);
         
         list_add ((list_entry_t **)(&device_list), (list_entry_t *)device_list_entry);
       }
 
-      db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 3, &column_value);
+      db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
       service_list_entry = ble_find_service (device_list_entry, column_value.blob.data, column_value.blob.length);
       
       if (service_list_entry == NULL)
@@ -621,26 +676,25 @@ void ble_get_device_list (ble_device_list_entry_t **device_list)
         service_list_entry->include_list = NULL;
         service_list_entry->char_list    = NULL;
 
-        db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 4, &column_value);
-        service_list_entry->update.char_list        = NULL;
-        service_list_entry->update.pending          = 0;
-        service_list_entry->update.init             = 1;
-        service_list_entry->update.expected_time    = 0;
-        service_list_entry->update.timer            = 0;
-        service_list_entry->update.timer_correction = 0;
-        service_list_entry->update.interval         = (column_value.integer * 60 * 1000);
-        service_list_entry->update.callback         = NULL;
+        db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_INTERVAL, &column_value);
+        service_list_entry->update.char_list   = NULL;
+        service_list_entry->update.pending     = 0;
+        service_list_entry->update.init        = 1;
+        service_list_entry->update.time        = 0;
+        service_list_entry->update.time_offset = 0;
+        service_list_entry->update.wait        = 0;
+        service_list_entry->update.interval    = (column_value.integer * 60 * 1000);
 
         list_add ((list_entry_t **)(&(device_list_entry->service_list)), (list_entry_t *)service_list_entry);  
 
         column_value.blob.data   = device_list_entry->address.byte;
         column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
-        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 1, &column_value);
+        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
         column_value.blob.data   = service_list_entry->declaration.data;
         column_value.blob.length = service_list_entry->declaration.data_length;
-        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 3, &column_value);
+        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
         column_value.text = "Inactive";
-        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, 5, &column_value);
+        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_STATUS, &column_value);
         db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0);
       }
     }
