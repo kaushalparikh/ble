@@ -71,6 +71,7 @@ typedef struct PACKED
 struct ble_attr_list_entry
 {
   struct ble_attr_list_entry *next;
+  uint8                       type;
   uint16                      handle;
   uint8                       uuid_length;
   uint8                       uuid[BLE_MAX_UUID_LENGTH];
@@ -96,8 +97,7 @@ typedef struct ble_char_list_entry ble_char_list_entry_t;
 
 typedef struct
 {
-  ble_char_list_entry_t  *char_list;
-  int32                   pending;
+  ble_attr_list_entry_t  *attr_list;
   uint8                   init;
   int32                   time;
   int32                   time_offset;
@@ -166,6 +166,9 @@ typedef struct ble_device_list_entry ble_device_list_entry_t;
 
 extern ble_attr_list_entry_t * ble_find_char_desc (ble_attr_list_entry_t *attr_list_entry,
                                                    uint16 uuid);
+
+extern ble_attr_list_entry_t * ble_find_attribute (ble_service_list_entry_t *service_list_entry,
+                                                   uint16 handle);
 
 extern void ble_print_service (ble_device_list_entry_t *device_list_entry);
 
