@@ -31,14 +31,14 @@ enum
 
 enum
 {
-  BLE_CHAR_TYPE_BROADCAST    = 0x01,
-  BLE_CHAR_TYPE_READ         = 0x02,
-  BLE_CHAR_TYPE_WRITE_NO_RSP = 0x04,
-  BLE_CHAR_TYPE_WRITE        = 0x08,
-  BLE_CHAR_TYPE_NOTIFY       = 0x10,
-  BLE_CHAR_TYPE_INDICATE     = 0x20,
-  BLE_CHAR_TYPE_WRITE_SIGNED = 0x40,
-  BLE_CHAR_TYPE_EXT          = 0x80
+  BLE_ATTR_TYPE_BROADCAST    = 0x01,
+  BLE_ATTR_TYPE_READ         = 0x02,
+  BLE_ATTR_TYPE_WRITE_NO_RSP = 0x04,
+  BLE_ATTR_TYPE_WRITE        = 0x08,
+  BLE_ATTR_TYPE_NOTIFY       = 0x10,
+  BLE_ATTR_TYPE_INDICATE     = 0x20,
+  BLE_ATTR_TYPE_WRITE_SIGNED = 0x40,
+  BLE_ATTR_TYPE_EXT          = 0x80
 };
 
 typedef struct PACKED
@@ -68,36 +68,31 @@ typedef struct PACKED
   uint16 description;
 } ble_char_format_t;
 
-struct ble_attr_list_entry
+typedef struct
 {
-  struct ble_attr_list_entry *next;
-  uint8                       type;
-  uint16                      handle;
-  uint8                       uuid_length;
-  uint8                       uuid[BLE_MAX_UUID_LENGTH];
-  uint8                       data_length;
-  uint8                      *data;
-  union
-  {
-    ble_char_decl_t           declaration;
-    ble_char_client_config_t  client_config;
-    ble_char_format_t         format;
-  };
-};
-
-typedef struct ble_attr_list_entry ble_attr_list_entry_t;
+  uint8   type;
+  uint16  handle;
+  uint8   uuid_length;
+  uint8   uuid[BLE_MAX_UUID_LENGTH];
+  uint8   data_length;
+  uint8  *data;  
+} ble_attribute_t;
 
 struct ble_char_list_entry
 {
   struct ble_char_list_entry *next;
-  ble_attr_list_entry_t      *desc_list;
+  ble_attribute_t            *declaration;
+  ble_attribute_t            *value;
+  ble_attribute_t            *description;
+  ble_attribute_t            *client_config;
+  ble_attribute_t            *format;
 };
 
 typedef struct ble_char_list_entry ble_char_list_entry_t;
 
 typedef struct
 {
-  ble_attr_list_entry_t  *attr_list;
+  ble_char_list_entry_t  *char_list;
   uint8                   init;
   int32                   time;
   int32                   time_offset;
@@ -108,7 +103,7 @@ typedef struct
 struct ble_service_list_entry
 {
   struct ble_service_list_entry *next;
-  ble_attr_list_entry_t          declaration;
+  ble_attribute_t               *declaration;
   uint16                         start_handle;
   uint16                         end_handle;
   struct ble_service_list_entry *include_list;
@@ -164,11 +159,8 @@ struct ble_device_list_entry
 
 typedef struct ble_device_list_entry ble_device_list_entry_t;
 
-extern ble_attr_list_entry_t * ble_find_char_desc (ble_attr_list_entry_t *attr_list_entry,
-                                                   uint16 uuid);
-
-extern ble_attr_list_entry_t * ble_find_attribute (ble_service_list_entry_t *service_list_entry,
-                                                   uint16 handle);
+extern ble_attribute_t * ble_find_attribute (ble_service_list_entry_t *service_list_entry,
+                                             uint16 handle);
 
 extern void ble_print_service (ble_device_list_entry_t *device_list_entry);
 

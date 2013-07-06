@@ -610,7 +610,7 @@ typedef struct PACKED
 {
   ble_message_header_t header;
   uint8                conn_handle;
-  uint16               char_handle;
+  uint16               attr_handle;
   uint8                length;
   uint8                data[];
 } ble_event_find_information_t;
@@ -672,7 +672,7 @@ typedef struct PACKED
   ble_message_header_t header;
   uint8                conn_handle;
   uint16               result;
-  uint16               char_handle;
+  uint16               attr_handle;
 } ble_event_procedure_completed_t;
 
 /* Function declarations */

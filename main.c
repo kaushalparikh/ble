@@ -432,6 +432,8 @@ int main (int argc, char * argv[])
 
   ble_deinit ();
 
+  printf ("\n");
+
   return 0;
 }
 
