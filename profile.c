@@ -150,7 +150,7 @@ static void ble_update_temperature (void *device_list_entry)
       
       while (update_list_entry != NULL)
       {
-        uint16 uuid = BLE_PACK_GATT_UUID (update_list_entry->value->data);
+        uint16 uuid = BLE_PACK_GATT_UUID (update_list_entry->value->uuid);
         ble_char_list_entry_t *update_list_entry_del = NULL;
         db_column_value_t column_value;
       
@@ -329,7 +329,9 @@ ble_attribute_t * ble_find_attribute (ble_service_list_entry_t *service_list_ent
       else if ((char_list_entry->format != NULL) && (char_list_entry->format->handle == handle))
       {
         attribute = char_list_entry->format;
-      }       
+      }
+
+      char_list_entry = char_list_entry->next;
     }
 
     char_list_entry = service_list_entry->update.char_list;
@@ -356,6 +358,8 @@ ble_attribute_t * ble_find_attribute (ble_service_list_entry_t *service_list_ent
       {
         attribute = char_list_entry->format;
       }        
+      
+      char_list_entry = char_list_entry->next;
     }
     
     service_list_entry = service_list_entry->next;
@@ -422,7 +426,7 @@ void ble_print_service (ble_device_list_entry_t *device_list_entry)
         
         uuid = BLE_PACK_GATT_UUID (char_list_entry->client_config->uuid);
 
-        printf ("        Descriptor -- description\n");
+        printf ("        Descriptor -- client configuration\n");
         printf ("          handle: 0x%04x\n", char_list_entry->client_config->handle);
         printf ("           value: ");
         printf ("0x%04x\n", client_config->bitfield);      

@@ -1169,7 +1169,14 @@ void ble_read_profile (void)
         else
         {
           connection_params.characteristics = connection_params.characteristics->next;
-          connection_params.attribute       = connection_params.characteristics->declaration; 
+          connection_params.attribute       = connection_params.characteristics->declaration;
+        }
+      
+        if ((connection_params.characteristics->description != NULL) ||
+            (connection_params.characteristics->client_config != NULL) ||
+            (connection_params.characteristics->format != NULL))
+        {
+          char_read_pending = 1;
         }
       }
     }
@@ -1182,6 +1189,7 @@ void ble_read_profile (void)
           (connection_params.service->next == NULL))
       {
         connection_params.device->status = BLE_DEVICE_CONFIGURE_CHAR;
+        printf ("Done\n");
       }
     }
     else
