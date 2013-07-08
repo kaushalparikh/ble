@@ -1343,65 +1343,69 @@ void ble_update_data (void)
       service_list_entry = service_list_entry->next;
     }
     
-    if ((update_pending) && (connection_params.service != NULL))
+    if (update_pending)
     {
       if (connection_params.characteristics == NULL)
       {
-        connection_params.characteristics = connection_params.service->update.char_list;
-      }
-      else
-      {
-        if (connection_params.characteristics->next == NULL)
+        if (connection_params.service != NULL)
         {
-          connection_params.service = connection_params.service->next;
-          
-          while (connection_params.service != NULL)
+          connection_params.characteristics = connection_params.service->update.char_list;
+        }
+      }
+      else if (connection_params.characteristics->next == NULL)
+      {
+        connection_params.service         = connection_params.service->next;
+        connection_params.characteristics = NULL;
+
+        while (connection_params.service != NULL)
+        {
+          if ((connection_params.service->update.char_list != NULL) &&
+              (connection_params.service->update.wait <= 0))
           {
-            if ((connection_params.service->update.char_list != NULL) &&
-                (connection_params.service->update.wait <= 0))
-            {
-              connection_params.characteristics = connection_params.service->update.char_list;
-              break;
-            }
-  
-            connection_params.service = connection_params.service->next;
+            connection_params.characteristics = connection_params.service->update.char_list;
+            break;
           }
+
+          connection_params.service = connection_params.service->next;
         }
-        else
-        {
-          connection_params.characteristics = connection_params.characteristics->next;
-        }
-      }
-      
-      if (connection_params.characteristics->value->type & BLE_ATTR_TYPE_READ)
-      {
-        connection_params.attribute = connection_params.characteristics->value;
-        
-        status = ble_read_long_handle ();
       }
       else
       {
-        if ((connection_params.characteristics->value->type & (BLE_ATTR_TYPE_NOTIFY |
-                                                               BLE_ATTR_TYPE_INDICATE)))
-        {
-          connection_params.attribute = connection_params.characteristics->client_config;
-        }
-        else
+        connection_params.characteristics = connection_params.characteristics->next;
+      }
+
+      if (connection_params.characteristics != NULL)
+      {
+        if (connection_params.characteristics->value->type & BLE_ATTR_TYPE_READ)
         {
           connection_params.attribute = connection_params.characteristics->value;
+          
+          status = ble_read_long_handle ();
         }
-        
-        status = ble_write_handle ();
-
-        if (connection_params.characteristics->value->type & BLE_ATTR_TYPE_WRITE)
+        else
         {
-          free (connection_params.attribute->data);
-          connection_params.attribute->data        = NULL;
-          connection_params.attribute->data_length = 0;
+          if ((connection_params.characteristics->value->type & (BLE_ATTR_TYPE_NOTIFY |
+                                                                 BLE_ATTR_TYPE_INDICATE)))
+          {
+            connection_params.attribute = connection_params.characteristics->client_config;
+          }
+          else
+          {
+            connection_params.attribute = connection_params.characteristics->value;
+          }
+          
+          status = ble_write_handle ();
+  
+          if (connection_params.characteristics->value->type & BLE_ATTR_TYPE_WRITE)
+          {
+            free (connection_params.attribute->data);
+            connection_params.attribute->data        = NULL;
+            connection_params.attribute->data_length = 0;
+          }
         }
       }
     }
-    else if (!update_pending)
+    else
     {
       ble_connect_disconnect ();
     }
