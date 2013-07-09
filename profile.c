@@ -113,6 +113,58 @@ static db_info_t db_info =
   .table_list = NULL,
 };
 
+
+static void ble_update_char_type (ble_char_list_entry_t * char_list_entry, uint8 type)
+{
+  ble_char_decl_t *char_decl = (ble_char_decl_t *)(char_list_entry->declaration->data);
+  
+  if (type == BLE_ATTR_TYPE_READ)
+  {
+    if (char_decl->type & BLE_ATTR_TYPE_READ)
+    {
+      char_list_entry->value->type = BLE_ATTR_TYPE_READ;
+    }
+    else if (char_decl->type & BLE_ATTR_TYPE_INDICATE)
+    {
+      char_list_entry->value->type = BLE_ATTR_TYPE_INDICATE;
+    }
+    else if (char_decl->type & BLE_ATTR_TYPE_NOTIFY)
+    {
+      char_list_entry->value->type = BLE_ATTR_TYPE_NOTIFY;
+    }
+    else
+    {
+      char_list_entry->value->type = 0;
+    }
+  }
+  else
+  {
+    if (char_decl->type & BLE_ATTR_TYPE_WRITE)
+    {
+      char_list_entry->value->type = BLE_ATTR_TYPE_WRITE;
+    }
+    else if (char_decl->type & BLE_ATTR_TYPE_WRITE_NO_RSP)
+    {
+      char_list_entry->value->type = BLE_ATTR_TYPE_WRITE_NO_RSP;
+    }
+    else if (char_decl->type & BLE_ATTR_TYPE_WRITE_SIGNED)
+    {
+      char_list_entry->value->type = BLE_ATTR_TYPE_WRITE_SIGNED;
+    }
+    else
+    {
+      char_list_entry->value->type = 0;
+    }
+  }
+
+  if (char_list_entry->value->type & (BLE_ATTR_TYPE_INDICATE | BLE_ATTR_TYPE_NOTIFY))
+  {
+    ((ble_char_client_config_t *)(char_list_entry->client_config->data))->bitfield
+      = (char_list_entry->value->type & BLE_ATTR_TYPE_INDICATE)
+        ? BLE_CHAR_CLIENT_INDICATE : BLE_CHAR_CLIENT_NOTIFY;
+  }
+}
+
 static void ble_update_temperature (void *device_list_entry)
 {
   int32 current_time;
@@ -125,6 +177,8 @@ static void ble_update_temperature (void *device_list_entry)
 
   db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, NULL);
   db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL, NULL);
+
+  printf ("Device: %s\n", ((ble_device_list_entry_t *)device_list_entry)->name);
 
   while (service_list_entry != NULL)
   {
@@ -231,6 +285,8 @@ static void ble_update_temperature (void *device_list_entry)
             char_list_entry->value->data[0] = (service_list_entry->update.interval/1000) & 0xff;
             char_list_entry->value->data[1] = ((service_list_entry->update.interval/1000) >> 8) & 0xff;            
 
+            ble_update_char_type (char_list_entry, BLE_ATTR_TYPE_WRITE);
+
             list_remove ((list_entry_t **)(&(service_list_entry->char_list)), (list_entry_t *)char_list_entry);
             list_add ((list_entry_t **)(&(service_list_entry->update.char_list)), (list_entry_t *)char_list_entry);
 
@@ -246,57 +302,6 @@ static void ble_update_temperature (void *device_list_entry)
   }
 
   db_write_table (table_list_entry, 1);
-}
-
-static void ble_update_char_type (ble_char_list_entry_t * char_list_entry, uint8 type)
-{
-  ble_char_decl_t *char_decl = (ble_char_decl_t *)(char_list_entry->declaration->data);
-  
-  if (type == BLE_ATTR_TYPE_READ)
-  {
-    if (char_decl->type & BLE_ATTR_TYPE_READ)
-    {
-      char_list_entry->value->type = BLE_ATTR_TYPE_READ;
-    }
-    else if (char_decl->type & BLE_ATTR_TYPE_INDICATE)
-    {
-      char_list_entry->value->type = BLE_ATTR_TYPE_INDICATE;
-    }
-    else if (char_decl->type & BLE_ATTR_TYPE_NOTIFY)
-    {
-      char_list_entry->value->type = BLE_ATTR_TYPE_NOTIFY;
-    }
-    else
-    {
-      char_list_entry->value->type = 0;
-    }
-  }
-  else
-  {
-    if (char_decl->type & BLE_ATTR_TYPE_WRITE)
-    {
-      char_list_entry->value->type = BLE_ATTR_TYPE_WRITE;
-    }
-    else if (char_decl->type & BLE_ATTR_TYPE_WRITE_NO_RSP)
-    {
-      char_list_entry->value->type = BLE_ATTR_TYPE_WRITE_NO_RSP;
-    }
-    else if (char_decl->type & BLE_ATTR_TYPE_WRITE_SIGNED)
-    {
-      char_list_entry->value->type = BLE_ATTR_TYPE_WRITE_SIGNED;
-    }
-    else
-    {
-      char_list_entry->value->type = 0;
-    }
-  }
-
-  if (char_list_entry->value->type & (BLE_ATTR_TYPE_INDICATE | BLE_ATTR_TYPE_NOTIFY))
-  {
-    ((ble_char_client_config_t *)(char_list_entry->client_config->data))->bitfield
-      = (char_list_entry->value->type & BLE_ATTR_TYPE_INDICATE)
-        ? BLE_CHAR_CLIENT_INDICATE : BLE_CHAR_CLIENT_NOTIFY;
-  }
 }
 
 ble_attribute_t * ble_find_attribute (ble_service_list_entry_t *service_list_entry,
