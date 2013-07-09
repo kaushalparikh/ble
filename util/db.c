@@ -471,21 +471,27 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
   return status;
 }
 
-int32 db_open (db_info_t *db_info)
+int32 db_open (int8 *file_name, db_info_t **db_info)
 {
   int status;
   sqlite3 *db;
 
-  status = sqlite3_open_v2 (db_info->file_name, &db,
-                            (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE), NULL);
+  *db_info = (db_info_t *)malloc (sizeof (**db_info));
+  status   = sqlite3_open_v2 (file_name, &db,
+                              (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE), NULL);
+  
   if (status == SQLITE_OK)
   {
-    db_info->handle = db;
+    (*db_info)->handle     = db;
+    (*db_info)->table_list = NULL;
     status = 1;
   }
   else
   {
-    printf ("Can't open database %s\n", db_info->file_name);
+    printf ("Can't open database %s\n", file_name);
+    
+    free (*db_info);
+    *db_info = NULL;
     sqlite3_close (db);
     status = -1;
   }
@@ -496,6 +502,7 @@ int32 db_open (db_info_t *db_info)
 int32 db_close (db_info_t *db_info)
 {
   sqlite3 *db = (sqlite3 *)(db_info->handle);
+  free (db_info);
   return sqlite3_close (db);
 }
 
@@ -532,13 +539,11 @@ static db_table_list_entry_t static_tables[NUM_STATIC_TABLES] =
 
 int main (int argc, char *argv[])
 {
-  db_info_t db_info = {NULL, NULL, NULL};
+  db_info_t *db_info = NULL;
 
   if (argc > 1)
   {
-    db_info.file_name = argv[1];
-    
-    if ((db_open (&db_info)) > 0)
+    if ((db_open (argv[1], &db_info)) > 0)
     {
       int repeat = 2;
 
@@ -547,7 +552,7 @@ int main (int argc, char *argv[])
         db_table_list_entry_t *table_list_entry;
         db_column_value_t column_value;
 
-        if ((db_create_table (&db_info, &(static_tables[0]))) > 0)
+        if ((db_create_table (db_info, &(static_tables[0]))) > 0)
         {
           uint8 address[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
           uint8 temperature_service[] = {0x18, 0x09};
@@ -663,7 +668,7 @@ int main (int argc, char *argv[])
             printf ("%10s\n", column_value.text);
           }
   
-          db_delete_table (&db_info, &(static_tables[0]));
+          db_delete_table (db_info, &(static_tables[0]));
         }
 
         table_list_entry = (db_table_list_entry_t *)malloc (sizeof (*table_list_entry));
@@ -675,7 +680,7 @@ int main (int argc, char *argv[])
         table_list_entry->update      = NULL;
         table_list_entry->select      = NULL;
 
-        if ((db_create_table (&db_info, table_list_entry)) > 0)
+        if ((db_create_table (db_info, table_list_entry)) > 0)
         {
           db_write_column (table_list_entry, 1, 2, NULL);
           db_write_column (table_list_entry, 1, 3, NULL);
@@ -696,7 +701,7 @@ int main (int argc, char *argv[])
             printf ("%7d\n", column_value.integer);
           }
 
-          db_delete_table (&db_info, table_list_entry);
+          db_delete_table (db_info, table_list_entry);
         }
 
         free (table_list_entry);
@@ -704,7 +709,7 @@ int main (int argc, char *argv[])
         repeat--;
       }
       
-      db_close (&db_info);
+      db_close (db_info);
     }
   }
   else

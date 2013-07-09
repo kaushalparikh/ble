@@ -106,12 +106,7 @@ static db_column_entry_t db_temperature_table_columns[DB_TEMPERATURE_TABLE_NUM_C
     (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),        NULL},
 };
 
-static db_info_t db_info = 
-{
-  .file_name  = "gateway.db",
-  .handle     = NULL,
-  .table_list = NULL,
-};
+static db_info_t *db_info = NULL;
 
 
 static void ble_update_char_type (ble_char_list_entry_t * char_list_entry, uint8 type)
@@ -548,7 +543,7 @@ int32 ble_init_service (ble_device_list_entry_t *device_list_entry)
         table_list_entry->update      = NULL;
         table_list_entry->select      = NULL;
 
-        if ((db_create_table (&db_info, table_list_entry)) > 0)
+        if ((db_create_table (db_info, table_list_entry)) > 0)
         {
           device_list_entry->data     = table_list_entry;
           device_list_entry->callback = ble_update_temperature;
@@ -707,12 +702,12 @@ void ble_get_device_list (ble_device_list_entry_t **device_list)
 {
   int32 status = 1;
   
-  if (db_info.handle == NULL)
+  if (db_info == NULL)
   {
-    status = db_open (&db_info);
+    status = db_open ("gateway.db", &db_info);
     if (status > 0)
     {
-      status = db_create_table (&db_info, &(db_static_tables[DB_DEVICE_LIST_TABLE]));
+      status = db_create_table (db_info, &(db_static_tables[DB_DEVICE_LIST_TABLE]));
     }
   }
 

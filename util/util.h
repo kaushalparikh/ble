@@ -91,7 +91,6 @@ typedef struct db_table_list_entry db_table_list_entry_t;
 
 typedef struct
 {
-  int8                  *file_name;
   void                  *handle;
   db_table_list_entry_t *table_list;
 } db_info_t;
@@ -110,7 +109,7 @@ extern int32 db_delete_table (db_info_t *db_info, db_table_list_entry_t *table_l
 
 extern int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry);
 
-extern int32 db_open (db_info_t *db_info);
+extern int32 db_open (int8 *file_name, db_info_t **db_info);
 
 extern int32 db_close (db_info_t *db_info);
 
