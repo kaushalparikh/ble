@@ -1266,7 +1266,7 @@ void ble_start_data (void)
 
 void ble_next_data (void)
 {
-  connection_params.device->callback (connection_params.device);  
+  ble_update_service (connection_params.device);
   ble_update_sleep ();
 
   connection_params.device = connection_params.device->next;

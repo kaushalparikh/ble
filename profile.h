@@ -154,15 +154,18 @@ struct ble_device_list_entry
   ble_service_list_entry_t      *service_list;
   ble_device_status_e            status;
   void                          *data;
-  void                         (*callback)(void *device_list_entry);
 };
 
 typedef struct ble_device_list_entry ble_device_list_entry_t;
+
+extern void ble_update_char_type (ble_char_list_entry_t * char_list_entry, uint8 type);
 
 extern ble_attribute_t * ble_find_attribute (ble_service_list_entry_t *service_list_entry,
                                              uint16 handle);
 
 extern void ble_print_service (ble_device_list_entry_t *device_list_entry);
+
+extern void ble_update_service (ble_device_list_entry_t *device_list_entry);
 
 extern int32 ble_init_service (ble_device_list_entry_t *device_list_entry);
 
