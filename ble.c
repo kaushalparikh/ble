@@ -8,6 +8,7 @@
 #include "list.h"
 #include "util.h"
 #include "profile.h"
+#include "device.h"
 #include "ble.h"
 
 struct timer_list_entry
@@ -950,7 +951,7 @@ void ble_start_scan (void)
   ble_command_scan_params_t *scan_params;
 
   ble_update_sleep ();
-  ble_get_device_list (&ble_device_list);
+  ble_get_device (&ble_device_list);
 
   printf ("BLE Start scan request\n");
 
@@ -1202,8 +1203,7 @@ void ble_read_profile (void)
   {
     ble_print_service (connection_params.device->service_list);
 
-    if ((ble_init_service (connection_params.device->service_list, &(connection_params.device->address),
-                           connection_params.device->name, &(connection_params.device->data))) > 0)
+    if ((ble_init_service (connection_params.device->service_list, connection_params.device)) > 0)
     {
       int32 current_time = clock_current_time ();
       ble_service_list_entry_t *service_list_entry = connection_params.device->service_list;
@@ -1221,6 +1221,7 @@ void ble_read_profile (void)
       connection_params.device->status = BLE_DEVICE_DISCOVER_SERVICE;
     }
 
+    ble_update_device (connection_params.device);
     ble_connect_disconnect ();
   }
 }
@@ -1263,8 +1264,8 @@ void ble_start_data (void)
 
 void ble_next_data (void)
 {
-  ble_update_service (connection_params.device->service_list, connection_params.device->name,
-                      connection_params.device->data);
+  ble_update_service (connection_params.device->service_list,
+                      connection_params.device);
   
   ble_update_sleep ();
 

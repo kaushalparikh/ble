@@ -66,9 +66,11 @@ static db_column_entry_t db_temperature_table_columns[DB_TEMPERATURE_TABLE_NUM_C
     (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),        NULL},
 };
 
+static db_info_t *db_info = NULL;
 
-void ble_update_temperature (ble_service_list_entry_t *service_list_entry, int8 *device_name,
-                             void *device_data)
+
+void ble_update_temperature (ble_service_list_entry_t *service_list_entry,
+                             ble_device_list_entry_t *device_list_entry)
 {
   int32 update_failed;
   int32 current_time;
@@ -77,13 +79,13 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry, int8 
 
   update_failed     = 0;
   current_time      = clock_current_time ();
-  table_list_entry  = (db_table_list_entry_t *)device_data;
+  table_list_entry  = (db_table_list_entry_t *)(device_list_entry->data);
   update_list_entry = service_list_entry->update.char_list;
 
   db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, NULL);
   db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL, NULL);
 
-  printf ("Device: %s\n", device_name);
+  printf ("Device: %s\n", device_list_entry->name);
 
   if (service_list_entry->update.init)
   {
@@ -196,8 +198,8 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry, int8 
   db_write_table (table_list_entry, 1);
 }
 
-int32 ble_init_temperature (ble_service_list_entry_t *service_list_entry, int8 *device_name,
-                            db_info_t *db_info, void **device_data)
+int32 ble_init_temperature (ble_service_list_entry_t *service_list_entry,
+                            ble_device_list_entry_t *device_list_entry)
 {
   int32 found = 0;
   uint8 uuid_length;
@@ -266,16 +268,22 @@ int32 ble_init_temperature (ble_service_list_entry_t *service_list_entry, int8 *
   {
     db_table_list_entry_t *table_list_entry = (db_table_list_entry_t *)malloc (sizeof (*table_list_entry));
     
-    table_list_entry->title       = strdup (device_name);
+    table_list_entry->title       = strdup (device_list_entry->name);
     table_list_entry->num_columns = DB_TEMPERATURE_TABLE_NUM_COLUMNS;
     table_list_entry->column      = db_temperature_table_columns;
     table_list_entry->insert      = NULL;
     table_list_entry->update      = NULL;
     table_list_entry->select      = NULL;
 
-    if ((db_create_table (db_info, table_list_entry)) > 0)
+    if (db_info == NULL)
     {
-      *device_data = table_list_entry;
+      if ((db_open ("gateway.db", &db_info)) > 0)
+      {
+        if ((db_create_table (db_info, table_list_entry)) > 0)
+        {
+          device_list_entry->data = table_list_entry;
+        }
+      }
     }
   }
 

@@ -165,23 +165,16 @@ extern ble_attribute_t * ble_find_attribute (ble_service_list_entry_t *service_l
 
 extern void ble_print_service (ble_service_list_entry_t *service_list_entry);
 
-extern void ble_update_service (ble_service_list_entry_t *service_list_entry, int8 *device_name,
-                                void *device_data);
+extern void ble_update_service (ble_service_list_entry_t *service_list_entry,
+                                ble_device_list_entry_t *device_list_entry);
 
-extern int32 ble_init_service (ble_service_list_entry_t *service_list_entry, ble_device_address_t *device_address,
-                               int8 *device_name, void **device_data);
+extern int32 ble_init_service (ble_service_list_entry_t *service_list_entry,
+                               ble_device_list_entry_t *device_list_entry);
 
 extern ble_service_list_entry_t * ble_find_service (ble_service_list_entry_t *service_list_entry,
                                                     uint8 *uuid, uint8 uuid_length);
 
 extern void ble_clear_service (ble_service_list_entry_t *service_list_entry);
-
-extern void ble_print_device (ble_device_list_entry_t *device_list_entry);
-
-extern ble_device_list_entry_t * ble_find_device (ble_device_list_entry_t *device_list_entry,
-                                                  ble_device_address_t *address);
-
-extern void ble_get_device_list (ble_device_list_entry_t **device_list);
 
 #endif
 
