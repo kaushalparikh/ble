@@ -171,10 +171,8 @@ ble_attribute_t * ble_find_attribute (ble_service_list_entry_t *service_list_ent
   return attribute;
 }
 
-void ble_print_service (ble_device_list_entry_t *device_list_entry)
+void ble_print_service (ble_service_list_entry_t *service_list_entry)
 {
-  ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
-  
   while (service_list_entry != NULL)
   {
     int32 i;
@@ -254,31 +252,34 @@ void ble_print_service (ble_device_list_entry_t *device_list_entry)
   }
 }
 
-void ble_update_service (ble_device_list_entry_t *device_list_entry)
+void ble_update_service (ble_service_list_entry_t *service_list_entry, int8 *device_name,
+                         void *device_data)
 {
-  ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
-  
   while (service_list_entry != NULL)
   {
-    uint8 uuid_length;
-    uint16 uuid;
-
-    uuid_length = service_list_entry->declaration->data_length;
-    uuid        = BLE_PACK_GATT_UUID (service_list_entry->declaration->data);
-
-    if ((uuid_length == BLE_GATT_UUID_LENGTH) && (uuid == BLE_TEMPERATURE_SERVICE_UUID))
+    if ((service_list_entry->update.char_list != NULL) &&
+        (service_list_entry->update.wait <= 0))
     {
-      ble_update_temperature (device_list_entry);
+      uint8 uuid_length;
+      uint16 uuid;
+  
+      uuid_length = service_list_entry->declaration->data_length;
+      uuid        = BLE_PACK_GATT_UUID (service_list_entry->declaration->data);
+  
+      if ((uuid_length == BLE_GATT_UUID_LENGTH) && (uuid == BLE_TEMPERATURE_SERVICE_UUID))
+      {
+        ble_update_temperature (service_list_entry, device_name, device_data);
+      }
     }
 
     service_list_entry = service_list_entry->next;
   }
 }
 
-int32 ble_init_service (ble_device_list_entry_t *device_list_entry)
+int32 ble_init_service (ble_service_list_entry_t *service_list_entry, ble_device_address_t *device_address,
+                        int8 *device_name, void **device_data)
 {
   int32 status = 0;
-  ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
   
   while (service_list_entry != NULL)
   {
@@ -291,14 +292,14 @@ int32 ble_init_service (ble_device_list_entry_t *device_list_entry)
 
     if ((uuid_length == BLE_GATT_UUID_LENGTH) && (uuid == BLE_TEMPERATURE_SERVICE_UUID))
     {
-      found = ble_init_temperature (device_list_entry, db_info);
+      found = ble_init_temperature (service_list_entry, device_name, db_info, device_data);
     }
 
     if (found > 0)
     {
       db_column_value_t column_value;
  
-      column_value.blob.data   = device_list_entry->address.byte;
+      column_value.blob.data   = device_address->byte;
       column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
       db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
       column_value.blob.data   = service_list_entry->declaration->data;
@@ -316,11 +317,9 @@ int32 ble_init_service (ble_device_list_entry_t *device_list_entry)
   return status;  
 }
 
-ble_service_list_entry_t * ble_find_service (ble_device_list_entry_t *device_list_entry,
+ble_service_list_entry_t * ble_find_service (ble_service_list_entry_t *service_list_entry,
                                              uint8 *uuid, uint8 uuid_length)
 {
-  ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
-
   while (service_list_entry != NULL)
   {
     if ((memcmp (uuid, service_list_entry->declaration->data, uuid_length)) == 0)
@@ -334,10 +333,8 @@ ble_service_list_entry_t * ble_find_service (ble_device_list_entry_t *device_lis
   return service_list_entry;  
 }
 
-void ble_clear_service (ble_device_list_entry_t *device_list_entry)
+void ble_clear_service (ble_service_list_entry_t *service_list_entry)
 {
-  ble_service_list_entry_t *service_list_entry = device_list_entry->service_list;
-
   while (service_list_entry != NULL)
   {
     while (service_list_entry->char_list != NULL)
@@ -485,7 +482,7 @@ void ble_get_device_list (ble_device_list_entry_t **device_list)
       }
 
       db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
-      service_list_entry = ble_find_service (device_list_entry, column_value.blob.data, column_value.blob.length);
+      service_list_entry = ble_find_service (device_list_entry->service_list, column_value.blob.data, column_value.blob.length);
       
       if (service_list_entry == NULL)
       {

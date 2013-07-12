@@ -582,7 +582,7 @@ void ble_event_read_group (ble_event_read_group_t *read_group)
 
   printf ("BLE Read group event\n");
 
-  service_list_entry = ble_find_service (connection_params.device, read_group->data, read_group->length);
+  service_list_entry = ble_find_service (connection_params.device->service_list, read_group->data, read_group->length);
 
   if (service_list_entry != NULL)
   {
@@ -1043,7 +1043,7 @@ void ble_start_profile (void)
     connection_params.device = connection_params.device->next;
   }
 
-  ble_clear_service (connection_params.device);
+  ble_clear_service (connection_params.device->service_list);
   (void)ble_connect_direct ();
 }
 
@@ -1060,7 +1060,7 @@ void ble_next_profile (void)
 
   if (connection_params.device != NULL)
   {
-    ble_clear_service (connection_params.device);
+    ble_clear_service (connection_params.device->service_list);
     (void)ble_connect_direct ();
   }
   else
@@ -1200,20 +1200,17 @@ void ble_read_profile (void)
   }
   else
   {
-    ble_print_service (connection_params.device);
+    ble_print_service (connection_params.device->service_list);
 
-    if ((ble_init_service (connection_params.device)) > 0)
+    if ((ble_init_service (connection_params.device->service_list, &(connection_params.device->address),
+                           connection_params.device->name, &(connection_params.device->data))) > 0)
     {
       int32 current_time = clock_current_time ();
       ble_service_list_entry_t *service_list_entry = connection_params.device->service_list;
   
       while (service_list_entry != NULL)
       {
-        if (service_list_entry->update.char_list != NULL)
-        {
-          service_list_entry->update.time = current_time;
-        }
-          
+        service_list_entry->update.time = current_time;
         service_list_entry = service_list_entry->next;
       }
 
@@ -1266,7 +1263,9 @@ void ble_start_data (void)
 
 void ble_next_data (void)
 {
-  ble_update_service (connection_params.device);
+  ble_update_service (connection_params.device->service_list, connection_params.device->name,
+                      connection_params.device->data);
+  
   ble_update_sleep ();
 
   connection_params.device = connection_params.device->next;
