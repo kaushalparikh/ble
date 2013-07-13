@@ -38,11 +38,10 @@ extern int32 clock_current_time (void);
 /* Database API */
 enum
 {
-  DB_COLUMN_TYPE_TEXT  = 1,
-  DB_COLUMN_TYPE_INT   = 2,
-  DB_COLUMN_TYPE_FLOAT = 3,
-  DB_COLUMN_TYPE_BLOB  = 4 ,
-  DB_COLUMN_TYPE_NULL  = 5
+  DB_COLUMN_TYPE_TEXT = 0,
+  DB_COLUMN_TYPE_INT,
+  DB_COLUMN_TYPE_FLOAT,
+  DB_COLUMN_TYPE_BLOB
 };
 
 enum
@@ -53,6 +52,12 @@ enum
   DB_COLUMN_FLAG_DEFAULT_NA        = 0x00000008,
   DB_COLUMN_FLAG_UPDATE_KEY        = 0x00000010,
   DB_COLUMN_FLAG_UPDATE_VALUE      = 0x00000020
+};
+
+enum
+{
+  DB_WRITE_INSERT = 0,
+  DB_WRITE_UPDATE
 };
 
 typedef union
@@ -98,12 +103,12 @@ typedef struct
 extern int32 db_read_column (db_table_list_entry_t *table_list_entry,
                              uint32 index, db_column_value_t *column_value);
 
-extern int32 db_write_column (db_table_list_entry_t *table_list_entry, uint8 insert,
+extern int32 db_write_column (db_table_list_entry_t *table_list_entry, uint8 type,
                               uint32 index, db_column_value_t *column_value);
 
 extern int32 db_read_table (db_table_list_entry_t *table_list_entry);
 
-extern int32 db_write_table (db_table_list_entry_t *table_list_entry, uint8 insert);
+extern int32 db_write_table (db_table_list_entry_t *table_list_entry, uint8 type);
 
 extern int32 db_delete_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry);
 

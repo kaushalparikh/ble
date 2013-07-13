@@ -120,7 +120,7 @@ typedef struct ble_service_list_entry ble_service_list_entry_t;
 enum
 {
   BLE_ADDR_PUBLIC = 0,
-  BLE_ADDR_RANDOM = 1
+  BLE_ADDR_RANDOM
 };
 
 typedef struct PACKED
@@ -132,13 +132,13 @@ typedef struct PACKED
 /* BLE device status */
 typedef enum
 {
-  BLE_DEVICE_DISCOVER           = 0,
-  BLE_DEVICE_DISCOVER_SERVICE   = 1,
-  BLE_DEVICE_DISCOVER_CHAR_DESC = 2,
-  BLE_DEVICE_DISCOVER_CHAR      = 3,
-  BLE_DEVICE_CONFIGURE_CHAR     = 4,
-  BLE_DEVICE_DATA               = 5,
-  BLE_DEVICE_IGNORE             = 6
+  BLE_DEVICE_DISCOVER = 0,
+  BLE_DEVICE_DISCOVER_SERVICE,
+  BLE_DEVICE_DISCOVER_CHAR_DESC,
+  BLE_DEVICE_DISCOVER_CHAR,
+  BLE_DEVICE_CONFIGURE_CHAR,
+  BLE_DEVICE_DATA,
+  BLE_DEVICE_IGNORE
 } ble_device_status_e;
 
 /* BLE device */

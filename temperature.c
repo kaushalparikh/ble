@@ -47,11 +47,11 @@ typedef struct PACKED
 
 enum
 {
-  DB_TEMPERATURE_TABLE_COLUMN_NO          = 0,
-  DB_TEMPERATURE_TABLE_COLUMN_TIME        = 1,
-  DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE = 2,
-  DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL   = 3,
-  DB_TEMPERATURE_TABLE_NUM_COLUMNS        = 4
+  DB_TEMPERATURE_TABLE_COLUMN_NO = 0,
+  DB_TEMPERATURE_TABLE_COLUMN_TIME,
+  DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE,
+  DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL,
+  DB_TEMPERATURE_TABLE_NUM_COLUMNS
 };
 
 static db_column_entry_t db_temperature_table_columns[DB_TEMPERATURE_TABLE_NUM_COLUMNS] =
@@ -195,7 +195,7 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry,
     }
   }
 
-  db_write_table (table_list_entry, 1);
+  db_write_table (table_list_entry, DB_WRITE_INSERT);
 }
 
 int32 ble_init_temperature (ble_service_list_entry_t *service_list_entry,

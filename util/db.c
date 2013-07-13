@@ -37,13 +37,13 @@ int32 db_read_column (db_table_list_entry_t *table_list_entry,
   return status;
 }
 
-int32 db_write_column (db_table_list_entry_t *table_list_entry, uint8 insert,
+int32 db_write_column (db_table_list_entry_t *table_list_entry, uint8 type,
                        uint32 index, db_column_value_t *column_value)
 {
   int status;
   sqlite3_stmt *statement;
 
-  if (insert)
+  if (type == DB_WRITE_INSERT)
   {
     statement = (sqlite3_stmt *)(table_list_entry->insert);
   }
@@ -72,16 +72,11 @@ int32 db_write_column (db_table_list_entry_t *table_list_entry, uint8 insert,
                                     (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
                                     (double)(column_value->decimal));
     }
-    else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_BLOB)
+    else
     {
       status = sqlite3_bind_blob (statement,
                                   (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)),
                                   column_value->blob.data, column_value->blob.length, SQLITE_TRANSIENT);
-    }
-    else
-    {
-      status = sqlite3_bind_null (statement,
-                                  (sqlite3_bind_parameter_index (statement, table_list_entry->column[index].tag)));
     }
   }
   else
@@ -128,12 +123,12 @@ int32 db_read_table (db_table_list_entry_t *table_list_entry)
   return status;
 }
 
-int32 db_write_table (db_table_list_entry_t *table_list_entry, uint8 insert)
+int32 db_write_table (db_table_list_entry_t *table_list_entry, uint8 type)
 {
   int status;
   sqlite3_stmt *statement;
 
-  if (insert)
+  if (type == DB_WRITE_INSERT)
   {
     statement = (sqlite3_stmt *)(table_list_entry->insert);
   }
@@ -227,7 +222,7 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
       {
         STRING_CONCAT (sql, " REAL");
       }
-      else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_BLOB)
+      else
       {
         STRING_CONCAT (sql, " BLOB");
       }
@@ -559,36 +554,36 @@ int main (int argc, char *argv[])
           uint8 battery_service[] = {0x18, 0x0f};
   
           column_value.integer = 1;
-          db_write_column (&(static_tables[0]), 1, 0, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 0, &column_value);
           column_value.blob.data   = address;
           column_value.blob.length = 6;
-          db_write_column (&(static_tables[0]), 1, 1, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 1, &column_value);
           column_value.text = "Temperature Sensor";
-          db_write_column (&(static_tables[0]), 1, 2, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 2, &column_value);
           column_value.blob.data   = temperature_service;
           column_value.blob.length = 2;
-          db_write_column (&(static_tables[0]), 1, 3, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 3, &column_value);
           column_value.integer = 15;
-          db_write_column (&(static_tables[0]), 1, 4, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 4, &column_value);
           column_value.text = "NA";
-          db_write_column (&(static_tables[0]), 1, 5, &column_value);
-          db_write_table (&(static_tables[0]), 1);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 5, &column_value);
+          db_write_table (&(static_tables[0]), DB_WRITE_INSERT);
           
           column_value.integer = 1;
-          db_write_column (&(static_tables[0]), 1, 0, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 0, &column_value);
           column_value.blob.data   = address;
           column_value.blob.length = 6;
-          db_write_column (&(static_tables[0]), 1, 1, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 1, &column_value);
           column_value.text = "Temperature Sensor";
-          db_write_column (&(static_tables[0]), 1, 2, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 2, &column_value);
           column_value.blob.data   = battery_service;
           column_value.blob.length = 2;
-          db_write_column (&(static_tables[0]), 1, 3, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 3, &column_value);
           column_value.integer = 60;
-          db_write_column (&(static_tables[0]), 1, 4, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 4, &column_value);
           column_value.text = "NA";
-          db_write_column (&(static_tables[0]), 1, 5, &column_value);
-          db_write_table (&(static_tables[0]), 1);
+          db_write_column (&(static_tables[0]), DB_WRITE_INSERT, 5, &column_value);
+          db_write_table (&(static_tables[0]), DB_WRITE_INSERT);
           
           printf ("Write table\n");
           while ((db_read_table (&(static_tables[0]))) > 0)
@@ -621,23 +616,23 @@ int main (int argc, char *argv[])
   
           column_value.blob.data   = address;
           column_value.blob.length = 6;
-          db_write_column (&(static_tables[0]), 0, 1, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_UPDATE, 1, &column_value);
           column_value.blob.data   = temperature_service;
           column_value.blob.length = 2;
-          db_write_column (&(static_tables[0]), 0, 3, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_UPDATE, 3, &column_value);
           column_value.text = "Active";
-          db_write_column (&(static_tables[0]), 0, 5, &column_value);
-          db_write_table (&(static_tables[0]), 0);
+          db_write_column (&(static_tables[0]), DB_WRITE_UPDATE, 5, &column_value);
+          db_write_table (&(static_tables[0]), DB_WRITE_UPDATE);
           
           column_value.blob.data   = address;
           column_value.blob.length = 6;
-          db_write_column (&(static_tables[0]), 0, 1, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_UPDATE, 1, &column_value);
           column_value.blob.data   = battery_service;
           column_value.blob.length = 2;
-          db_write_column (&(static_tables[0]), 0, 3, &column_value);
+          db_write_column (&(static_tables[0]), DB_WRITE_UPDATE, 3, &column_value);
           column_value.text = "Inactive";
-          db_write_column (&(static_tables[0]), 0, 5, &column_value);
-          db_write_table (&(static_tables[0]), 0);
+          db_write_column (&(static_tables[0]), DB_WRITE_UPDATE, 5, &column_value);
+          db_write_table (&(static_tables[0]), DB_WRITE_UPDATE);
           
           printf ("Update table\n");
           while ((db_read_table (&(static_tables[0]))) > 0)
@@ -682,11 +677,11 @@ int main (int argc, char *argv[])
 
         if ((db_create_table (db_info, table_list_entry)) > 0)
         {
-          db_write_column (table_list_entry, 1, 2, NULL);
-          db_write_column (table_list_entry, 1, 3, NULL);
+          db_write_column (table_list_entry, DB_WRITE_INSERT, 2, NULL);
+          db_write_column (table_list_entry, DB_WRITE_INSERT, 3, NULL);
           column_value.decimal = 98.4;
-          db_write_column (table_list_entry, 1, 2, &column_value);
-          db_write_table (table_list_entry, 1);
+          db_write_column (table_list_entry, DB_WRITE_INSERT, 2, &column_value);
+          db_write_table (table_list_entry, DB_WRITE_INSERT);
 
           printf ("Write table\n");
           while ((db_read_table (table_list_entry)) > 0)

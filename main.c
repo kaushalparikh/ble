@@ -11,10 +11,10 @@
 
 typedef enum
 {
-  BLE_STATE_SCAN     = 0,
-  BLE_STATE_PROFILE  = 1,
-  BLE_STATE_DATA     = 2,
-  BLE_STATE_MAX      = 3
+  BLE_STATE_SCAN = 0,
+  BLE_STATE_PROFILE,
+  BLE_STATE_DATA,
+  BLE_STATE_MAX
 } ble_state_e;
 
 typedef ble_state_e (*ble_state_handler_t)(ble_message_t *message);
