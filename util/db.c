@@ -47,9 +47,13 @@ int32 db_write_column (db_table_list_entry_t *table_list_entry, uint8 type,
   {
     statement = (sqlite3_stmt *)(table_list_entry->insert);
   }
-  else
+  else if (type == DB_WRITE_UPDATE)
   {
     statement = (sqlite3_stmt *)(table_list_entry->update);
+  }
+  else
+  {
+    statement = (sqlite3_stmt *)(table_list_entry->delete);
   }
   
   if (column_value != NULL)
@@ -132,9 +136,13 @@ int32 db_write_table (db_table_list_entry_t *table_list_entry, uint8 type)
   {
     statement = (sqlite3_stmt *)(table_list_entry->insert);
   }
-  else
+  else if (type == DB_WRITE_UPDATE)
   {
     statement = (sqlite3_stmt *)(table_list_entry->update);
+  }
+  else
+  {
+    statement = (sqlite3_stmt *)(table_list_entry->delete);
   }
     
   status = sqlite3_step (statement);
@@ -168,6 +176,30 @@ int32 db_delete_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
 
   if (status == SQLITE_OK)
   {
+    if (table_list_entry->insert != NULL)
+    {
+      sqlite3_finalize (table_list_entry->insert);
+      table_list_entry->insert = NULL;
+    }
+
+    if (table_list_entry->update != NULL)
+    {
+      sqlite3_finalize (table_list_entry->update);
+      table_list_entry->update = NULL;
+    }
+
+    if (table_list_entry->delete != NULL)
+    {
+      sqlite3_finalize (table_list_entry->delete);
+      table_list_entry->delete = NULL;
+    }
+
+    if (table_list_entry->select != NULL)
+    {
+      sqlite3_finalize (table_list_entry->select);
+      table_list_entry->select = NULL;
+    }
+
     list_remove ((list_entry_t **)(&(db_info->table_list)), (list_entry_t *)table_list_entry);
     status = 1;
   }
@@ -339,7 +371,7 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
   if (status == SQLITE_OK)
   {
     /* Prepare update statement   */
-    /* Column value to be updated */
+    /* Column value(s) to be updated */
     for (index = 0; index < table_list_entry->num_columns; index++)
     {
       if (table_list_entry->column[index].flags & DB_COLUMN_FLAG_UPDATE_VALUE)
@@ -414,6 +446,54 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
 
   if (status == SQLITE_OK)
   {
+    /* Prepare delete statement   */
+    /* Column value(s) to be deleted */
+    for (index = 0; index < table_list_entry->num_columns; index++)
+    {
+      if (table_list_entry->column[index].flags & DB_COLUMN_FLAG_UPDATE_KEY)
+      {
+        sql = strdup ("DELETE FROM ");
+        STRING_CONCAT (sql, "[");
+        STRING_CONCAT (sql, table_list_entry->title);
+        STRING_CONCAT (sql, "] WHERE ");
+        
+        STRING_CONCAT (sql, "[");
+        STRING_CONCAT (sql, table_list_entry->column[index].title);
+        STRING_CONCAT (sql, "] = ");
+        STRING_CONCAT (sql, table_list_entry->column[index].tag);
+        break;
+      }
+    }
+
+    for (; index < table_list_entry->num_columns; index++)
+    {
+      if (table_list_entry->column[index].flags & DB_COLUMN_FLAG_UPDATE_KEY)
+      {
+        STRING_CONCAT (sql, " AND ");
+        
+        STRING_CONCAT (sql, "[");
+        STRING_CONCAT (sql, table_list_entry->column[index].title);
+        STRING_CONCAT (sql, "] = ");
+        STRING_CONCAT (sql, table_list_entry->column[index].tag);
+      }
+    }
+
+    if (sql != NULL)
+    {
+      status = sqlite3_prepare_v2 ((sqlite3 *)(db_info->handle), sql, -1,
+                                   (sqlite3_stmt **)(&(table_list_entry->delete)), NULL);
+    
+      if (status != SQLITE_OK)
+      {
+        printf ("Can't prepare database delete statement '%s'\n", sql);
+      }
+    
+      free (sql);
+    }
+  }
+
+  if (status == SQLITE_OK)
+  {
     /* Prepare select statement */
     sql = strdup ("SELECT * FROM ");
     STRING_CONCAT (sql, "[");
@@ -448,16 +528,22 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
       table_list_entry->insert = NULL;
     }
 
-    if (table_list_entry->select != NULL)
-    {
-      sqlite3_finalize (table_list_entry->select);
-      table_list_entry->select = NULL;
-    }
-
     if (table_list_entry->update != NULL)
     {
       sqlite3_finalize (table_list_entry->update);
       table_list_entry->update = NULL;
+    }
+
+    if (table_list_entry->delete != NULL)
+    {
+      sqlite3_finalize (table_list_entry->delete);
+      table_list_entry->delete = NULL;
+    }
+
+    if (table_list_entry->select != NULL)
+    {
+      sqlite3_finalize (table_list_entry->select);
+      table_list_entry->select = NULL;
     }
 
     status = -1;
@@ -528,7 +614,7 @@ static db_column_entry_t temperature_table_columns[TEMPERATURE_TABLE_NUM_COLUMNS
 
 static db_table_list_entry_t static_tables[NUM_STATIC_TABLES] =
 {
-  {NULL, "Device List", DEVICE_TABLE_NUM_COLUMNS, device_table_columns, NULL, NULL, NULL}
+  {NULL, "Device List", DEVICE_TABLE_NUM_COLUMNS, device_table_columns, NULL, NULL, NULL, NULL}
 };
 
 
@@ -673,6 +759,7 @@ int main (int argc, char *argv[])
         table_list_entry->column      = temperature_table_columns;
         table_list_entry->insert      = NULL;
         table_list_entry->update      = NULL;
+        table_list_entry->delete      = NULL;
         table_list_entry->select      = NULL;
 
         if ((db_create_table (db_info, table_list_entry)) > 0)

@@ -57,7 +57,8 @@ enum
 enum
 {
   DB_WRITE_INSERT = 0,
-  DB_WRITE_UPDATE
+  DB_WRITE_UPDATE,
+  DB_WRITE_DELETE
 };
 
 typedef union
@@ -89,6 +90,7 @@ struct db_table_list_entry
   db_column_entry_t          *column;
   void                       *insert;
   void                       *update;
+  void                       *delete;
   void                       *select;
 };
 

@@ -130,6 +130,58 @@ ble_attribute_t * ble_find_attribute (ble_service_list_entry_t *service_list_ent
   return attribute;
 }
 
+void ble_clear_characteristics (ble_char_list_entry_t *char_list_entry)
+{
+  while (char_list_entry != NULL)
+  {
+    ble_char_list_entry_t *char_list_entry_del = char_list_entry;
+    
+    if (char_list_entry->declaration != NULL)
+    {
+      if (char_list_entry->declaration->data != NULL)
+      {
+        free (char_list_entry->declaration->data);
+      }
+      free (char_list_entry->declaration);
+    }
+    if (char_list_entry->value != NULL)
+    {
+      if (char_list_entry->value->data != NULL)
+      {
+        free (char_list_entry->value->data);
+      }
+      free (char_list_entry->value);
+    }
+    if (char_list_entry->description != NULL)
+    {
+      if (char_list_entry->description->data != NULL)
+      {
+        free (char_list_entry->description->data);
+      }
+      free (char_list_entry->description);
+    }
+    if (char_list_entry->client_config != NULL)
+    {
+      if (char_list_entry->client_config->data != NULL)
+      {
+        free (char_list_entry->client_config->data);
+      }
+      free (char_list_entry->client_config);
+    }
+    if (char_list_entry->format != NULL)
+    {
+      if (char_list_entry->format->data != NULL)
+      {
+        free (char_list_entry->format->data);
+      }
+      free (char_list_entry->format);
+    }
+    
+    list_remove ((list_entry_t **)(&(char_list_entry)), (list_entry_t *)char_list_entry_del);
+    free (char_list_entry_del);
+  }  
+}
+
 void ble_print_service (ble_service_list_entry_t *service_list_entry)
 {
   while (service_list_entry != NULL)
@@ -279,55 +331,10 @@ void ble_clear_service (ble_service_list_entry_t *service_list_entry)
 {
   while (service_list_entry != NULL)
   {
-    while (service_list_entry->char_list != NULL)
-    {
-      ble_char_list_entry_t *char_list_entry = service_list_entry->char_list;
-
-      if (char_list_entry->declaration != NULL)
-      {
-        if (char_list_entry->declaration->data != NULL)
-        {
-          free (char_list_entry->declaration->data);
-        }
-        free (char_list_entry->declaration);
-      }
-      if (char_list_entry->value != NULL)
-      {
-        if (char_list_entry->value->data != NULL)
-        {
-          free (char_list_entry->value->data);
-        }
-        free (char_list_entry->value);
-      }
-      if (char_list_entry->description != NULL)
-      {
-        if (char_list_entry->description->data != NULL)
-        {
-          free (char_list_entry->description->data);
-        }
-        free (char_list_entry->description);
-      }
-      if (char_list_entry->client_config != NULL)
-      {
-        if (char_list_entry->client_config->data != NULL)
-        {
-          free (char_list_entry->client_config->data);
-        }
-        free (char_list_entry->client_config);
-      }
-      if (char_list_entry->format != NULL)
-      {
-        if (char_list_entry->format->data != NULL)
-        {
-          free (char_list_entry->format->data);
-        }
-        free (char_list_entry->format);
-      }
-      
-      list_remove ((list_entry_t **)(&(service_list_entry->char_list)), (list_entry_t *)char_list_entry);
-      free (char_list_entry);   
-    }
-
+    ble_clear_characteristics (service_list_entry->char_list);
+    service_list_entry->char_list = NULL;
+    ble_clear_characteristics (service_list_entry->update.char_list);
+    service_list_entry->update.char_list = NULL;    
     service_list_entry = service_list_entry->next;
   }
 }

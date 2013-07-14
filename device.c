@@ -39,14 +39,14 @@ static db_column_entry_t db_device_table_columns[DB_DEVICE_TABLE_NUM_COLUMNS] =
   {"Service",  DB_DEVICE_TABLE_COLUMN_SERVICE,  DB_COLUMN_TYPE_BLOB,
     (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_UPDATE_KEY),                               NULL},
   {"Interval", DB_DEVICE_TABLE_COLUMN_INTERVAL, DB_COLUMN_TYPE_INT,
-    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),                               NULL},
+    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA | DB_COLUMN_FLAG_UPDATE_VALUE), NULL},
   {"Status",   DB_DEVICE_TABLE_COLUMN_STATUS,   DB_COLUMN_TYPE_TEXT,
     (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA | DB_COLUMN_FLAG_UPDATE_VALUE), NULL}
 };
 
 static db_table_list_entry_t db_static_tables[DB_NUM_STATIC_TABLES] =
 {
-  {NULL, "Device List", DB_DEVICE_TABLE_NUM_COLUMNS, db_device_table_columns, NULL, NULL, NULL}
+  {NULL, "Device List", DB_DEVICE_TABLE_NUM_COLUMNS, db_device_table_columns, NULL, NULL, NULL, NULL}
 };
 
 static db_info_t *db_info = NULL;
@@ -128,10 +128,10 @@ void ble_update_device (ble_device_list_entry_t *device_list_entry)
  
     column_value.blob.data   = device_list_entry->address.byte;
     column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
-    db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
+    db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
     column_value.blob.data   = service_list_entry->declaration->data;
     column_value.blob.length = service_list_entry->declaration->data_length;
-    db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
+    db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
     
     if (device_list_entry->status == BLE_DEVICE_DATA)
     {
@@ -148,9 +148,12 @@ void ble_update_device (ble_device_list_entry_t *device_list_entry)
     {
       column_value.text = "Inactive";
     }
-    db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0, DB_DEVICE_TABLE_COLUMN_STATUS, &column_value);
+    db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_STATUS, &column_value);
+
+    column_value.integer = (service_list_entry->update.interval)/(60 * 1000);
+    db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_INTERVAL, &column_value);    
     
-    db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), 0);
+    db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE);
 
     sync_list_entry      = (ble_sync_list_entry_t *)malloc (sizeof (*sync_list_entry));
     sync_list_entry->type = BLE_SYNC_PUSH;
@@ -161,7 +164,7 @@ void ble_update_device (ble_device_list_entry_t *device_list_entry)
     memcpy (sync_device_data->address, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
     sync_device_data->name     = strdup (device_list_entry->name);
     memcpy (sync_device_data->service, service_list_entry->declaration->data, service_list_entry->declaration->data_length);
-    sync_device_data->interval = service_list_entry->update.interval;
+    sync_device_data->interval = (service_list_entry->update.interval)/(60 * 1000);
     sync_device_data->status   = strdup (column_value.text);
 
     service_list_entry = service_list_entry->next;
@@ -229,7 +232,6 @@ void ble_get_device (ble_device_list_entry_t **device_list)
           device_list_entry->name         = strdup (sync_device_data->name);
           
           list_add ((list_entry_t **)(&device_list), (list_entry_t *)device_list_entry);
-          write_type = DB_WRITE_INSERT;
         }
 
         service_list_entry = ble_find_service (device_list_entry->service_list,
@@ -262,6 +264,14 @@ void ble_get_device (ble_device_list_entry_t **device_list)
           list_add ((list_entry_t **)(&(device_list_entry->service_list)), (list_entry_t *)service_list_entry);  
           write_type = DB_WRITE_INSERT;
         }
+        else if (strcmp (sync_device_data->status, "Delete") == 0)
+        {
+          ble_clear_characteristics (service_list_entry->char_list);
+          ble_clear_characteristics (service_list_entry->update.char_list);
+
+          list_remove ((list_entry_t **)(&(device_list_entry->service_list)), (list_entry_t *)service_list_entry);
+          write_type = DB_WRITE_DELETE;
+        }
 
         column_value.blob.data   = device_list_entry->address.byte;
         column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
@@ -269,17 +279,24 @@ void ble_get_device (ble_device_list_entry_t **device_list)
         column_value.blob.data   = service_list_entry->declaration->data;
         column_value.blob.length = service_list_entry->declaration->data_length;
         db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
-        column_value.text = sync_device_data->status;
-        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_STATUS, &column_value);
 
-        if (write_type == DB_WRITE_INSERT)
+        if ((write_type == DB_WRITE_INSERT) || (write_type == DB_WRITE_UPDATE))
         {
-          column_value.text = sync_device_data->name;
-          db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_NAME, &column_value);
+          if (write_type == DB_WRITE_INSERT)
+          {
+            column_value.text = sync_device_data->name;
+            db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_NAME, &column_value);            
+            column_value.text = "Searching";
+          }
+          else
+          {
+            column_value.text = sync_device_data->status;
+          }
+          db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_STATUS, &column_value);
           column_value.integer = sync_device_data->interval;
           db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_INTERVAL, &column_value);
         }
-
+        
         db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type);
 
         free (sync_device_data->name);

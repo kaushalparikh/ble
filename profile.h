@@ -163,6 +163,8 @@ extern void ble_update_char_type (ble_char_list_entry_t * char_list_entry, uint8
 extern ble_attribute_t * ble_find_attribute (ble_service_list_entry_t *service_list_entry,
                                              uint16 handle);
 
+extern void ble_clear_characteristics (ble_char_list_entry_t *char_list_entry);
+
 extern void ble_print_service (ble_service_list_entry_t *service_list_entry);
 
 extern void ble_update_service (ble_service_list_entry_t *service_list_entry,

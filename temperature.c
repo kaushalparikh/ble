@@ -273,6 +273,7 @@ int32 ble_init_temperature (ble_service_list_entry_t *service_list_entry,
     table_list_entry->column      = db_temperature_table_columns;
     table_list_entry->insert      = NULL;
     table_list_entry->update      = NULL;
+    table_list_entry->delete      = NULL;
     table_list_entry->select      = NULL;
 
     if (db_info == NULL)
