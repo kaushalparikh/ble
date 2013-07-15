@@ -800,7 +800,11 @@ int32 ble_init (void)
         printf ("BLE Reset request failed\n");
       }
   
-      if (status < 0)
+      if (status > 0)
+      {
+        ble_init_device_list (&ble_device_list);
+      }
+      else
       {
         serial_deinit ();
       }
@@ -821,11 +825,11 @@ void ble_deinit (void)
 
 void ble_print_message (ble_message_t *message)
 {
- printf ("Message not handled\n");
- printf (" type 0x%02x, length %d, class 0x%02x, command 0x%02x\n", message->header.type,
-                                                                    message->header.length,
-                                                                    message->header.class,
-                                                                    message->header.command);
+  printf ("Message not handled\n");
+  printf (" type 0x%02x, length %d, class 0x%02x, command 0x%02x\n", message->header.type,
+                                                                     message->header.length,
+                                                                     message->header.class,
+                                                                     message->header.command);
 }
 
 int32 ble_check_scan_list (void)
@@ -951,7 +955,7 @@ void ble_start_scan (void)
   ble_command_scan_params_t *scan_params;
 
   ble_update_sleep ();
-  ble_get_device (&ble_device_list);
+  ble_update_device_list (&ble_device_list);
 
   printf ("BLE Start scan request\n");
 
@@ -1190,7 +1194,6 @@ void ble_read_profile (void)
           (connection_params.service->next == NULL))
       {
         connection_params.device->status = BLE_DEVICE_CONFIGURE_CHAR;
-        printf ("Done\n");
       }
     }
     else

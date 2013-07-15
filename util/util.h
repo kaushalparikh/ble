@@ -4,7 +4,17 @@
 #include "types.h"
 
 /* OS API */
+enum
+{
+  OS_THREAD_PRIORITY_MIN = 0,
+  OS_THREAD_PRIORITY_NORMAL,
+  OS_THREAD_PRIORITY_MAX
+};
+
 extern void os_init (void);
+
+extern int32 os_create_thread (void * (*start_function)(void *), uint8 priority,
+                               int32 duration, void **handle);
 
 /* Serial API */
 extern int32 serial_init (void);

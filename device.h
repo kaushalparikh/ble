@@ -23,7 +23,9 @@ extern void ble_update_device (ble_device_list_entry_t *device_list_entry);
 extern ble_device_list_entry_t * ble_find_device (ble_device_list_entry_t *device_list_entry,
                                                   ble_device_address_t *address);
 
-extern void ble_get_device (ble_device_list_entry_t **device_list);
+extern void ble_init_device_list (ble_device_list_entry_t **device_list);
+
+extern void ble_update_device_list (ble_device_list_entry_t **device_list);
 
 #endif
 

@@ -31,7 +31,7 @@ OBJ_DIR   := $(BUILD_DIR)/obj
 DEP_DIR   := $(BUILD_DIR)/depend
 
 # Input source files
-SRC_MASTER := device.c temperature.c profile.c ble.c main.c
+SRC_MASTER := sync.c device.c temperature.c profile.c ble.c main.c
 
 # Object & dependency files
 DEP_MASTER := $(patsubst %.c,$(DEP_DIR)/%.d, $(SRC_MASTER))
@@ -45,7 +45,7 @@ ifneq ($(SYSTEM_PACKAGES),)
         SYSTEM_INCLUDE_DIRS := `pkg-config --cflags $(SYSTEM_PACKAGES)`
         SYSTEM_LIBS := `pkg-config --libs $(SYSTEM_PACKAGES)`
 endif
-SYSTEM_LIBS += -lrt
+SYSTEM_LIBS += -lrt -lpthread
 
 # Local packages
 LOCAL_PACKAGES := util

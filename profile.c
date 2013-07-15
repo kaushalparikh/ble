@@ -334,7 +334,7 @@ void ble_clear_service (ble_service_list_entry_t *service_list_entry)
     ble_clear_characteristics (service_list_entry->char_list);
     service_list_entry->char_list = NULL;
     ble_clear_characteristics (service_list_entry->update.char_list);
-    service_list_entry->update.char_list = NULL;    
+    service_list_entry->update.char_list = NULL;
     service_list_entry = service_list_entry->next;
   }
 }

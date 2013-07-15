@@ -4,6 +4,7 @@
 #include "types.h"
 #include "util.h"
 #include "ble.h"
+#include "sync.h"
 
 typedef enum
 {
@@ -27,6 +28,8 @@ static ble_state_handler_t ble_state_handler[BLE_STATE_MAX] =
   ble_profile,
   ble_data
 };
+
+static void *ble_sync_thread = NULL;
 
 
 static ble_state_e ble_scan (ble_message_t *message)
@@ -394,7 +397,9 @@ void master_loop (void)
   timer_info_t *timer_info = NULL;
   
   (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_SCAN,
-                     ble_callback_timer, &timer_info);    
+                     ble_callback_timer, &timer_info);
+
+  os_create_thread (ble_sync, OS_THREAD_PRIORITY_NORMAL, (BLE_MIN_SLEEP_INTERVAL/1000), &ble_sync_thread);
 
   while (1)
   {
