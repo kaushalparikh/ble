@@ -59,7 +59,7 @@ static db_column_entry_t db_temperature_table_columns[DB_TEMPERATURE_TABLE_NUM_C
   {"No.",               DB_TEMPERATURE_TABLE_COLUMN_NO,          DB_COLUMN_TYPE_INT,
     DB_COLUMN_FLAG_PRIMARY_KEY,                                   NULL},
   {"Time",              DB_TEMPERATURE_TABLE_COLUMN_TIME,        DB_COLUMN_TYPE_TEXT,
-    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_TIMESTAMP), NULL},
+    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),        NULL},
   {"Temperature (C)",   DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, DB_COLUMN_TYPE_FLOAT,
     (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),        NULL},
   {"Battery Level (%)", DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL,   DB_COLUMN_TYPE_INT,
@@ -76,14 +76,18 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry,
   int32 current_time;
   db_table_list_entry_t *table_list_entry;
   ble_char_list_entry_t *update_list_entry;
+  db_column_value_t column_value;
 
   update_failed     = 0;
-  current_time      = clock_current_time ();
+  current_time      = clock_get_count ();
   table_list_entry  = (db_table_list_entry_t *)(device_list_entry->data);
   update_list_entry = service_list_entry->update.char_list;
 
-  db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, NULL);
-  db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL, NULL);
+  column_value.text = clock_get_time ();
+  db_write_column (table_list_entry, DB_WRITE_INSERT, DB_TEMPERATURE_TABLE_COLUMN_TIME, &column_value);
+  db_write_column (table_list_entry, DB_WRITE_INSERT, DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL, NULL);
+  db_write_column (table_list_entry, DB_WRITE_INSERT, DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL, NULL);
+  free (column_value.text);
 
   printf ("Device: %s\n", device_list_entry->name);
 
@@ -104,7 +108,6 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry,
   {
     uint16 uuid = BLE_PACK_GATT_UUID (update_list_entry->value->uuid);
     ble_char_list_entry_t *update_list_entry_del = NULL;
-    db_column_value_t column_value;
   
     if (uuid == BLE_TEMPERATURE_MEAS_UUID)
     {
@@ -124,7 +127,7 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry,
         printf ("             offset: %d (ms)\n", service_list_entry->update.time_offset);
   
         column_value.decimal = temperature->meas_value;
-        (void)db_write_column (table_list_entry, 1, DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, &column_value);
+        (void)db_write_column (table_list_entry, DB_WRITE_INSERT, DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, &column_value);
       }
       else
       {

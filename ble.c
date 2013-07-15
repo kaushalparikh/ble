@@ -61,7 +61,7 @@ static void ble_update_sleep (void)
   int32 current_time;
   ble_device_list_entry_t *device_list_entry;
   
-  current_time      = clock_current_time ();
+  current_time      = clock_get_count ();
   device_list_entry = ble_device_list;
 
   while (device_list_entry != NULL)
@@ -146,7 +146,7 @@ static void ble_init_timer (void)
   int32 sleep_interval;
   ble_service_list_entry_t *service_list_entry = connection_params.device->service_list;
   
-  wakeup_time    = clock_current_time ();
+  wakeup_time    = clock_get_count ();
   sleep_interval = ble_get_sleep ();
   
   if (sleep_interval <= 20000)
@@ -757,7 +757,7 @@ int32 ble_init (void)
   int32 status = -1;
   int32 ble_init_attempt = 0;
 
-  ble_init_time = clock_current_time ();
+  ble_init_time = clock_get_count ();
 
   do
   {
@@ -1205,7 +1205,7 @@ void ble_read_profile (void)
 
     if ((ble_init_service (connection_params.device->service_list, connection_params.device)) > 0)
     {
-      int32 current_time = clock_current_time ();
+      int32 current_time = clock_get_count ();
       ble_service_list_entry_t *service_list_entry = connection_params.device->service_list;
   
       while (service_list_entry != NULL)
@@ -1303,7 +1303,7 @@ void ble_next_data (void)
   {
     timer_info_t *timer_info = NULL;
     
-    if (((clock_current_time ())- ble_init_time) > (24*60*60*1000))
+    if (((clock_get_count ())- ble_init_time) > (24*60*60*1000))
     {
       ble_deinit ();
       (void)ble_init ();
@@ -1320,61 +1320,59 @@ void ble_update_data (void)
 
   if (connection_params.handle != 0xff)
   {
-    int32 update_pending = 0;
-    ble_service_list_entry_t *service_list_entry = connection_params.device->service_list;
-
-    while ((service_list_entry != NULL) && (!update_pending))
-    {
-      ble_char_list_entry_t *update_list_entry = service_list_entry->update.char_list;
-
-      while ((update_list_entry != NULL) && (!update_pending))
-      {
-        if ((((update_list_entry->value->type & BLE_ATTR_TYPE_WRITE) &&
-             (update_list_entry->value->data != NULL))) ||
-            ((update_list_entry->value->type & (BLE_ATTR_TYPE_READ | BLE_ATTR_TYPE_NOTIFY | BLE_ATTR_TYPE_INDICATE)) &&
-             (update_list_entry->value->data == NULL)))
-        {
-          update_pending = 1;
-        }
-          
-        update_list_entry = update_list_entry->next;
-      }
-
-      service_list_entry = service_list_entry->next;
-    }
+    int32 notify_pending = 0;
     
-    if (update_pending)
+    if (connection_params.characteristics == NULL)
     {
-      if (connection_params.characteristics == NULL)
+      if (connection_params.service != NULL)
       {
-        if (connection_params.service != NULL)
-        {
-          connection_params.characteristics = connection_params.service->update.char_list;
-        }
+        connection_params.characteristics = connection_params.service->update.char_list;
       }
-      else if (connection_params.characteristics->next == NULL)
+    }
+    else 
+    {
+      if ((connection_params.characteristics->value->type & (BLE_ATTR_TYPE_NOTIFY | BLE_ATTR_TYPE_INDICATE)) &&
+          (connection_params.characteristics->value->data == NULL))
       {
-        connection_params.service         = connection_params.service->next;
-        connection_params.characteristics = NULL;
+        notify_pending = 1;
+      }
+      else if (connection_params.characteristics->value->type & BLE_ATTR_TYPE_WRITE)
+      {
+        free (connection_params.characteristics->value->data);
+        
+        connection_params.characteristics->value->data        = NULL;
+        connection_params.characteristics->value->data_length = 0;
+      }
 
-        while (connection_params.service != NULL)
+      if (!notify_pending)
+      {
+        if (connection_params.characteristics->next == NULL)
         {
-          if ((connection_params.service->update.char_list != NULL) &&
-              (connection_params.service->update.wait <= 0))
+          connection_params.service         = connection_params.service->next;
+          connection_params.characteristics = NULL;
+  
+          while (connection_params.service != NULL)
           {
-            connection_params.characteristics = connection_params.service->update.char_list;
-            break;
+            if ((connection_params.service->update.char_list != NULL) &&
+                (connection_params.service->update.wait <= 0))
+            {
+              connection_params.characteristics = connection_params.service->update.char_list;
+              break;
+            }
+  
+            connection_params.service = connection_params.service->next;
           }
-
-          connection_params.service = connection_params.service->next;
+        }
+        else
+        {
+          connection_params.characteristics = connection_params.characteristics->next;
         }
       }
-      else
-      {
-        connection_params.characteristics = connection_params.characteristics->next;
-      }
+    }
 
-      if (connection_params.characteristics != NULL)
+    if (connection_params.characteristics != NULL)
+    {
+      if (!notify_pending)
       {
         if (connection_params.characteristics->value->type & BLE_ATTR_TYPE_READ)
         {
@@ -1395,19 +1393,38 @@ void ble_update_data (void)
           }
           
           status = ble_write_handle ();
-  
-          if (connection_params.characteristics->value->type & BLE_ATTR_TYPE_WRITE)
-          {
-            free (connection_params.attribute->data);
-            connection_params.attribute->data        = NULL;
-            connection_params.attribute->data_length = 0;
-          }
         }
       }
     }
     else
     {
-      ble_connect_disconnect ();
+      int32 update_pending = 0;
+      ble_service_list_entry_t *service_list_entry = connection_params.device->service_list;
+      
+      while ((service_list_entry != NULL) && (!update_pending))
+      {
+        ble_char_list_entry_t *update_list_entry = service_list_entry->update.char_list;
+      
+        while ((update_list_entry != NULL) && (!update_pending))
+        {
+          if ((((update_list_entry->value->type & BLE_ATTR_TYPE_WRITE) &&
+               (update_list_entry->value->data != NULL))) ||
+              ((update_list_entry->value->type & (BLE_ATTR_TYPE_READ | BLE_ATTR_TYPE_NOTIFY | BLE_ATTR_TYPE_INDICATE)) &&
+               (update_list_entry->value->data == NULL)))
+          {
+            update_pending = 1;
+          }
+            
+          update_list_entry = update_list_entry->next;
+        }
+      
+        service_list_entry = service_list_entry->next;
+      }
+
+      if (!update_pending)
+      {
+        ble_connect_disconnect ();
+      }
     }
   }
   else

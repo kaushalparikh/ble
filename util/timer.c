@@ -1,7 +1,7 @@
 
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 #include <signal.h>
 #include <time.h>
 
@@ -104,7 +104,7 @@ int32 timer_stop (timer_info_t *timer_info)
   return timer_delete (timer_id);
 }
 
-int32 clock_current_time (void)
+int32 clock_get_count (void)
 {
   int millisec = -1;
   struct timespec current_time;
@@ -116,6 +116,19 @@ int32 clock_current_time (void)
   }
 
   return millisec;
+}
+
+int8 * clock_get_time (void)
+{
+  char current_time[50];
+  time_t utc;
+  struct tm *utc_tm;
+  
+  utc = time (NULL);
+  utc_tm = localtime (&utc);
+  strftime(current_time, 50, "%F %T", utc_tm);
+
+  return strdup (current_time);
 }
 
 #ifdef UTIL_TIMER_TEST

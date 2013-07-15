@@ -1,8 +1,10 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
 
-#include <string.h>
 #include "types.h"
+
+/* OS API */
+extern void os_init (void);
 
 /* Serial API */
 extern int32 serial_init (void);
@@ -33,7 +35,9 @@ extern int32 timer_status (timer_info_t *timer_info);
 
 extern int32 timer_stop (timer_info_t *timer_info);
 
-extern int32 clock_current_time (void);
+extern int32 clock_get_count (void);
+
+extern int8 * clock_get_time (void);
 
 /* Database API */
 enum

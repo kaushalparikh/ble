@@ -122,6 +122,7 @@ void ble_update_device (ble_device_list_entry_t *device_list_entry)
 
   while (service_list_entry != NULL)
   {
+    int8 *device_status;
     db_column_value_t column_value;
     ble_sync_list_entry_t *sync_list_entry;
     ble_sync_device_data_t *sync_device_data;
@@ -137,17 +138,18 @@ void ble_update_device (ble_device_list_entry_t *device_list_entry)
     {
       if (service_list_entry->update.char_list != NULL)
       {
-        column_value.text = "Active";
+        device_status = "Active";
       }
       else
       {
-        column_value.text = "Ignored";
+        device_status = "Ignored";
       }
     }
     else
     {
-      column_value.text = "Inactive";
+      device_status = "Inactive";
     }
+    column_value.text = device_status;
     db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_STATUS, &column_value);
 
     column_value.integer = (service_list_entry->update.interval)/(60 * 1000);
@@ -165,7 +167,7 @@ void ble_update_device (ble_device_list_entry_t *device_list_entry)
     sync_device_data->name     = strdup (device_list_entry->name);
     memcpy (sync_device_data->service, service_list_entry->declaration->data, service_list_entry->declaration->data_length);
     sync_device_data->interval = (service_list_entry->update.interval)/(60 * 1000);
-    sync_device_data->status   = strdup (column_value.text);
+    sync_device_data->status   = strdup (device_status);
 
     service_list_entry = service_list_entry->next;
   }
@@ -190,7 +192,8 @@ ble_device_list_entry_t * ble_find_device (ble_device_list_entry_t *device_list_
 void ble_get_device (ble_device_list_entry_t **device_list)
 {
   int32 status = 1;
-  
+  ble_device_list_entry_t *device_list_entry;
+    
   if (db_info == NULL)
   {
     status = db_open ("gateway.db", &db_info);
@@ -198,11 +201,81 @@ void ble_get_device (ble_device_list_entry_t **device_list)
     {
       status = db_create_table (db_info, &(db_static_tables[DB_DEVICE_LIST_TABLE]));
     }
+
+    if (status > 0)
+    {
+      while ((status = db_read_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]))) > 0)
+      {
+        db_column_value_t column_value;
+        ble_service_list_entry_t *service_list_entry;
+        ble_device_address_t address;
+  
+        db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
+        memcpy (address.byte, column_value.blob.data, BLE_DEVICE_ADDRESS_LENGTH);
+        address.type = BLE_ADDR_PUBLIC;
+
+        device_list_entry = ble_find_device (*device_list, &address);
+
+        if (device_list_entry == NULL)
+        {
+          device_list_entry = (ble_device_list_entry_t *)malloc (sizeof (*device_list_entry));
+          
+          device_list_entry->address      = address;
+          device_list_entry->service_list = NULL;
+          device_list_entry->status       = BLE_DEVICE_DISCOVER;
+          device_list_entry->data         = NULL;
+  
+          db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_NAME, &column_value);
+          device_list_entry->name = strdup (column_value.text);
+          
+          list_add ((list_entry_t **)(&device_list), (list_entry_t *)device_list_entry);
+        }
+  
+        db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
+
+        service_list_entry = (ble_service_list_entry_t *)malloc (sizeof (*service_list_entry));
+  
+        service_list_entry->declaration = (ble_attribute_t *)malloc (sizeof (ble_attribute_t));
+        service_list_entry->declaration->type = 0;
+        service_list_entry->declaration->handle = BLE_INVALID_GATT_HANDLE;
+        service_list_entry->declaration->uuid_length = 0;
+        service_list_entry->declaration->data_length = column_value.blob.length;
+        service_list_entry->declaration->data = malloc (column_value.blob.length);
+        memcpy (service_list_entry->declaration->data, column_value.blob.data, column_value.blob.length);
+  
+        service_list_entry->start_handle = BLE_INVALID_GATT_HANDLE;
+        service_list_entry->start_handle = BLE_INVALID_GATT_HANDLE;
+        service_list_entry->include_list = NULL;
+        service_list_entry->char_list = NULL;
+  
+        db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_INTERVAL, &column_value);
+        service_list_entry->update.char_list = NULL;
+        service_list_entry->update.init = 1;
+        service_list_entry->update.time = 0;
+        service_list_entry->update.time_offset = 0;
+        service_list_entry->update.wait = 0;
+        service_list_entry->update.interval = (column_value.integer * 60 * 1000);
+  
+        list_add ((list_entry_t **)(&(device_list_entry->service_list)), (list_entry_t *)service_list_entry);
+  
+        column_value.blob.data = device_list_entry->address.byte;
+        column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
+        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
+        column_value.blob.data = service_list_entry->declaration->data;
+        column_value.blob.length = service_list_entry->declaration->data_length;
+        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
+        column_value.integer = (service_list_entry->update.interval)/(60 * 1000);
+        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_INTERVAL, &column_value);    
+        column_value.text = "Searching";
+        db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_STATUS, &column_value);
+        
+        db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE);        
+      }        
+    }
   }
 
   if (status > 0)
   {
-    ble_device_list_entry_t *device_list_entry;
     ble_sync_list_entry_t *sync_list_entry = sync_list;
  
     while (sync_list_entry != NULL)
@@ -314,21 +387,21 @@ void ble_get_device (ble_device_list_entry_t **device_list)
         sync_list_entry_del = NULL;
       }
     }
+  }
 
-    printf ("BLE device list -- \n");
-    device_list_entry = *device_list;
-    if (device_list_entry != NULL)
+  printf ("BLE device list -- \n");
+  device_list_entry = *device_list;
+  if (device_list_entry != NULL)
+  {
+    while (device_list_entry != NULL)
     {
-      while (device_list_entry != NULL)
-      {
-        ble_print_device (device_list_entry);
-        device_list_entry = device_list_entry->next;
-      }
-    }
-    else
-    {
-      printf (" No devices\n");
+      ble_print_device (device_list_entry);
+      device_list_entry = device_list_entry->next;
     }
   }
+  else
+  {
+    printf (" No devices\n");
+  }  
 }
 
