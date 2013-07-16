@@ -32,12 +32,12 @@ static db_column_entry_t db_device_table_columns[DB_DEVICE_TABLE_NUM_COLUMNS] =
 {
   {"No.",      DB_DEVICE_TABLE_COLUMN_NO,       DB_COLUMN_TYPE_INT,
     DB_COLUMN_FLAG_PRIMARY_KEY,                                                          NULL},
-  {"Address",  DB_DEVICE_TABLE_COLUMN_ADDRESS,  DB_COLUMN_TYPE_BLOB,
-    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_UPDATE_KEY),                               NULL},
+  {"Address",  DB_DEVICE_TABLE_COLUMN_ADDRESS,  DB_COLUMN_TYPE_TEXT,
+    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA | DB_COLUMN_FLAG_UPDATE_KEY),   NULL},
   {"Name",     DB_DEVICE_TABLE_COLUMN_NAME,     DB_COLUMN_TYPE_TEXT,
     (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA),                               NULL},
-  {"Service",  DB_DEVICE_TABLE_COLUMN_SERVICE,  DB_COLUMN_TYPE_BLOB,
-    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_UPDATE_KEY),                               NULL},
+  {"Service",  DB_DEVICE_TABLE_COLUMN_SERVICE,  DB_COLUMN_TYPE_TEXT,
+    (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA | DB_COLUMN_FLAG_UPDATE_KEY),   NULL},
   {"Interval", DB_DEVICE_TABLE_COLUMN_INTERVAL, DB_COLUMN_TYPE_INT,
     (DB_COLUMN_FLAG_NOT_NULL | DB_COLUMN_FLAG_DEFAULT_NA | DB_COLUMN_FLAG_UPDATE_VALUE), NULL},
   {"Status",   DB_DEVICE_TABLE_COLUMN_STATUS,   DB_COLUMN_TYPE_TEXT,
@@ -140,52 +140,53 @@ void ble_update_device (ble_device_list_entry_t *device_list_entry)
 
   while (service_list_entry != NULL)
   {
-    int8 *device_status;
-    db_column_value_t column_value;
     ble_sync_list_entry_t *sync_list_entry;
     ble_sync_device_data_t *sync_device_data;
- 
-    column_value.blob.data   = device_list_entry->address.byte;
-    column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
+    db_column_value_t column_value;
+
+    sync_list_entry       = (ble_sync_list_entry_t *)malloc (sizeof (*sync_list_entry));
+    sync_list_entry->type = BLE_SYNC_PUSH;
+    sync_list_entry->data = malloc (sizeof (ble_sync_device_data_t));
+    list_add ((list_entry_t **)(&sync_list), (list_entry_t *)sync_list_entry);
+
+    sync_device_data       = (ble_sync_device_data_t *)(sync_list_entry->data);
+    sync_device_data->name = strdup (device_list_entry->name);
+
+    column_value.text = malloc ((2 * BLE_DEVICE_ADDRESS_LENGTH) + 1);
+    hex_to_string (column_value.text, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
     db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
-    column_value.blob.data   = service_list_entry->declaration->data;
-    column_value.blob.length = service_list_entry->declaration->data_length;
+    sync_device_data->address = strdup (column_value.text);
+    free (column_value.text);
+    column_value.text = malloc ((2 * service_list_entry->declaration->data_length) + 1);
+    hex_to_string (column_value.text, service_list_entry->declaration->data,
+                   service_list_entry->declaration->data_length);
     db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
+    sync_device_data->service = strdup (column_value.text);
+    free (column_value.text);
     
     if (device_list_entry->status == BLE_DEVICE_DATA)
     {
       if (service_list_entry->update.char_list != NULL)
       {
-        device_status = "Active";
+        column_value.text = "Active";
       }
       else
       {
-        device_status = "Ignored";
+        column_value.text = "Ignored";
       }
     }
     else
     {
-      device_status = "Inactive";
+      column_value.text = "Inactive";
     }
-    column_value.text = device_status;
     db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_STATUS, &column_value);
+    sync_device_data->status = strdup (column_value.text);
 
     column_value.integer = (service_list_entry->update.interval)/(60 * 1000);
     db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_INTERVAL, &column_value);    
+    sync_device_data->interval = (service_list_entry->update.interval)/(60 * 1000);
     
     db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE);
-
-    sync_list_entry      = (ble_sync_list_entry_t *)malloc (sizeof (*sync_list_entry));
-    sync_list_entry->type = BLE_SYNC_PUSH;
-    sync_list_entry->data = malloc (sizeof (ble_sync_device_data_t));
-    list_add ((list_entry_t **)(&sync_list), (list_entry_t *)sync_list_entry);
-    
-    sync_device_data           = (ble_sync_device_data_t *)(sync_list_entry->data);
-    memcpy (sync_device_data->address, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
-    sync_device_data->name     = strdup (device_list_entry->name);
-    memcpy (sync_device_data->service, service_list_entry->declaration->data, service_list_entry->declaration->data_length);
-    sync_device_data->interval = (service_list_entry->update.interval)/(60 * 1000);
-    sync_device_data->status   = strdup (device_status);
 
     service_list_entry = service_list_entry->next;
   }
@@ -229,7 +230,7 @@ void ble_init_device_list (ble_device_list_entry_t **device_list)
         db_column_value_t column_value;
   
         db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
-        memcpy (address.byte, column_value.blob.data, BLE_DEVICE_ADDRESS_LENGTH);
+        string_to_hex (address.byte, column_value.text, (2 * BLE_DEVICE_ADDRESS_LENGTH));
         address.type = BLE_ADDR_PUBLIC;
 
         device_list_entry = ble_find_device (*device_list, &address);
@@ -246,7 +247,7 @@ void ble_init_device_list (ble_device_list_entry_t **device_list)
           db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_NAME, &column_value);
           device_list_entry->name = strdup (column_value.text);
           
-          list_add ((list_entry_t **)(&device_list), (list_entry_t *)device_list_entry);
+          list_add ((list_entry_t **)(device_list), (list_entry_t *)device_list_entry);
         }
   
         db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
@@ -257,9 +258,10 @@ void ble_init_device_list (ble_device_list_entry_t **device_list)
         service_list_entry->declaration->type = 0;
         service_list_entry->declaration->handle = BLE_INVALID_GATT_HANDLE;
         service_list_entry->declaration->uuid_length = 0;
-        service_list_entry->declaration->data_length = column_value.blob.length;
-        service_list_entry->declaration->data = malloc (column_value.blob.length);
-        memcpy (service_list_entry->declaration->data, column_value.blob.data, column_value.blob.length);
+        service_list_entry->declaration->data_length = (strlen (column_value.text) + 1)/2;
+        service_list_entry->declaration->data = malloc (service_list_entry->declaration->data_length);
+        string_to_hex (service_list_entry->declaration->data, column_value.text,
+                       (2 * service_list_entry->declaration->data_length));
   
         service_list_entry->start_handle = BLE_INVALID_GATT_HANDLE;
         service_list_entry->start_handle = BLE_INVALID_GATT_HANDLE;
@@ -275,13 +277,16 @@ void ble_init_device_list (ble_device_list_entry_t **device_list)
         service_list_entry->update.interval = (column_value.integer * 60 * 1000);
   
         list_add ((list_entry_t **)(&(device_list_entry->service_list)), (list_entry_t *)service_list_entry);
-  
-        column_value.blob.data = device_list_entry->address.byte;
-        column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
+
+        column_value.text = malloc ((2 * BLE_DEVICE_ADDRESS_LENGTH) + 1);
+        hex_to_string (column_value.text, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
         db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
-        column_value.blob.data = service_list_entry->declaration->data;
-        column_value.blob.length = service_list_entry->declaration->data_length;
+        free (column_value.text);
+        column_value.text = malloc ((2 * service_list_entry->declaration->data_length) + 1);
+        hex_to_string (column_value.text, service_list_entry->declaration->data,
+                       service_list_entry->declaration->data_length);
         db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
+        free (column_value.text);
         column_value.integer = (service_list_entry->update.interval)/(60 * 1000);
         db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_INTERVAL, &column_value);    
         column_value.text = "Searching";
@@ -307,12 +312,13 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
     {
       ble_sync_device_data_t *sync_device_data = (ble_sync_device_data_t *)(sync_list_entry->data);
       ble_device_address_t address;
-      ble_device_list_entry_t *device_list_entry;        
+      ble_device_list_entry_t *device_list_entry;
+      uint8 uuid[BLE_MAX_UUID_LENGTH];
       ble_service_list_entry_t *service_list_entry;
       db_column_value_t column_value;
       uint8 write_type = DB_WRITE_UPDATE;
 
-      memcpy (address.byte, sync_device_data->address, BLE_DEVICE_ADDRESS_LENGTH);
+      string_to_hex (address.byte, sync_device_data->address, (2 * BLE_DEVICE_ADDRESS_LENGTH));
       address.type = BLE_ADDR_PUBLIC;
       
       device_list_entry = ble_find_device (*device_list, &address);
@@ -326,11 +332,12 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
         device_list_entry->data         = NULL;
         device_list_entry->name         = strdup (sync_device_data->name);
         
-        list_add ((list_entry_t **)(&device_list), (list_entry_t *)device_list_entry);
+        list_add ((list_entry_t **)(device_list), (list_entry_t *)device_list_entry);
       }
 
+      string_to_hex (uuid, sync_device_data->service, (strlen (sync_device_data->service)));
       service_list_entry = ble_find_service (device_list_entry->service_list,
-                                             sync_device_data->service, BLE_GATT_UUID_LENGTH);
+                                             uuid, (((strlen (sync_device_data->service)) + 1)/2));
       if (service_list_entry == NULL)
       {
         service_list_entry = (ble_service_list_entry_t *)malloc (sizeof (*service_list_entry));
@@ -339,10 +346,10 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
         service_list_entry->declaration->type         = 0;
         service_list_entry->declaration->handle       = BLE_INVALID_GATT_HANDLE;
         service_list_entry->declaration->uuid_length  = 0;
-        service_list_entry->declaration->data_length  = BLE_GATT_UUID_LENGTH;
-        service_list_entry->declaration->data         = malloc (service_list_entry->declaration->data_length);
-        memcpy (service_list_entry->declaration->data, sync_device_data->service,
-                service_list_entry->declaration->data_length);
+        service_list_entry->declaration->data_length = (strlen (sync_device_data->service) + 1)/2;
+        service_list_entry->declaration->data = malloc (service_list_entry->declaration->data_length);
+        string_to_hex (service_list_entry->declaration->data, sync_device_data->service,
+                       (2 * service_list_entry->declaration->data_length));
 
         service_list_entry->start_handle = BLE_INVALID_GATT_HANDLE;
         service_list_entry->start_handle = BLE_INVALID_GATT_HANDLE;
@@ -375,12 +382,15 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
         }
       }
 
-      column_value.blob.data   = device_list_entry->address.byte;
-      column_value.blob.length = BLE_DEVICE_ADDRESS_LENGTH;
+      column_value.text = malloc ((2 * BLE_DEVICE_ADDRESS_LENGTH) + 1);
+      hex_to_string (column_value.text, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
       db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
-      column_value.blob.data   = service_list_entry->declaration->data;
-      column_value.blob.length = service_list_entry->declaration->data_length;
+      free (column_value.text);
+      column_value.text = malloc ((2 * service_list_entry->declaration->data_length) + 1);
+      hex_to_string (column_value.text, service_list_entry->declaration->data,
+                     service_list_entry->declaration->data_length);
       db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
+      free (column_value.text);
 
       if ((write_type == DB_WRITE_INSERT) || (write_type == DB_WRITE_UPDATE))
       {
@@ -409,7 +419,9 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
       
       db_write_table (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type);
 
+      free (sync_device_data->address);
       free (sync_device_data->name);
+      free (sync_device_data->service);
       free (sync_device_data->status);
       sync_list_entry_del = sync_list_entry;
     }

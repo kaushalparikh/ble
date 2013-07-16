@@ -240,24 +240,21 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
     STRING_CONCAT (sql, "]");
 
     /* Space, then column data type */
-    if (table_list_entry->column[index].type != 0)
+    if (table_list_entry->column[index].type == DB_COLUMN_TYPE_TEXT)
     {
-      if (table_list_entry->column[index].type == DB_COLUMN_TYPE_TEXT)
-      {
-        STRING_CONCAT (sql, " TEXT");
-      }
-      else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_INT)
-      {
-        STRING_CONCAT (sql, " INTEGER");
-      }
-      else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_FLOAT)
-      {
-        STRING_CONCAT (sql, " REAL");
-      }
-      else
-      {
-        STRING_CONCAT (sql, " BLOB");
-      }
+      STRING_CONCAT (sql, " TEXT COLLATE NOCASE");
+    }
+    else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_INT)
+    {
+      STRING_CONCAT (sql, " INTEGER");
+    }
+    else if (table_list_entry->column[index].type == DB_COLUMN_TYPE_FLOAT)
+    {
+      STRING_CONCAT (sql, " REAL");
+    }
+    else
+    {
+      STRING_CONCAT (sql, " BLOB");
     }
 
     /* Space, then column flags/constraints */

@@ -103,7 +103,7 @@ ifneq ($(MAKECMDGOALS),clean)
         $(shell mkdir -p $(BUILD_DIR))
         $(shell mkdir -p $(OBJ_DIR))
         $(shell mkdir -p $(DEP_DIR))
-        ifneq ($(findstring ble-master, $(TARGET_FILE)),)
+        ifneq ($(findstring ble, $(TARGET_FILE)),)
                 -include $(DEP_MASTER)
         endif
 endif

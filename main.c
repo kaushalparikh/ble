@@ -225,6 +225,7 @@ static ble_state_e ble_profile (ble_message_t *message)
             }
             else
             {
+              new_state      = BLE_STATE_SCAN;
               event          = BLE_TIMER_SCAN;
               sleep_interval = BLE_MIN_TIMER_DURATION;
             }

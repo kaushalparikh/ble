@@ -37,7 +37,6 @@ SRC := usb.c timer.c serial.c db.c os.c
 DEP := $(patsubst %.c,$(DEP_DIR)/%.d, $(SRC))
 OBJ := $(patsubst %.c,$(OBJ_DIR)/%.o, $(SRC))
 
-
 # System packages
 SYSTEM_PACKAGES := libudev sqlite3
 

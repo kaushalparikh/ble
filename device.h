@@ -7,11 +7,11 @@
 
 typedef struct
 {
-  uint8   address[BLE_DEVICE_ADDRESS_LENGTH];
-  int8   *name;
-  uint8   service[BLE_MAX_UUID_LENGTH];
-  int32   interval;
-  int8   *status;
+  int8  *address;
+  int8  *name;
+  int8  *service;
+  int32  interval;
+  int8  *status;
 } ble_sync_device_data_t;
 
 extern void ble_sync_device (ble_sync_list_entry_t *sync_list_entry);

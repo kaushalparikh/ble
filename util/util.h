@@ -6,7 +6,7 @@
 /* OS API */
 enum
 {
-  OS_THREAD_PRIORITY_MIN = 0,
+  OS_THREAD_PRIORITY_MIN = 1,
   OS_THREAD_PRIORITY_NORMAL,
   OS_THREAD_PRIORITY_MAX
 };
@@ -157,50 +157,60 @@ static inline void string_replace_char (int8 *dest, int8 search, int8 replace)
   }
 }
 
-static inline void hex_to_string (uint8 *hex, uint32 length, int8 *dest, int8 delimit)
+static inline void hex_to_string (int8 *dest, uint8 *src, int32 length)
 {
-  uint32 byte;
-  char lut[] = "0123456789ABCDEF";
+  int32 count;
 
-  for (byte = 0; byte < length; byte++)
+  for (count = 0; count < length; count++)
   {
-    *dest = lut[((*hex) >> 4) & 0x0f];
-    dest++;
-    *dest = lut[(*hex) & 0x0f];
-    dest++;
-    hex++;
-
-    if (delimit != '\0')
+    uint8 nibble = ((src[count] & 0xf0) >> 4);
+    nibble += 0x30;
+    if (nibble > 0x39)
     {
-      *dest = delimit;
-      dest++;
+      nibble += 0x07;
     }
+    *dest = (int8)nibble;
+    dest++;
+
+    nibble = src[count] & 0x0f;
+    nibble += 0x30;
+    if (nibble > 0x39)
+    {
+      nibble += 0x07;
+    }    
+    *dest = (int8)nibble;
+    dest++;
   }
 
   *dest = '\0';
 }
 
-static inline void string_to_hex (uint8 *hex, uint32 length, int8 *dest, int8 delimit)
+static inline void string_to_hex (uint8 *dest, int8 *src, int32 length)
 {
-  uint32 byte;
-  char lut[] = "0123456789ABCDEF";
+  int32 count;  
 
-  for (byte = 0; byte < length; byte++)
+  for (count = 0; count < length; count++)
   {
-    *dest = lut[((*hex) >> 4) & 0x0f];
-    dest++;
-    *dest = lut[(*hex) & 0x0f];
-    dest++;
-    hex++;
+    uint8 nibble = (uint8)(src[count]);
 
-    if (delimit != '\0')
+    if (nibble > 0x60)
     {
-      *dest = delimit;
-      dest++;
+      nibble -= 0x20;
+    }
+    if (nibble > 0x40)
+    {
+      nibble -= 0x07;
+    }
+
+    if (count & 0x1)
+    {
+      dest[count/2] |= (nibble & 0x0f);
+    }
+    else
+    {
+      dest[count/2] = ((nibble & 0x0f) << 4);
     }
   }
-
-  *dest = '\0';
 }
 
 #endif

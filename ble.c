@@ -598,7 +598,7 @@ void ble_event_read_group (ble_event_read_group_t *read_group)
   else
   {
     int32 i;
-    
+
     printf ("BLE ignore service uuid 0x");
     for (i = 0; i < read_group->length; i++)
     {
