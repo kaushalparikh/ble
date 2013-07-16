@@ -213,5 +213,21 @@ static inline void string_to_hex (uint8 *dest, int8 *src, int32 length)
   }
 }
 
+static inline void hex_reverse (uint8 *src, int32 length)
+{
+  int32 count;
+  uint8 *src_end = src + length - 1;
+
+  for (count = 0; count < ((length + 1)/2); count++)
+  {
+    uint8 tmp = *src;
+
+    *src     = *src_end;
+    *src_end = tmp;
+    src++;
+    src_end--;
+  }
+}
+
 #endif
 

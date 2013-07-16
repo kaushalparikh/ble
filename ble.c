@@ -496,6 +496,7 @@ void ble_event_scan_response (ble_event_scan_response_t *scan_response)
 
   printf ("BLE Scan response event\n");
 
+  hex_reverse (scan_response->device_address.byte, BLE_DEVICE_ADDRESS_LENGTH);
   device_list_entry = ble_find_device (ble_device_list, &(scan_response->device_address));
   if (device_list_entry != NULL)
   {
@@ -583,6 +584,7 @@ void ble_event_read_group (ble_event_read_group_t *read_group)
 
   printf ("BLE Read group event\n");
 
+  hex_reverse (read_group->data, read_group->length);
   service_list_entry = ble_find_service (connection_params.device->service_list, read_group->data, read_group->length);
 
   if (service_list_entry != NULL)
@@ -616,7 +618,10 @@ void ble_event_find_information (ble_event_find_information_t *find_information)
 
   if (find_information->length == BLE_GATT_UUID_LENGTH)
   {
-    uint16 uuid = BLE_PACK_GATT_UUID (find_information->data);
+    uint16 uuid;
+
+    hex_reverse (find_information->data, BLE_GATT_UUID_LENGTH);
+    uuid = BLE_PACK_GATT_UUID (find_information->data);
     
     if (uuid == BLE_GATT_INCLUDE)
     {

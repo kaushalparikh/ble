@@ -3,8 +3,8 @@
 
 #include "types.h"
 
-#define BLE_PACK_GATT_UUID(byte)  (((byte)[1] << 8) | (byte)[0])
-#define BLE_UNPACK_GATT_UUID(uuid, byte)  { (byte)[0] = ((uuid) & 0xff); (byte)[1] = (((uuid) & 0xff00) >> 8); } 
+#define BLE_PACK_GATT_UUID(byte)  (((byte)[0] << 8) | (byte)[1])
+#define BLE_UNPACK_GATT_UUID(uuid, byte)  { (byte)[1] = ((uuid) & 0xff); (byte)[0] = (((uuid) & 0xff00) >> 8); } 
 
 #define BLE_MAX_UUID_LENGTH  (16)
 

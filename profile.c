@@ -193,7 +193,7 @@ void ble_print_service (ble_service_list_entry_t *service_list_entry)
     printf ("Service -- %s\n", ((uuid == BLE_GATT_PRI_SERVICE) ? "primary" : "secondary"));
     printf ("  handle range: 0x%04x to 0x%04x\n", service_list_entry->start_handle, service_list_entry->end_handle);
     printf ("          uuid: 0x");
-    for (i = (service_list_entry->declaration->data_length - 1); i >= 0; i--)
+    for (i = 0; i < service_list_entry->declaration->data_length; i++)
     {
       printf ("%02x", service_list_entry->declaration->data[i]);
     }
@@ -211,7 +211,7 @@ void ble_print_service (ble_service_list_entry_t *service_list_entry)
         printf ("      handle: 0x%04x\n", char_list_entry->declaration->handle);
         printf ("       value: ");
         printf ("0x%02x, 0x%04x, 0x", char_decl->type, char_decl->handle);
-        for (i = (char_list_entry->declaration->data_length - 4); i >= 0; i--)
+        for (i = 0; i < char_list_entry->declaration->data_length - 3; i++)
         {
           printf ("%02x", char_decl->uuid[i]);
         }
