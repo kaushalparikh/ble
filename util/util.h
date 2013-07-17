@@ -134,7 +134,7 @@ extern int32 db_open (int8 *file_name, db_info_t **db_info);
 
 extern int32 db_close (db_info_t *db_info);
 
-/* String API */
+/* String/Binary API */
 
 #define STRING_CONCAT(dest, src)                                    \
   {                                                                 \
@@ -157,7 +157,7 @@ static inline void string_replace_char (int8 *dest, int8 search, int8 replace)
   }
 }
 
-static inline void hex_to_string (int8 *dest, uint8 *src, int32 length)
+static inline void bin_to_string (int8 *dest, uint8 *src, int32 length)
 {
   int32 count;
 
@@ -185,7 +185,7 @@ static inline void hex_to_string (int8 *dest, uint8 *src, int32 length)
   *dest = '\0';
 }
 
-static inline void string_to_hex (uint8 *dest, int8 *src, int32 length)
+static inline void string_to_bin (uint8 *dest, int8 *src, int32 length)
 {
   int32 count;  
 
@@ -213,7 +213,7 @@ static inline void string_to_hex (uint8 *dest, int8 *src, int32 length)
   }
 }
 
-static inline void hex_reverse (uint8 *src, int32 length)
+static inline void bin_reverse (uint8 *src, int32 length)
 {
   int32 count;
   uint8 *src_end = src + length - 1;

@@ -153,12 +153,12 @@ void ble_update_device (ble_device_list_entry_t *device_list_entry)
     sync_device_data->name = strdup (device_list_entry->name);
 
     column_value.text = malloc ((2 * BLE_DEVICE_ADDRESS_LENGTH) + 1);
-    hex_to_string (column_value.text, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
+    bin_to_string (column_value.text, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
     db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
     sync_device_data->address = strdup (column_value.text);
     free (column_value.text);
     column_value.text = malloc ((2 * service_list_entry->declaration->data_length) + 1);
-    hex_to_string (column_value.text, service_list_entry->declaration->data,
+    bin_to_string (column_value.text, service_list_entry->declaration->data,
                    service_list_entry->declaration->data_length);
     db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
     sync_device_data->service = strdup (column_value.text);
@@ -230,7 +230,7 @@ void ble_init_device_list (ble_device_list_entry_t **device_list)
         db_column_value_t column_value;
   
         db_read_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
-        string_to_hex (address.byte, column_value.text, (2 * BLE_DEVICE_ADDRESS_LENGTH));
+        string_to_bin (address.byte, column_value.text, (2 * BLE_DEVICE_ADDRESS_LENGTH));
         address.type = BLE_ADDR_PUBLIC;
 
         device_list_entry = ble_find_device (*device_list, &address);
@@ -260,7 +260,7 @@ void ble_init_device_list (ble_device_list_entry_t **device_list)
         service_list_entry->declaration->uuid_length = 0;
         service_list_entry->declaration->data_length = (strlen (column_value.text) + 1)/2;
         service_list_entry->declaration->data = malloc (service_list_entry->declaration->data_length);
-        string_to_hex (service_list_entry->declaration->data, column_value.text,
+        string_to_bin (service_list_entry->declaration->data, column_value.text,
                        (2 * service_list_entry->declaration->data_length));
   
         service_list_entry->start_handle = BLE_INVALID_GATT_HANDLE;
@@ -279,11 +279,11 @@ void ble_init_device_list (ble_device_list_entry_t **device_list)
         list_add ((list_entry_t **)(&(device_list_entry->service_list)), (list_entry_t *)service_list_entry);
 
         column_value.text = malloc ((2 * BLE_DEVICE_ADDRESS_LENGTH) + 1);
-        hex_to_string (column_value.text, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
+        bin_to_string (column_value.text, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
         db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
         free (column_value.text);
         column_value.text = malloc ((2 * service_list_entry->declaration->data_length) + 1);
-        hex_to_string (column_value.text, service_list_entry->declaration->data,
+        bin_to_string (column_value.text, service_list_entry->declaration->data,
                        service_list_entry->declaration->data_length);
         db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), DB_WRITE_UPDATE, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
         free (column_value.text);
@@ -318,7 +318,7 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
       db_column_value_t column_value;
       uint8 write_type = DB_WRITE_UPDATE;
 
-      string_to_hex (address.byte, sync_device_data->address, (2 * BLE_DEVICE_ADDRESS_LENGTH));
+      string_to_bin (address.byte, sync_device_data->address, (2 * BLE_DEVICE_ADDRESS_LENGTH));
       address.type = BLE_ADDR_PUBLIC;
       
       device_list_entry = ble_find_device (*device_list, &address);
@@ -335,7 +335,7 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
         list_add ((list_entry_t **)(device_list), (list_entry_t *)device_list_entry);
       }
 
-      string_to_hex (uuid, sync_device_data->service, (strlen (sync_device_data->service)));
+      string_to_bin (uuid, sync_device_data->service, (strlen (sync_device_data->service)));
       service_list_entry = ble_find_service (device_list_entry->service_list,
                                              uuid, (((strlen (sync_device_data->service)) + 1)/2));
       if (service_list_entry == NULL)
@@ -348,7 +348,7 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
         service_list_entry->declaration->uuid_length  = 0;
         service_list_entry->declaration->data_length = (strlen (sync_device_data->service) + 1)/2;
         service_list_entry->declaration->data = malloc (service_list_entry->declaration->data_length);
-        string_to_hex (service_list_entry->declaration->data, sync_device_data->service,
+        string_to_bin (service_list_entry->declaration->data, sync_device_data->service,
                        (2 * service_list_entry->declaration->data_length));
 
         service_list_entry->start_handle = BLE_INVALID_GATT_HANDLE;
@@ -383,11 +383,11 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
       }
 
       column_value.text = malloc ((2 * BLE_DEVICE_ADDRESS_LENGTH) + 1);
-      hex_to_string (column_value.text, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
+      bin_to_string (column_value.text, device_list_entry->address.byte, BLE_DEVICE_ADDRESS_LENGTH);
       db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_ADDRESS, &column_value);
       free (column_value.text);
       column_value.text = malloc ((2 * service_list_entry->declaration->data_length) + 1);
-      hex_to_string (column_value.text, service_list_entry->declaration->data,
+      bin_to_string (column_value.text, service_list_entry->declaration->data,
                      service_list_entry->declaration->data_length);
       db_write_column (&(db_static_tables[DB_DEVICE_LIST_TABLE]), write_type, DB_DEVICE_TABLE_COLUMN_SERVICE, &column_value);
       free (column_value.text);

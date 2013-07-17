@@ -217,7 +217,6 @@ int32 ble_init_temperature (ble_service_list_entry_t *service_list_entry,
     ble_char_decl_t *char_decl = (ble_char_decl_t *)(char_list_entry->declaration->data);
     
     uuid_length = char_list_entry->declaration->data_length - 3;
-    hex_reverse (char_decl->uuid, uuid_length);
     uuid        = BLE_PACK_GATT_UUID (char_decl->uuid);       
     
     if ((uuid_length == BLE_GATT_UUID_LENGTH) &&
