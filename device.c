@@ -51,7 +51,7 @@ static db_table_list_entry_t db_static_tables[DB_NUM_STATIC_TABLES] =
 
 static db_info_t *db_info = NULL;
 
-LIST_HEAD_INIT (ble_sync_list_entry_t, sync_list);
+LIST_HEAD_INIT (ble_sync_list_entry_t, device_sync_list);
 
 
 static void ble_print_device_list (ble_device_list_entry_t *device_list_entry)
@@ -72,32 +72,47 @@ static void ble_print_device_list (ble_device_list_entry_t *device_list_entry)
   }   
 }
 
-void ble_sync_device (ble_sync_list_entry_t *sync_list_entry)
+void ble_sync_device (ble_sync_list_entry_t **sync_list)
 {
-  ble_sync_list_entry_t *temp_list_entry;
+  ble_sync_list_entry_t *sync_list_entry;
 
-  if (sync_list_entry->type == BLE_SYNC_PULL)
+  sync_list_entry = *sync_list;
+  while (sync_list_entry != NULL)
   {
-    temp_list_entry  = (ble_sync_list_entry_t *)malloc (sizeof (*temp_list_entry));
-    *temp_list_entry = *sync_list_entry;
-    list_add ((list_entry_t **)(&sync_list), (list_entry_t *)temp_list_entry);
-  }
-  else
-  {
-    temp_list_entry = sync_list;
-
-    while  (temp_list_entry != NULL)
+    ble_sync_list_entry_t *pull_list_entry = NULL;
+    
+    if (sync_list_entry->type == BLE_SYNC_PULL)
     {
-      if (temp_list_entry->type == BLE_SYNC_PUSH)
-      {
-        list_remove ((list_entry_t **)(&sync_list), (list_entry_t *)temp_list_entry);
-        sync_list_entry->data = temp_list_entry->data;
-        free (temp_list_entry);
+      pull_list_entry = sync_list_entry;
+    }
+    
+    sync_list_entry = sync_list_entry->next;
 
-        break;
-      }
+    if (pull_list_entry != NULL)
+    {
+      list_remove ((list_entry_t **)sync_list, (list_entry_t *)pull_list_entry);
+      list_add ((list_entry_t **)(&device_sync_list), (list_entry_t *)pull_list_entry);
+      pull_list_entry = NULL;
+    }
+  }
 
-      temp_list_entry = temp_list_entry->next;
+  sync_list_entry = device_sync_list;
+  while  (sync_list_entry != NULL)
+  {
+    ble_sync_list_entry_t *push_list_entry = NULL;
+    
+    if (sync_list_entry->type == BLE_SYNC_PUSH)
+    {
+      push_list_entry = sync_list_entry;
+    }
+
+    sync_list_entry = sync_list_entry->next;
+
+    if (push_list_entry != NULL)
+    {
+      list_remove ((list_entry_t **)(&device_sync_list), (list_entry_t *)push_list_entry);
+      list_add ((list_entry_t **)sync_list, (list_entry_t *)push_list_entry);
+      push_list_entry = NULL;
     }
   }
 }
@@ -144,10 +159,11 @@ void ble_update_device (ble_device_list_entry_t *device_list_entry)
     ble_sync_device_data_t *sync_device_data;
     db_column_value_t column_value;
 
-    sync_list_entry       = (ble_sync_list_entry_t *)malloc (sizeof (*sync_list_entry));
-    sync_list_entry->type = BLE_SYNC_PUSH;
-    sync_list_entry->data = malloc (sizeof (ble_sync_device_data_t));
-    list_add ((list_entry_t **)(&sync_list), (list_entry_t *)sync_list_entry);
+    sync_list_entry            = (ble_sync_list_entry_t *)malloc (sizeof (*sync_list_entry));
+    sync_list_entry->type      = BLE_SYNC_PUSH;
+    sync_list_entry->data_type = BLE_SYNC_DEVICE;
+    sync_list_entry->data      = malloc (sizeof (ble_sync_device_data_t));
+    list_add ((list_entry_t **)(&device_sync_list), (list_entry_t *)sync_list_entry);
 
     sync_device_data       = (ble_sync_device_data_t *)(sync_list_entry->data);
     sync_device_data->name = strdup (device_list_entry->name);
@@ -302,7 +318,7 @@ void ble_init_device_list (ble_device_list_entry_t **device_list)
 
 void ble_update_device_list (ble_device_list_entry_t **device_list)
 {
-  ble_sync_list_entry_t *sync_list_entry = sync_list;
+  ble_sync_list_entry_t *sync_list_entry = device_sync_list;
  
   while (sync_list_entry != NULL)
   {
@@ -431,7 +447,7 @@ void ble_update_device_list (ble_device_list_entry_t **device_list)
     if (sync_list_entry_del != NULL)
     {
       free (sync_list_entry_del->data);
-      list_remove ((list_entry_t **)(&sync_list), (list_entry_t *)sync_list_entry_del);
+      list_remove ((list_entry_t **)(&device_sync_list), (list_entry_t *)sync_list_entry_del);
       free (sync_list_entry_del);
       sync_list_entry_del = NULL;
     }

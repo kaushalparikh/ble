@@ -161,57 +161,6 @@ int32 db_write_table (db_table_list_entry_t *table_list_entry, uint8 type)
   return status;
 }
 
-int32 db_delete_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry)
-{
-  int status;
-  char *sql = NULL;
-  
-  sql = strdup ("DROP TABLE IF EXISTS ");
-  STRING_CONCAT (sql, "[");
-  STRING_CONCAT (sql, table_list_entry->title);
-  STRING_CONCAT (sql, "]");
-
-  status = sqlite3_exec ((sqlite3 *)(db_info->handle), sql, NULL, NULL, NULL);
-  free (sql);
-
-  if (status == SQLITE_OK)
-  {
-    if (table_list_entry->insert != NULL)
-    {
-      sqlite3_finalize (table_list_entry->insert);
-      table_list_entry->insert = NULL;
-    }
-
-    if (table_list_entry->update != NULL)
-    {
-      sqlite3_finalize (table_list_entry->update);
-      table_list_entry->update = NULL;
-    }
-
-    if (table_list_entry->delete != NULL)
-    {
-      sqlite3_finalize (table_list_entry->delete);
-      table_list_entry->delete = NULL;
-    }
-
-    if (table_list_entry->select != NULL)
-    {
-      sqlite3_finalize (table_list_entry->select);
-      table_list_entry->select = NULL;
-    }
-
-    list_remove ((list_entry_t **)(&(db_info->table_list)), (list_entry_t *)table_list_entry);
-    status = 1;
-  }
-  else
-  {
-    printf ("Can't delete database table '%s'\n", table_list_entry->title);
-    status = -1;
-  }
-
-  return status;
-}
-
 int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry)
 {
   int status;
@@ -543,6 +492,57 @@ int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_ent
       table_list_entry->select = NULL;
     }
 
+    status = -1;
+  }
+
+  return status;
+}
+
+int32 db_delete_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry)
+{
+  int status;
+  char *sql = NULL;
+  
+  sql = strdup ("DROP TABLE IF EXISTS ");
+  STRING_CONCAT (sql, "[");
+  STRING_CONCAT (sql, table_list_entry->title);
+  STRING_CONCAT (sql, "]");
+
+  status = sqlite3_exec ((sqlite3 *)(db_info->handle), sql, NULL, NULL, NULL);
+  free (sql);
+
+  if (status == SQLITE_OK)
+  {
+    if (table_list_entry->insert != NULL)
+    {
+      sqlite3_finalize (table_list_entry->insert);
+      table_list_entry->insert = NULL;
+    }
+
+    if (table_list_entry->update != NULL)
+    {
+      sqlite3_finalize (table_list_entry->update);
+      table_list_entry->update = NULL;
+    }
+
+    if (table_list_entry->delete != NULL)
+    {
+      sqlite3_finalize (table_list_entry->delete);
+      table_list_entry->delete = NULL;
+    }
+
+    if (table_list_entry->select != NULL)
+    {
+      sqlite3_finalize (table_list_entry->select);
+      table_list_entry->select = NULL;
+    }
+
+    list_remove ((list_entry_t **)(&(db_info->table_list)), (list_entry_t *)table_list_entry);
+    status = 1;
+  }
+  else
+  {
+    printf ("Can't delete database table '%s'\n", table_list_entry->title);
     status = -1;
   }
 

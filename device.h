@@ -14,7 +14,7 @@ typedef struct
   int8  *status;
 } ble_sync_device_data_t;
 
-extern void ble_sync_device (ble_sync_list_entry_t *sync_list_entry);
+extern void ble_sync_device (ble_sync_list_entry_t **sync_list);
 
 extern void ble_print_device (ble_device_list_entry_t *device_list_entry);
 

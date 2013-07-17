@@ -14,7 +14,9 @@ enum
 extern void os_init (void);
 
 extern int32 os_create_thread (void * (*start_function)(void *), uint8 priority,
-                               int32 duration, void **handle);
+                               int32 timeout, void **handle);
+
+extern int32 os_destroy_thread (void *handle);
 
 /* Serial API */
 extern int32 serial_init (void);
@@ -126,9 +128,9 @@ extern int32 db_read_table (db_table_list_entry_t *table_list_entry);
 
 extern int32 db_write_table (db_table_list_entry_t *table_list_entry, uint8 type);
 
-extern int32 db_delete_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry);
-
 extern int32 db_create_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry);
+
+extern int32 db_delete_table (db_info_t *db_info, db_table_list_entry_t *table_list_entry);
 
 extern int32 db_open (int8 *file_name, db_info_t **db_info);
 

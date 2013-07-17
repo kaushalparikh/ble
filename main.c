@@ -307,6 +307,9 @@ static ble_state_e ble_data (ble_message_t *message)
           printf ("BLE Data state\n");
 
           ble_start_data ();
+          
+          os_create_thread (ble_sync, OS_THREAD_PRIORITY_NORMAL,
+                            (BLE_MIN_SLEEP_INTERVAL/1000), &ble_sync_thread);
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
                  (message->data[0] == BLE_TIMER_CONNECT_DATA))
@@ -324,6 +327,9 @@ static ble_state_e ble_data (ble_message_t *message)
           int32 sleep_interval;
           int32 power_save = 0;          
           timer_info_t *timer_info = NULL;
+
+          os_destroy_thread (ble_sync_thread);
+          ble_sync_thread = NULL;
           
           if (((ble_check_data_list ()) > 0) && ((ble_get_sleep ()) <= BLE_MIN_SLEEP_INTERVAL))
           {
@@ -400,7 +406,8 @@ void master_loop (void)
   (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_SCAN,
                      ble_callback_timer, &timer_info);
 
-  os_create_thread (ble_sync, OS_THREAD_PRIORITY_NORMAL, (BLE_MIN_SLEEP_INTERVAL/1000), &ble_sync_thread);
+  os_create_thread (ble_sync, OS_THREAD_PRIORITY_NORMAL,
+                    (BLE_MIN_SLEEP_INTERVAL/1000), &ble_sync_thread);
 
   while (1)
   {
