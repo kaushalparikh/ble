@@ -25,6 +25,10 @@ struct ble_sync_list_entry
 
 typedef struct ble_sync_list_entry ble_sync_list_entry_t;
 
+extern void ble_sync_push (ble_sync_list_entry_t *sync_list_entry);
+
+extern void ble_sync_pull (ble_sync_list_entry_t **sync_list_entry, uint8 data_type);
+
 extern void * ble_sync (void *timeout);
 
 #endif

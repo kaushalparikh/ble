@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
+#include <float.h>
 
 #include "types.h"
 #include "list.h"
@@ -77,6 +79,14 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry,
   db_table_list_entry_t *table_list_entry;
   ble_char_list_entry_t *update_list_entry;
   db_column_value_t column_value;
+  ble_sync_list_entry_t *sync_list_entry;
+  ble_sync_temperature_data_t *sync_temperature_data;
+
+  sync_list_entry            = (ble_sync_list_entry_t *)malloc (sizeof (*sync_list_entry));
+  sync_list_entry->type      = BLE_SYNC_PUSH;
+  sync_list_entry->data_type = BLE_SYNC_TEMPERATURE;
+  sync_list_entry->data      = malloc (sizeof (ble_sync_temperature_data_t));
+  sync_temperature_data      = (ble_sync_temperature_data_t *)(sync_list_entry->data);
 
   update_failed     = 0;
   current_time      = clock_get_count ();
@@ -87,7 +97,11 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry,
   db_write_column (table_list_entry, DB_WRITE_INSERT, DB_TEMPERATURE_TABLE_COLUMN_TIME, &column_value);
   db_write_column (table_list_entry, DB_WRITE_INSERT, DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL, NULL);
   db_write_column (table_list_entry, DB_WRITE_INSERT, DB_TEMPERATURE_TABLE_COLUMN_BAT_LEVEL, NULL);
+
+  sync_temperature_data->time = strdup (column_value.text);
   free (column_value.text);
+  sync_temperature_data->temperature   = FLT_MAX;
+  sync_temperature_data->battery_level = UINT_MAX;
 
   printf ("Device: %s\n", device_list_entry->name);
 
@@ -128,6 +142,7 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry,
   
         column_value.decimal = temperature->meas_value;
         (void)db_write_column (table_list_entry, DB_WRITE_INSERT, DB_TEMPERATURE_TABLE_COLUMN_TEMPERATURE, &column_value);
+        sync_temperature_data->temperature = temperature->meas_value;
       }
       else
       {
@@ -199,6 +214,7 @@ void ble_update_temperature (ble_service_list_entry_t *service_list_entry,
   }
 
   db_write_table (table_list_entry, DB_WRITE_INSERT);
+  ble_sync_push (sync_list_entry);
 }
 
 int32 ble_init_temperature (ble_service_list_entry_t *service_list_entry,

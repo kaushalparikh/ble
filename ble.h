@@ -23,6 +23,9 @@
 /* Minimum sleep interval in ms */
 #define BLE_MIN_SLEEP_INTERVAL  (20000)
 
+/* Sync thread timeout in ms */
+#define BLE_SYNC_TIMEOUT  (5000)
+
 /* Message header definitions */
 /* Message types */
 enum

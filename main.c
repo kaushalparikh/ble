@@ -308,8 +308,11 @@ static ble_state_e ble_data (ble_message_t *message)
 
           ble_start_data ();
           
-          os_create_thread (ble_sync, OS_THREAD_PRIORITY_NORMAL,
-                            (BLE_MIN_SLEEP_INTERVAL/1000), &ble_sync_thread);
+          if (ble_sync_thread == NULL)
+          {
+            os_create_thread (ble_sync, OS_THREAD_PRIORITY_NORMAL,
+                              (BLE_SYNC_TIMEOUT/1000), &ble_sync_thread);
+          }
         }
         else if ((message->data[0] == BLE_TIMER_CONNECT_SETUP) ||
                  (message->data[0] == BLE_TIMER_CONNECT_DATA))
@@ -407,7 +410,7 @@ void master_loop (void)
                      ble_callback_timer, &timer_info);
 
   os_create_thread (ble_sync, OS_THREAD_PRIORITY_NORMAL,
-                    (BLE_MIN_SLEEP_INTERVAL/1000), &ble_sync_thread);
+                    ((4 * BLE_SYNC_TIMEOUT)/1000), &ble_sync_thread);
 
   while (1)
   {

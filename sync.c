@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <limits.h>
+#include <float.h>
 
 #include "types.h"
 #include "list.h"
@@ -22,7 +24,8 @@ static void ble_print_sync (void)
 
     if (sync_list_entry->data_type == BLE_SYNC_DEVICE)
     {
-      ble_sync_device_data_t *sync_device_data = (ble_sync_device_data_t *)(sync_list_entry->data);
+      ble_sync_device_data_t *sync_device_data
+        = (ble_sync_device_data_t *)(sync_list_entry->data);
         
       printf ("  type    : %s\n", "Device");
       printf ("  address : 0x%s\n", sync_device_data->address);
@@ -33,20 +36,70 @@ static void ble_print_sync (void)
     }
     else if (sync_list_entry->data_type == BLE_SYNC_TEMPERATURE)
     {
-      printf ("  type    : %s\n", "Temperature");
+      ble_sync_temperature_data_t *sync_temperature_data
+        = (ble_sync_temperature_data_t *)(sync_list_entry->data);
+      
+      printf ("  type       : %s\n", "Temperature");
+      printf ("  time       : %s\n", sync_temperature_data->time);
+      if (sync_temperature_data->temperature != FLT_MAX)
+      {
+        printf ("  temperature: %.1f (C)\n", sync_temperature_data->temperature);
+      }
+      else
+      {
+        printf ("  temperature: %s\n", "NA");
+      }
+      if (sync_temperature_data->battery_level != UINT_MAX)
+      {
+        printf ("  battery    : %u\n", sync_temperature_data->battery_level);
+      }
+      else
+      {
+        printf ("  battery    : %s\n", "NA");
+      }
     }
 
     sync_list_entry = sync_list_entry->next;
   }  
 }
 
+void ble_sync_push (ble_sync_list_entry_t *push_list_entry)
+{
+  list_add ((list_entry_t **)(&sync_list), (list_entry_t *)push_list_entry);
+}
+
+void ble_sync_pull (ble_sync_list_entry_t **pull_list, uint8 data_type)
+{
+  ble_sync_list_entry_t *sync_list_entry = sync_list;
+
+  while (sync_list_entry != NULL)
+  {
+    ble_sync_list_entry_t *pull_list_entry = NULL;
+
+    if ((sync_list_entry->type == BLE_SYNC_PULL) &&
+        (sync_list_entry->data_type == data_type))
+    {
+      pull_list_entry = sync_list_entry;
+    }
+    
+    sync_list_entry = sync_list_entry->next;
+
+    if (pull_list_entry != NULL)
+    {
+      list_remove ((list_entry_t **)(&sync_list), (list_entry_t *)pull_list_entry);
+      list_add ((list_entry_t **)pull_list, (list_entry_t *)pull_list_entry);
+      pull_list_entry = NULL;
+    }
+  }
+}
+  
 void * ble_sync (void *timeout)
 {
   ble_sync_list_entry_t *sync_list_entry;
   
   printf ("Sync thread start with timeout %d (sec)\n", (int32)timeout);
 
-  ble_sync_device (&sync_list);
+  sleep ((int32)timeout);
   ble_print_sync ();
 
   sync_list_entry = sync_list;
@@ -56,7 +109,8 @@ void * ble_sync (void *timeout)
     
     if (sync_list_entry->data_type == BLE_SYNC_DEVICE)
     {
-      ble_sync_device_data_t *sync_device_data = (ble_sync_device_data_t *)(sync_list_entry->data);
+      ble_sync_device_data_t *sync_device_data
+        = (ble_sync_device_data_t *)(sync_list_entry->data);
         
       free (sync_device_data->address);
       free (sync_device_data->name);
@@ -65,6 +119,10 @@ void * ble_sync (void *timeout)
     }
     else if (sync_list_entry->data_type == BLE_SYNC_TEMPERATURE)
     {
+      ble_sync_temperature_data_t *sync_temperature_data
+        = (ble_sync_temperature_data_t *)(sync_list_entry->data);
+      
+      free (sync_temperature_data->time);
     }
 
     free (sync_list_entry->data);
