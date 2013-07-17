@@ -959,7 +959,6 @@ void ble_start_scan (void)
   ble_command_scan_params_t *scan_params;
 
   ble_update_sleep ();
-  ble_update_device_list (&ble_device_list);
 
   printf ("BLE Start scan request\n");
 
@@ -1039,6 +1038,8 @@ void ble_stop_scan (void)
   ble_update_sleep ();
   connection_params.timer_info = NULL;
   (void)ble_end_procedure ();
+
+  ble_update_device_list (&ble_device_list);
 }
 
 void ble_start_profile (void)
@@ -1075,9 +1076,11 @@ void ble_next_profile (void)
   else
   {
     timer_info_t *timer_info = NULL;
-    
+
     (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_PROFILE_STOP,
-                       ble_callback_timer, &timer_info);    
+                       ble_callback_timer, &timer_info);
+
+    ble_update_device_list (&ble_device_list);
   }
 }
 
@@ -1335,6 +1338,8 @@ void ble_next_data (void)
     
     (void)timer_start (BLE_MIN_TIMER_DURATION, BLE_TIMER_DATA_STOP,
                        ble_callback_timer, &timer_info);
+
+    ble_update_device_list (&ble_device_list);
   }
 }
 
