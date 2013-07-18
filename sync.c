@@ -7,11 +7,16 @@
 
 #include "types.h"
 #include "list.h"
+#include "util.h"
 #include "sync.h"
 #include "device.h"
 #include "temperature.h"
 
+#define BLE_SYNC_INTERVAL  (10 * 60 * 1000)
+
 LIST_HEAD_INIT (ble_sync_list_entry_t, sync_list);
+
+static int32 previous_sync_time = (-BLE_SYNC_INTERVAL);
 
 
 static void ble_print_sync (void)
@@ -95,43 +100,50 @@ void ble_sync_pull (ble_sync_list_entry_t **pull_list, uint8 data_type)
   
 void * ble_sync (void *timeout)
 {
+  int32 current_time;
   ble_sync_list_entry_t *sync_list_entry;
   
   printf ("Sync thread start with timeout %d (sec)\n", (int32)timeout);
 
-  sleep ((int32)timeout);
-  ble_print_sync ();
-
-  sync_list_entry = sync_list;
-  while (sync_list_entry != NULL)
+  current_time = clock_get_count ();
+  if ((current_time - previous_sync_time) >= BLE_SYNC_INTERVAL)
   {
-    ble_sync_list_entry_t *sync_list_entry_del = sync_list_entry;
-    
-    if (sync_list_entry->data_type == BLE_SYNC_DEVICE)
-    {
-      ble_sync_device_data_t *sync_device_data
-        = (ble_sync_device_data_t *)(sync_list_entry->data);
-        
-      free (sync_device_data->address);
-      free (sync_device_data->name);
-      free (sync_device_data->service);
-      free (sync_device_data->status);
-    }
-    else if (sync_list_entry->data_type == BLE_SYNC_TEMPERATURE)
-    {
-      ble_sync_temperature_data_t *sync_temperature_data
-        = (ble_sync_temperature_data_t *)(sync_list_entry->data);
-      
-      free (sync_temperature_data->time);
-    }
-
-    free (sync_list_entry->data);
-    
-    sync_list_entry = sync_list_entry->next;
-    list_remove ((list_entry_t **)(&sync_list), (list_entry_t *)sync_list_entry_del);
-    free (sync_list_entry_del);
-  }
+    sleep ((int32)timeout);
+    ble_print_sync ();
   
+    sync_list_entry = sync_list;
+    while (sync_list_entry != NULL)
+    {
+      ble_sync_list_entry_t *sync_list_entry_del = sync_list_entry;
+      
+      if (sync_list_entry->data_type == BLE_SYNC_DEVICE)
+      {
+        ble_sync_device_data_t *sync_device_data
+          = (ble_sync_device_data_t *)(sync_list_entry->data);
+          
+        free (sync_device_data->address);
+        free (sync_device_data->name);
+        free (sync_device_data->service);
+        free (sync_device_data->status);
+      }
+      else if (sync_list_entry->data_type == BLE_SYNC_TEMPERATURE)
+      {
+        ble_sync_temperature_data_t *sync_temperature_data
+          = (ble_sync_temperature_data_t *)(sync_list_entry->data);
+        
+        free (sync_temperature_data->time);
+      }
+  
+      free (sync_list_entry->data);
+      
+      sync_list_entry = sync_list_entry->next;
+      list_remove ((list_entry_t **)(&sync_list), (list_entry_t *)sync_list_entry_del);
+      free (sync_list_entry_del);
+    }
+  
+    previous_sync_time = current_time;
+  }
+
   printf ("Sync thread end\n");
 
   return NULL;

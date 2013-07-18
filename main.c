@@ -32,6 +32,67 @@ static ble_state_handler_t ble_state_handler[BLE_STATE_MAX] =
 static void *ble_sync_thread = NULL;
 
 
+static ble_state_e ble_next_state (ble_state_e current_state)
+{
+  int32 sleep_interval;
+  int32 num_scan;
+  int32 num_profile;
+  int32 num_data;
+  int32 event;
+  ble_state_e new_state;
+  int32 power_save;
+  timer_info_t *timer_info;
+
+  sleep_interval = ble_get_sleep ();
+  num_scan       = ble_check_scan_list ();
+  num_profile    = ble_check_profile_list ();
+  num_data       = ble_check_data_list ();
+  power_save     = 1;
+  timer_info     = NULL;
+
+  if ((num_data > 0) &&
+      ((sleep_interval < BLE_MIN_SLEEP_INTERVAL) || ((num_scan == 0) && (num_profile == 0))))
+  {
+    new_state = BLE_STATE_DATA;
+    event     = BLE_TIMER_DATA;
+
+    if (sleep_interval < BLE_MIN_SLEEP_INTERVAL)
+    {
+      power_save = 0;
+    }
+  }
+  else if ((num_profile > 0) &&
+           ((current_state == BLE_STATE_SCAN) || (current_state == BLE_STATE_DATA) || (num_scan == 0)))
+  {
+    new_state      = BLE_STATE_PROFILE;
+    event          = BLE_TIMER_PROFILE;
+    sleep_interval = BLE_MIN_TIMER_DURATION;
+    power_save     = 0;
+  }
+  else
+  {
+    new_state      = BLE_STATE_SCAN;
+    event          = BLE_TIMER_SCAN;
+    sleep_interval = BLE_MIN_TIMER_DURATION;
+    power_save     = 0;
+  }
+
+  if (power_save)
+  {
+    /* TODO: Power save */
+    printf ("BLE Power save interval %d (ms)\n", sleep_interval);
+    (void)timer_start (sleep_interval, event, ble_callback_timer, &timer_info);
+
+  }
+  else
+  {
+    printf ("BLE Wait interval %d (ms)\n", sleep_interval);
+    (void)timer_start (sleep_interval, event, ble_callback_timer, &timer_info);
+  }
+
+  return new_state;
+}
+  
 static ble_state_e ble_scan (ble_message_t *message)
 {
   ble_state_e new_state = BLE_STATE_SCAN;
@@ -56,59 +117,9 @@ static ble_state_e ble_scan (ble_message_t *message)
         }
         else if (message->data[0] == BLE_TIMER_SCAN_STOP)
         {
-          int32 event;
-          int32 sleep_interval;
-          int32 power_save = 0;
-          timer_info_t *timer_info = NULL;
-          
           ble_stop_scan ();
 
-          if (((ble_check_data_list ()) > 0) && ((ble_get_sleep ()) <= BLE_MIN_SLEEP_INTERVAL))
-          {
-            new_state      = BLE_STATE_DATA;
-            event          = BLE_TIMER_DATA;
-            sleep_interval = ble_get_sleep ();
-          }
-          else if ((ble_check_profile_list ()) > 0)
-          {
-            new_state      = BLE_STATE_PROFILE;
-            event          = BLE_TIMER_PROFILE;
-            sleep_interval = BLE_MIN_TIMER_DURATION;
-          }
-          else if ((ble_check_scan_list ()) > 0)
-          {
-            event          = BLE_TIMER_SCAN;
-            sleep_interval = BLE_MIN_TIMER_DURATION;
-          }
-          else
-          {
-            power_save = 1;
-
-            if ((ble_check_data_list ()) > 0)
-            {
-              new_state     = BLE_STATE_DATA;
-              event         = BLE_TIMER_DATA;
-             sleep_interval = ble_get_sleep ();
-            }
-            else
-            {
-              event          = BLE_TIMER_SCAN;
-              sleep_interval = BLE_MIN_TIMER_DURATION;
-            }
-          }
-
-          if (power_save)
-          {
-            /* TODO: Power save */
-            printf ("BLE Power save interval %d (ms)\n", sleep_interval);
-            (void)timer_start (sleep_interval, event, ble_callback_timer, &timer_info);
-
-          }
-          else
-          {
-            printf ("BLE Wait interval %d (ms)\n", sleep_interval);
-            (void)timer_start (sleep_interval, event, ble_callback_timer, &timer_info);
-          }
+          new_state = ble_next_state (BLE_STATE_SCAN);
         }
         else
         {
@@ -196,53 +207,7 @@ static ble_state_e ble_profile (ble_message_t *message)
         }
         else if (message->data[0] == BLE_TIMER_PROFILE_STOP)
         {
-          int32 event;
-          int32 sleep_interval;
-          int32 power_save = 0;          
-          timer_info_t *timer_info = NULL;
-          
-          if (((ble_check_data_list ()) > 0) && ((ble_get_sleep ()) <= BLE_MIN_SLEEP_INTERVAL))
-          {
-            new_state      = BLE_STATE_DATA;
-            event          = BLE_TIMER_DATA;
-            sleep_interval = ble_get_sleep ();
-          }
-          else if ((ble_check_scan_list ()) > 0)
-          {
-            new_state      = BLE_STATE_SCAN;
-            event          = BLE_TIMER_SCAN;
-            sleep_interval = BLE_MIN_TIMER_DURATION;
-          }
-          else
-          {
-            power_save = 1;
-
-            if ((ble_check_data_list ()) > 0)
-            {
-              new_state      = BLE_STATE_DATA;
-              event          = BLE_TIMER_DATA;
-              sleep_interval = ble_get_sleep ();
-            }
-            else
-            {
-              new_state      = BLE_STATE_SCAN;
-              event          = BLE_TIMER_SCAN;
-              sleep_interval = BLE_MIN_TIMER_DURATION;
-            }
-          }
-
-          if (power_save)
-          {
-            /* TODO: Power save */
-            printf ("BLE Power save interval %d (ms)\n", sleep_interval);
-            (void)timer_start (sleep_interval, event, ble_callback_timer, &timer_info);
-
-          }
-          else
-          {
-            printf ("BLE Wait interval %d (ms)\n", sleep_interval);
-            (void)timer_start (sleep_interval, event, ble_callback_timer, &timer_info);
-          }
+          new_state = ble_next_state (BLE_STATE_PROFILE);
         }
         else
         {
@@ -326,59 +291,10 @@ static ble_state_e ble_data (ble_message_t *message)
         }
         else if (message->data[0] == BLE_TIMER_DATA_STOP)
         {
-          int32 event;
-          int32 sleep_interval;
-          int32 power_save = 0;          
-          timer_info_t *timer_info = NULL;
-
           os_destroy_thread (ble_sync_thread);
           ble_sync_thread = NULL;
-          
-          if (((ble_check_data_list ()) > 0) && ((ble_get_sleep ()) <= BLE_MIN_SLEEP_INTERVAL))
-          {
-            event          = BLE_TIMER_DATA;
-            sleep_interval = ble_get_sleep ();
-          }
-          else if ((ble_check_profile_list ()) > 0)
-          {
-            new_state      = BLE_STATE_PROFILE;
-            event          = BLE_TIMER_PROFILE;
-            sleep_interval = BLE_MIN_TIMER_DURATION;
-          }          
-          else if ((ble_check_scan_list ()) > 0)
-          {
-            new_state      = BLE_STATE_SCAN;
-            event          = BLE_TIMER_SCAN;
-            sleep_interval = BLE_MIN_TIMER_DURATION;
-          }
-          else
-          {
-            power_save = 1;
 
-            if ((ble_check_data_list ()) > 0)
-            {
-              event          = BLE_TIMER_DATA;
-              sleep_interval = ble_get_sleep ();
-            }
-            else
-            {
-              event          = BLE_TIMER_SCAN;
-              sleep_interval = BLE_MIN_TIMER_DURATION;
-            }
-          }
-
-          if (power_save)
-          {
-            /* TODO: Power save */
-            printf ("BLE Power save interval %d (ms)\n", sleep_interval);
-            (void)timer_start (sleep_interval, event, ble_callback_timer, &timer_info);
-
-          }
-          else
-          {
-            printf ("BLE Wait interval %d (ms)\n", sleep_interval);
-            (void)timer_start (sleep_interval, event, ble_callback_timer, &timer_info);
-          }
+          new_state = ble_next_state (BLE_STATE_DATA);
         }
         else
         {
