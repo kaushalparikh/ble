@@ -285,24 +285,26 @@ int32 ble_init_temperature (ble_service_list_entry_t *service_list_entry,
 
   if (found > 0)
   {
-    db_table_list_entry_t *table_list_entry = (db_table_list_entry_t *)malloc (sizeof (*table_list_entry));
-    
-    table_list_entry->title       = strdup (device_list_entry->name);
-    table_list_entry->num_columns = DB_TEMPERATURE_TABLE_NUM_COLUMNS;
-    table_list_entry->column      = db_temperature_table_columns;
-    table_list_entry->insert      = NULL;
-    table_list_entry->update      = NULL;
-    table_list_entry->delete      = NULL;
-    table_list_entry->select      = NULL;
-
     if (db_info == NULL)
     {
-      if ((db_open ("gateway.db", &db_info)) > 0)
+      db_open ("gateway.db", &db_info);
+    }
+        
+    if (db_info != NULL)
+    {
+      db_table_list_entry_t *table_list_entry = (db_table_list_entry_t *)malloc (sizeof (*table_list_entry));
+      
+      table_list_entry->title       = strdup (device_list_entry->name);
+      table_list_entry->num_columns = DB_TEMPERATURE_TABLE_NUM_COLUMNS;
+      table_list_entry->column      = db_temperature_table_columns;
+      table_list_entry->insert      = NULL;
+      table_list_entry->update      = NULL;
+      table_list_entry->delete      = NULL;
+      table_list_entry->select      = NULL;
+
+      if ((db_create_table (db_info, table_list_entry)) > 0)
       {
-        if ((db_create_table (db_info, table_list_entry)) > 0)
-        {
-          device_list_entry->data = table_list_entry;
-        }
+        device_list_entry->data = table_list_entry;
       }
     }
   }
